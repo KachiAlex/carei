@@ -170,7 +170,7 @@ export function HomeScreen({ onStartShift, onWatchDemo, onProfile }: {
 
 // ─── Login Screen ────────────────────────────────────────────────────────────
 
-export function LoginScreen({ onSignIn, onBack }: { onSignIn: (email: string, password: string) => Promise<void>; onBack?: () => void }) {
+export function LoginScreen({ onSignIn, onBack, onRegister }: { onSignIn: (email: string, password: string) => Promise<void>; onBack?: () => void; onRegister?: () => void }) {
   const [email, setEmail] = useState("demo@carei.app");
   const [password, setPassword] = useState("password123");
   const [loading, setLoading] = useState(false);
@@ -260,8 +260,144 @@ export function LoginScreen({ onSignIn, onBack }: { onSignIn: (email: string, pa
           {!loading && <span style={{ fontSize: 18 }}>→</span>}
         </button>
 
-        <div style={{ textAlign: "center", color: COLORS.g4, fontSize: 12 }}>
+        <div style={{ textAlign: "center", color: COLORS.g4, fontSize: 12, marginBottom: 12 }}>
           Demo: <span style={{ color: COLORS.teal, fontWeight: 600, cursor: "pointer" }} onClick={() => { setEmail("demo@carei.app"); setPassword("password123"); }}>demo@carei.app / password123</span>
+        </div>
+        <div style={{ textAlign: "center", color: COLORS.g4, fontSize: 13 }}>
+          Don't have an account? <span style={{ color: COLORS.teal, fontWeight: 700, cursor: "pointer" }} onClick={() => onRegister?.()}>Create Account</span>
+        </div>
+      </form>
+
+      {/* Encrypted footer */}
+      <div style={{ marginTop: 28, display: "flex", alignItems: "center", gap: 8, color: "#8fa8c8", fontSize: 13 }}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L3 4v4c0 3 2 5.5 5 6.3 3-.8 5-3.3 5-6.3V4L8 1.5z" stroke="#8fa8c8" strokeWidth="1.3" fill="none"/></svg>
+        Your data is encrypted and secure
+      </div>
+    </div>
+  );
+}
+
+// ─── Register Screen ───────────────────────────────────────────────────────────
+
+export function RegisterScreen({ onSignUp, onBack }: { onSignUp: (name: string, email: string, password: string, role: string) => Promise<void>; onBack?: () => void }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("carer");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await onSignUp(name, email, password, role);
+    } catch (e: any) {
+      setError(e.message || "Registration failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: "linear-gradient(180deg, #0a1e3d 0%, #0d2550 60%, #0a1e3d 100%)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 20px", fontFamily: "DM Sans, sans-serif", position: "relative", overflow: "hidden" }}>
+      {/* Teal wave decoration bottom */}
+      <svg style={{ position: "absolute", bottom: 0, left: 0, width: "100%", opacity: 0.15 }} viewBox="0 0 390 120" fill="none" preserveAspectRatio="none">
+        <path d="M0 60 Q97 20 195 60 Q292 100 390 60 L390 120 L0 120Z" fill="#4FD1C5"/>
+        <path d="M0 80 Q97 40 195 80 Q292 120 390 80 L390 120 L0 120Z" fill="#4FD1C5" opacity="0.5"/>
+      </svg>
+
+      {/* Back button */}
+      {onBack && (
+        <div style={{ position: "absolute", top: 20, left: 20, zIndex: 10 }}>
+          <button onClick={onBack} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 999, width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff", fontSize: 18 }}>←</button>
+        </div>
+      )}
+
+      {/* Logo */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
+        <div style={{ width: 52, height: 52, borderRadius: 16, background: "linear-gradient(135deg, #4FD1C5, #38B2AC)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+            <path d="M15 6C10 6 6 10 6 15c0 2.8 1.1 5.3 3 7.1L15 28l6-5.9C22.9 20.3 24 17.8 24 15c0-5-4-9-9-9z" stroke="#0a1e3d" strokeWidth="2" fill="none"/>
+            <path d="M11 15h8M15 11v8" stroke="#0a1e3d" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+        </div>
+        <span style={{ color: "#fff", fontWeight: 800, fontSize: 28, letterSpacing: 0.5 }}>
+          CARE<span style={{ color: COLORS.teal }}>i</span>
+        </span>
+      </div>
+
+      {/* Welcome text */}
+      <div style={{ textAlign: "center", marginBottom: 28 }}>
+        <h2 style={{ margin: 0, color: "#fff", fontWeight: 700, fontSize: 24 }}>Create your account 👋</h2>
+        <p style={{ margin: "8px 0 0", color: "#8fa8c8", fontSize: 15 }}>Join the CAREi care community</p>
+      </div>
+
+      {/* White card */}
+      <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 28, padding: "28px 24px 24px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", gap: 0 }}>
+        <div style={{ color: "#0f2040", fontWeight: 700, fontSize: 20, marginBottom: 4 }}>Sign up</div>
+        <div style={{ color: COLORS.g4, fontSize: 14, marginBottom: 20 }}>Fill in your details to get started</div>
+
+        {/* Name */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ color: "#475569", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Full Name</div>
+          <input
+            type="text" value={name} required
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Sarah Johnson"
+            style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: "1.5px solid #e2e8f0", background: "#f8fafc", color: "#0f2040", fontSize: 15, outline: "none", fontFamily: "DM Sans, sans-serif", fontWeight: 500, boxSizing: "border-box" }}
+          />
+        </div>
+
+        {/* Email */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ color: "#475569", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Email</div>
+          <input
+            type="email" value={email} required
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@carei.app"
+            style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: "1.5px solid #e2e8f0", background: "#f8fafc", color: "#0f2040", fontSize: 15, outline: "none", fontFamily: "DM Sans, sans-serif", fontWeight: 500, boxSizing: "border-box" }}
+          />
+        </div>
+
+        {/* Password */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ color: "#475569", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Password</div>
+          <input
+            type="password" value={password} required minLength={6}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: "1.5px solid #e2e8f0", background: "#f8fafc", color: "#0f2040", fontSize: 15, outline: "none", fontFamily: "DM Sans, sans-serif", fontWeight: 500, boxSizing: "border-box" }}
+          />
+        </div>
+
+        {/* Role */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ color: "#475569", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Role</div>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: "1.5px solid #e2e8f0", background: "#f8fafc", color: "#0f2040", fontSize: 15, outline: "none", fontFamily: "DM Sans, sans-serif", fontWeight: 500, boxSizing: "border-box", cursor: "pointer" }}
+          >
+            <option value="carer">Carer</option>
+            <option value="admin">Admin</option>
+            <option value="supervisor">Supervisor</option>
+          </select>
+        </div>
+
+        {error && (
+          <div style={{ color: COLORS.red, fontSize: 13, marginBottom: 12, textAlign: "center" }}>{error}</div>
+        )}
+
+        {/* Submit */}
+        <button type="submit" disabled={loading} style={{ width: "100%", padding: "16px 0", borderRadius: 999, border: "none", background: loading ? "#cbd5e1" : COLORS.teal, color: "#fff", fontWeight: 700, fontSize: 17, fontFamily: "DM Sans, sans-serif", cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: loading ? "none" : "0 6px 20px rgba(79,209,197,0.4)", marginBottom: 14 }}>
+          {loading ? "Creating account…" : "Create Account"}
+          {!loading && <span style={{ fontSize: 18 }}>→</span>}
+        </button>
+
+        <div style={{ textAlign: "center", color: COLORS.g4, fontSize: 12 }}>
+          Already have an account? <span style={{ color: COLORS.teal, fontWeight: 600, cursor: "pointer" }} onClick={() => onBack?.()}>Sign in</span>
         </div>
       </form>
 

@@ -25,6 +25,8 @@ export const api = {
   auth: {
     login: (email: string, password: string) =>
       fetchJson("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
+    register: (body: { name: string; email: string; password: string; role?: string }) =>
+      fetchJson("/api/auth/register", { method: "POST", body: JSON.stringify(body) }),
   },
   clients: {
     list: () => fetchJson("/api/clients"),

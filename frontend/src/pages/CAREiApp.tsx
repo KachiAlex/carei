@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import AdminDashboard from "./AdminDashboard";
-import { HomeScreen, LoginScreen, DashboardScreen } from "./Redesign";
+import { HomeScreen, LoginScreen, RegisterScreen, DashboardScreen } from "./Redesign";
 import { COLORS, CLIENT, TASKS, QUICK_CHIPS, OFFLINE_RESPONSES, SCHEDULE_CLIENTS, type ScheduleClient } from "@/lib/mockData";
 import { api } from "@/lib/api";
 
@@ -35,6 +35,7 @@ declare global {
 
 type Screen =
   | "otp"
+  | "register"
   | "today"
   | "client-overview"
   | "active-visit"
@@ -3198,7 +3199,7 @@ export default function CAREiApp() {
       const authed = !!sessionStorage.getItem("carei_token");
       if (!authed) return "today";
       const saved = sessionStorage.getItem("carei_screen") as Screen;
-      const valid: Screen[] = ["today","client-overview","active-visit","medication","handover","continucare-summary","care-plan","bodymap","emergency","visit-history","incident-report","rota","operations","schedule","family","family-summary","manager-approvals","copilot","profile","admin","admin-dashboard"];
+      const valid: Screen[] = ["today","register","client-overview","active-visit","medication","handover","continucare-summary","care-plan","bodymap","emergency","visit-history","incident-report","rota","operations","schedule","family","family-summary","manager-approvals","copilot","profile","admin","admin-dashboard"];
       return valid.includes(saved) ? saved : "operations";
     } catch {
       return "today";
@@ -3269,6 +3270,21 @@ export default function CAREiApp() {
     }
   }
 
+  async function signUp(name: string, email: string, password: string, role: string) {
+    try {
+      const res = await api.auth.register({ name, email, password, role });
+      setIsAuthed(true);
+      setUser(res.user);
+      try {
+        sessionStorage.setItem("carei_token", res.token);
+        sessionStorage.setItem("carei_user", JSON.stringify(res.user));
+      } catch {}
+      nav("operations");
+    } catch (e: any) {
+      throw new Error(e.message || "Registration failed");
+    }
+  }
+
   function signOut() {
     setIsAuthed(false);
     setUser(null);
@@ -3280,12 +3296,14 @@ export default function CAREiApp() {
 
   function renderScreen() {
     if (!isAuthed && PROTECTED.includes(screen)) {
-      return <LoginScreen onSignIn={signIn} onBack={() => nav("today", "right")} />;
+      return <LoginScreen onSignIn={signIn} onBack={() => nav("today", "right")} onRegister={() => nav("register")} />;
     }
 
     switch (screen) {
       case "otp":
-        return <LoginScreen onSignIn={signIn} onBack={() => nav("today", "right")} />;
+        return <LoginScreen onSignIn={signIn} onBack={() => nav("today", "right")} onRegister={() => nav("register")} />;
+      case "register":
+        return <RegisterScreen onSignUp={signUp} onBack={() => nav("otp")} />;
       case "copilot":
         return <CopilotScreen onBack={() => nav("operations")} />;
       case "medication":
