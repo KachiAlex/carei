@@ -170,30 +170,23 @@ export function HomeScreen({ onStartShift, onWatchDemo, onProfile }: {
 
 // ─── Login Screen ────────────────────────────────────────────────────────────
 
-export function LoginScreen({ onNext, onBack }: { onNext: () => void; onBack?: () => void }) {
-  const [phone, setPhone] = useState("+44 7123 456789");
-  const [codeSent, setCodeSent] = useState(false);
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [verified, setVerified] = useState(false);
-  const refs = [
-    useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null),
-  ];
+export function LoginScreen({ onSignIn, onBack }: { onSignIn: (email: string, password: string) => Promise<void>; onBack?: () => void }) {
+  const [email, setEmail] = useState("demo@carei.app");
+  const [password, setPassword] = useState("password123");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!verified) return;
-    const t = setTimeout(onNext, 1400);
-    return () => clearTimeout(t);
-  }, [verified, onNext]);
-
-  function handleSend() { setCodeSent(true); setTimeout(() => refs[0].current?.focus(), 100); }
-
-  function handleOtpChange(i: number, val: string) {
-    if (!/^\d?$/.test(val)) return;
-    const next = [...otp]; next[i] = val; setOtp(next);
-    if (val && i < 5) refs[i + 1].current?.focus();
-    if (next.every((d) => d !== "")) setTimeout(() => setVerified(true), 400);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await onSignIn(email, password);
+    } catch (e: any) {
+      setError(e.message || "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -226,79 +219,51 @@ export function LoginScreen({ onNext, onBack }: { onNext: () => void; onBack?: (
 
       {/* Welcome text */}
       <div style={{ textAlign: "center", marginBottom: 28 }}>
-        <h2 style={{ margin: 0, color: "#fff", fontWeight: 700, fontSize: 24 }}>Welcome back, Sarah 👋</h2>
+        <h2 style={{ margin: 0, color: "#fff", fontWeight: 700, fontSize: 24 }}>Welcome back 👋</h2>
         <p style={{ margin: "8px 0 0", color: "#8fa8c8", fontSize: 15 }}>Secure access to today's care schedule</p>
       </div>
 
       {/* White card */}
-      <div style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 28, padding: "28px 24px 24px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", gap: 0 }}>
-        {/* Step indicator */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ color: "#475569", fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Step 1 of 2</div>
-          <div style={{ height: 5, background: "#e2e8f0", borderRadius: 99, overflow: "hidden" }}>
-            <div style={{ width: codeSent ? "100%" : "50%", height: "100%", background: COLORS.teal, borderRadius: 99, transition: "width 0.4s ease" }} />
-          </div>
-        </div>
+      <form onSubmit={handleSubmit} style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 28, padding: "28px 24px 24px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", gap: 0 }}>
+        <div style={{ color: "#0f2040", fontWeight: 700, fontSize: 20, marginBottom: 4 }}>Sign in</div>
+        <div style={{ color: COLORS.g4, fontSize: 14, marginBottom: 20 }}>Enter your credentials to continue</div>
 
-        <div style={{ color: "#0f2040", fontWeight: 700, fontSize: 20, marginBottom: 6 }}>Enter your phone number</div>
-        <div style={{ color: COLORS.g4, fontSize: 14, marginBottom: 18 }}>We'll send you a 6-digit code</div>
-
-        {/* Phone input */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 14px", borderRadius: 14, border: "1.5px solid #e2e8f0", background: "#f8fafc", marginBottom: 16 }}>
-          <span style={{ fontSize: 18 }}>🇬🇧</span>
-          <span style={{ color: COLORS.g4, fontSize: 13 }}>▾</span>
+        {/* Email */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ color: "#475569", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Email</div>
           <input
-            type="tel" value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            style={{ flex: 1, background: "transparent", border: "none", color: "#0f2040", fontSize: 16, outline: "none", fontFamily: "DM Sans, sans-serif", fontWeight: 500 }}
+            type="email" value={email} required
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@carei.app"
+            style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: "1.5px solid #e2e8f0", background: "#f8fafc", color: "#0f2040", fontSize: 15, outline: "none", fontFamily: "DM Sans, sans-serif", fontWeight: 500, boxSizing: "border-box" }}
           />
-          <div style={{ width: 26, height: 26, borderRadius: "50%", background: COLORS.teal, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7l3 3 6-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </div>
         </div>
 
-        {/* OTP boxes — shown after send */}
-        {codeSent && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ color: COLORS.g4, fontSize: 13, marginBottom: 10 }}>Enter the 6-digit code sent to your phone</div>
-            <div style={{ display: "flex", gap: 8, justifyContent: "space-between" }}>
-              {otp.map((d, i) => (
-                <input key={i} ref={refs[i]} type="text" inputMode="numeric" maxLength={1} value={d}
-                  onChange={(e) => handleOtpChange(i, e.target.value)}
-                  style={{ width: "14%", aspectRatio: "1", borderRadius: 12, border: `2px solid ${d ? COLORS.teal : "#e2e8f0"}`, background: d ? "#edfafa" : "#f8fafc", color: "#0f2040", textAlign: "center", fontSize: 20, fontFamily: "DM Sans, sans-serif", outline: "none", fontWeight: 700 }}
-                />
-              ))}
-            </div>
-            {verified && (
-              <div style={{ textAlign: "center", padding: "10px 0 4px", animation: "fadeIn 0.3s ease-out" }}>
-                <div style={{ width: 48, height: 48, borderRadius: "50%", background: COLORS.green, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px" }}>
-                  <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M5 13l6 6L21 7" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
-                <div style={{ color: COLORS.green, fontSize: 15, fontWeight: 700 }}>Verified! Signing you in…</div>
-              </div>
-            )}
-          </div>
+        {/* Password */}
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ color: "#475569", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Password</div>
+          <input
+            type="password" value={password} required
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            style={{ width: "100%", padding: "13px 14px", borderRadius: 14, border: "1.5px solid #e2e8f0", background: "#f8fafc", color: "#0f2040", fontSize: 15, outline: "none", fontFamily: "DM Sans, sans-serif", fontWeight: 500, boxSizing: "border-box" }}
+          />
+        </div>
+
+        {error && (
+          <div style={{ color: COLORS.red, fontSize: 13, marginBottom: 12, textAlign: "center" }}>{error}</div>
         )}
 
-        {/* Send OTP button */}
-        <button onClick={handleSend} style={{ width: "100%", padding: "16px 0", borderRadius: 999, border: "none", background: COLORS.teal, color: "#fff", fontWeight: 700, fontSize: 17, fontFamily: "DM Sans, sans-serif", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: "0 6px 20px rgba(79,209,197,0.4)", marginBottom: 18 }}>
-          {codeSent ? "Resend Code" : "Send OTP Code"}
-          <span style={{ fontSize: 18 }}>→</span>
+        {/* Submit */}
+        <button type="submit" disabled={loading} style={{ width: "100%", padding: "16px 0", borderRadius: 999, border: "none", background: loading ? "#cbd5e1" : COLORS.teal, color: "#fff", fontWeight: 700, fontSize: 17, fontFamily: "DM Sans, sans-serif", cursor: loading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, boxShadow: loading ? "none" : "0 6px 20px rgba(79,209,197,0.4)", marginBottom: 14 }}>
+          {loading ? "Signing in…" : "Sign In"}
+          {!loading && <span style={{ fontSize: 18 }}>→</span>}
         </button>
 
-        {/* Divider */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-          <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
-          <span style={{ color: "#94a3b8", fontSize: 13 }}>or continue with</span>
-          <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+        <div style={{ textAlign: "center", color: COLORS.g4, fontSize: 12 }}>
+          Demo: <span style={{ color: COLORS.teal, fontWeight: 600, cursor: "pointer" }} onClick={() => { setEmail("demo@carei.app"); setPassword("password123"); }}>demo@carei.app / password123</span>
         </div>
-
-        {/* Biometric */}
-        <button style={{ width: "100%", padding: "15px 0", borderRadius: 14, border: "1.5px solid #e2e8f0", background: "#fff", color: "#0f2040", fontWeight: 600, fontSize: 16, fontFamily: "DM Sans, sans-serif", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="9.5" stroke={COLORS.teal} strokeWidth="1.5"/><path d="M7 11c0-2.2 1.8-4 4-4s4 1.8 4 4M9 13c0 1.1.9 2 2 2s2-.9 2-2M11 7V5M8 8.5L6.5 7M14 8.5L15.5 7" stroke={COLORS.teal} strokeWidth="1.3" strokeLinecap="round"/></svg>
-          Use Biometric Login
-        </button>
-      </div>
+      </form>
 
       {/* Encrypted footer */}
       <div style={{ marginTop: 28, display: "flex", alignItems: "center", gap: 8, color: "#8fa8c8", fontSize: 13 }}>
@@ -314,11 +279,12 @@ export function LoginScreen({ onNext, onBack }: { onNext: () => void; onBack?: (
 const WAVEFORM_HEIGHTS = [8,14,20,12,18,24,10,16,22,8,14,18,24,12,20,10,16,22,14,18];
 
 export function DashboardScreen({
-  visitStatuses, onSelectClient, onOperations, onRota, onAssistant, onSOS, onProfile, clients,
+  visitStatuses, onSelectClient, onOperations, onRota, onAssistant, onSOS, onProfile, clients, userName, loading,
 }: {
   visitStatuses: Record<string, string>; onSelectClient: (id: string) => void;
   onOperations: () => void; onRota: () => void; onAssistant: () => void;
   onSOS: () => void; onProfile: () => void; clients: ScheduleClient[];
+  userName?: string; loading?: boolean;
 }) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
@@ -340,7 +306,7 @@ export function DashboardScreen({
           <div style={{ width: 22, height: 2, background: "#fff", borderRadius: 2, marginBottom: 5 }} />
           <div style={{ width: 16, height: 2, background: "#fff", borderRadius: 2 }} />
         </div>
-        <div style={{ color: "#fff", fontWeight: 600, fontSize: 17 }}>{greeting}, Sarah ☀️</div>
+        <div style={{ color: "#fff", fontWeight: 600, fontSize: 17 }}>{greeting}, {userName || "Carer"} ☀️</div>
         <div style={{ position: "relative", cursor: "pointer" }} onClick={onProfile}>
           <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(255,255,255,0.1)", border: "1.5px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2a3 3 0 100 6 3 3 0 000-6zM4 16c0-3.3 2.7-6 6-6s6 2.7 6 6" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/></svg>
@@ -351,6 +317,22 @@ export function DashboardScreen({
 
       {/* ── Scrollable content ── */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 100px" }}>
+
+        {loading && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center", padding: "40px 0" }}>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[0, 1, 2].map((d) => <div key={d} className={`dot-${d + 1}`} style={{ width: 8, height: 8, borderRadius: "50%", background: COLORS.teal }} />)}
+            </div>
+            <div style={{ color: COLORS.g4, fontSize: 14 }}>Loading your schedule…</div>
+          </div>
+        )}
+
+        {!loading && clients.length === 0 && (
+          <div style={{ textAlign: "center", padding: "40px 20px" }}>
+            <div style={{ color: COLORS.g4, fontSize: 14, marginBottom: 8 }}>No visits scheduled today</div>
+            <div style={{ color: COLORS.g4, fontSize: 12 }}>Check back later or contact your coordinator</div>
+          </div>
+        )}
 
         {/* Shift Progress */}
         <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center" }}>

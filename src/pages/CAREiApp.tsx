@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import AdminDashboard from "./AdminDashboard";
 import { HomeScreen, LoginScreen, DashboardScreen } from "./Redesign";
 import { COLORS, CLIENT, TASKS, QUICK_CHIPS, OFFLINE_RESPONSES, SCHEDULE_CLIENTS, type ScheduleClient } from "@/lib/mockData";
+import { api } from "@/lib/api";
 
 type SpeechRecognitionInstance = {
   continuous: boolean;
@@ -147,9 +148,40 @@ function formatTime(seconds: number): string {
   return `${m}:${s}`;
 }
 
-function useScheduleClients(): ScheduleClient[] {
-  const [clients] = useState<ScheduleClient[]>(() => SCHEDULE_CLIENTS);
-  return clients;
+function mapApiClient(apiClient: any): ScheduleClient {
+  return {
+    id: String(apiClient.id),
+    name: apiClient.name,
+    age: apiClient.age || 0,
+    address: apiClient.address || "",
+    time: "09:00 – 10:00",
+    condition: apiClient.condition || "",
+    tags: apiClient.needs || [],
+    emoji: "👤",
+    gp: "Dr TBD",
+    allergy: "None known",
+    supportLevel: "Standard care",
+    framework: "Person-Centred",
+    communication: "Standard communication",
+    mobilityNote: "No specific notes",
+    medNote: apiClient.meds?.map((m: any) => `${m.name} ${m.dose}`).join(" · ") || "",
+    meds: apiClient.meds?.map((m: any) => ({ name: m.name, dose: m.dose || "", adminNote: "" })) || [],
+  };
+}
+
+function useRealClients(): { clients: ScheduleClient[]; loading: boolean; error: string | null } {
+  const [clients, setClients] = useState<ScheduleClient[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.clients.list()
+      .then((data) => setClients(data.map(mapApiClient)))
+      .catch((e) => { console.error("Failed to load clients:", e); setError(e.message); })
+      .finally(() => setLoading(false));
+  }, []);
+
+  return { clients, loading, error };
 }
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
@@ -3156,11 +3188,14 @@ function ScheduleScreen({
 
 export default function CAREiApp() {
   const [isAuthed, setIsAuthed] = useState<boolean>(() => {
-    try { return sessionStorage.getItem("carei_authed") === "1"; } catch { return false; }
+    try { return !!sessionStorage.getItem("carei_token"); } catch { return false; }
+  });
+  const [user, setUser] = useState<any>(() => {
+    try { const u = sessionStorage.getItem("carei_user"); return u ? JSON.parse(u) : null; } catch { return null; }
   });
   const [screen, setScreen] = useState<Screen>(() => {
     try {
-      const authed = sessionStorage.getItem("carei_authed") === "1";
+      const authed = !!sessionStorage.getItem("carei_token");
       if (!authed) return "today";
       const saved = sessionStorage.getItem("carei_screen") as Screen;
       const valid: Screen[] = ["today","client-overview","active-visit","medication","handover","continucare-summary","care-plan","bodymap","emergency","visit-history","incident-report","rota","operations","schedule","family","family-summary","manager-approvals","copilot","profile","admin","admin-dashboard"];
@@ -3189,7 +3224,7 @@ export default function CAREiApp() {
   const [summaryReadAt, setSummaryReadAt] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [queuedCount, setQueuedCount] = useState(0);
-  const scheduleClients = useScheduleClients();
+  const { clients: scheduleClients, loading: clientsLoading, error: clientsError } = useRealClients();
 
   useEffect(() => {
     const up = () => { setIsOffline(false); setQueuedCount(0); };
@@ -3219,15 +3254,25 @@ export default function CAREiApp() {
     }, 180);
   }
 
-  function signIn() {
-    setIsAuthed(true);
-    try { sessionStorage.setItem("carei_authed", "1"); } catch {}
-    nav("operations");
+  async function signIn(email: string, password: string) {
+    try {
+      const res = await api.auth.login(email, password);
+      setIsAuthed(true);
+      setUser(res.user);
+      try {
+        sessionStorage.setItem("carei_token", res.token);
+        sessionStorage.setItem("carei_user", JSON.stringify(res.user));
+      } catch {}
+      nav("operations");
+    } catch (e: any) {
+      throw new Error(e.message || "Login failed");
+    }
   }
 
   function signOut() {
     setIsAuthed(false);
-    try { sessionStorage.removeItem("carei_authed"); sessionStorage.removeItem("carei_screen"); } catch {}
+    setUser(null);
+    try { sessionStorage.removeItem("carei_token"); sessionStorage.removeItem("carei_user"); sessionStorage.removeItem("carei_screen"); } catch {}
     nav("today", "right");
   }
 
@@ -3235,12 +3280,12 @@ export default function CAREiApp() {
 
   function renderScreen() {
     if (!isAuthed && PROTECTED.includes(screen)) {
-      return <LoginScreen onNext={signIn} onBack={() => nav("today", "right")} />;
+      return <LoginScreen onSignIn={signIn} onBack={() => nav("today", "right")} />;
     }
 
     switch (screen) {
       case "otp":
-        return <LoginScreen onNext={signIn} onBack={() => nav("today", "right")} />;
+        return <LoginScreen onSignIn={signIn} onBack={() => nav("today", "right")} />;
       case "copilot":
         return <CopilotScreen onBack={() => nav("operations")} />;
       case "medication":
@@ -3347,6 +3392,8 @@ export default function CAREiApp() {
             onSOS={() => setShowSOS(true)}
             onProfile={() => nav("profile")}
             clients={scheduleClients}
+            userName={user?.name || "Carer"}
+            loading={clientsLoading}
           />
         );
       case "schedule":
