@@ -1,5 +1,5 @@
 import { db } from "./lib/db";
-import { users, clients, medications, visits } from "../src/db/schema";
+import { users, clients, medications, visits } from "../db/schema";
 import bcrypt from "bcryptjs";
 import { setCors, handleOptions } from "./lib/cors";
 

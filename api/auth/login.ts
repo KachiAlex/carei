@@ -1,5 +1,5 @@
 import { db } from "../lib/db";
-import { users } from "../../src/db/schema";
+import { users } from "../db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { setCors, handleOptions } from "../lib/cors";

@@ -1,5 +1,5 @@
 import { db } from "./lib/db";
-import { clients, medications } from "../src/db/schema";
+import { clients, medications } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { setCors, handleOptions } from "./lib/cors";
 

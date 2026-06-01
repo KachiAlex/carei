@@ -1,5 +1,5 @@
 import { db } from "./lib/db";
-import { visits, clients, users } from "../src/db/schema";
+import { visits, clients, users } from "../db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { setCors, handleOptions } from "./lib/cors";
 

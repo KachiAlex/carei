@@ -26,7 +26,7 @@ export default defineConfig(async () => {
       dedupe: ["react", "react-dom"],
     },
     build: {
-      outDir: "dist",
+      outDir: "../dist",
       emptyOutDir: true,
     },
     server: {
