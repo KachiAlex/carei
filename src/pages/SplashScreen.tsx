@@ -68,44 +68,42 @@ export default function SplashScreen() {
           </p>
         </div>
 
-        {/* Hero Image + Buttons */}
-        <div className="relative w-full max-w-lg rounded-3xl overflow-hidden">
+        {/* Hero Image */}
+        <div className="w-full max-w-lg rounded-3xl overflow-hidden">
           <img
             src="https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=800&auto=format&fit=crop&q=80"
             alt="Caregiver with elderly person"
             className="w-full h-auto block"
           />
-          <div
-            className="absolute bottom-0 left-0 right-0"
-            style={{ height: '60%', background: `linear-gradient(180deg, transparent 0%, ${COLORS.darkNavy} 90%)` }}
-          />
-          <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 flex flex-col gap-2.5">
-            <button
-              onClick={() => setLocation('/login')}
-              className="w-full py-3.5 px-6 rounded-full border-none font-bold text-base cursor-pointer flex items-center justify-center gap-2"
-              style={{
-                background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
-                color: COLORS.darkNavy,
-                boxShadow: '0 8px 32px rgba(79,209,197,0.3)',
-              }}
-            >
-              Start Shift <span className="text-lg">→</span>
-            </button>
-            <button
-              className="w-full py-3 px-6 rounded-full border text-white font-semibold text-sm cursor-pointer flex items-center justify-center gap-2"
-              style={{ borderColor: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)' }}
-            >
-              <span className="inline-flex w-5 h-5 rounded-full border-2 border-white items-center justify-center text-[10px]">▶</span>
-              Watch Demo
-            </button>
-            <button
-              onClick={() => setLocation('/manager/login')}
-              className="w-full py-2.5 px-6 rounded-full border-none text-white/60 text-xs cursor-pointer hover:text-white transition-colors"
-              style={{ background: 'transparent' }}
-            >
-              Manager Portal →
-            </button>
-          </div>
+        </div>
+
+        {/* Buttons */}
+        <div className="w-full max-w-lg flex flex-col gap-2.5">
+          <button
+            onClick={() => setLocation('/login')}
+            className="w-full py-3.5 px-6 rounded-full border-none font-bold text-base cursor-pointer flex items-center justify-center gap-2"
+            style={{
+              background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
+              color: COLORS.darkNavy,
+              boxShadow: '0 8px 32px rgba(79,209,197,0.3)',
+            }}
+          >
+            Start Shift <span className="text-lg">→</span>
+          </button>
+          <button
+            className="w-full py-3 px-6 rounded-full border text-white font-semibold text-sm cursor-pointer flex items-center justify-center gap-2"
+            style={{ borderColor: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)' }}
+          >
+            <span className="inline-flex w-5 h-5 rounded-full border-2 border-white items-center justify-center text-[10px]">▶</span>
+            Watch Demo
+          </button>
+          <button
+            onClick={() => setLocation('/manager/login')}
+            className="w-full py-2.5 px-6 rounded-full border-none text-white/60 text-xs cursor-pointer hover:text-white transition-colors"
+            style={{ background: 'transparent' }}
+          >
+            Manager Portal →
+          </button>
         </div>
 
         {/* Trust Badges */}
