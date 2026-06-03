@@ -463,7 +463,22 @@ export default function ActiveVisitScreen() {
               <button
                 onClick={() => {
                   setShowClockOut(false)
-                  setLocation('/dashboard')
+                  const snapshot = {
+                    visitId: visit.id,
+                    clientName: client.name,
+                    clientAge: client.age,
+                    clientAddress: client.address,
+                    visitTime: visit.time,
+                    visitDuration: visit.duration,
+                    elapsed,
+                    tasks: tasks.map((t) => ({ name: t.name, done: t.done })),
+                    fluid,
+                    notes,
+                    medications: meds.map((m) => ({ name: m.name, dose: m.dose, status: m.status, skipReason: m.skipReason })),
+                    clockOutAt: new Date().toISOString(),
+                  }
+                  localStorage.setItem(`carei_visit_${visit.id}`, JSON.stringify(snapshot))
+                  setLocation(`/summary/${visit.id}`)
                 }}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
                 style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
