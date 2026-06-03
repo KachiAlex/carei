@@ -30,6 +30,10 @@ export default function ActiveVisitScreen() {
   const [transcript, setTranscript] = useState('')
   const [showClockOut, setShowClockOut] = useState(false)
   const [showSOSConfirm, setShowSOSConfirm] = useState(false)
+  const [meds, setMeds] = useState<{ name: string; dose: string; status: 'pending' | 'confirmed' | 'skipped'; skipReason?: string }[]>(client?.medications.map((m) => ({ name: m.name, dose: m.dose, status: 'pending' })) || [])
+  const [showMedConfirm, setShowMedConfirm] = useState(false)
+  const [selectedMed, setSelectedMed] = useState<string | null>(null)
+  const [showSkipReason, setShowSkipReason] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recognitionRef = useRef<any>(null)
 
@@ -94,6 +98,24 @@ export default function ActiveVisitScreen() {
     setShowSOSConfirm(false)
     alert('SOS Alert Sent! Supervisor notified.')
   }
+
+  const confirmMed = (medName: string) => {
+    setMeds((prev) =>
+      prev.map((m) => (m.name === medName ? { ...m, status: 'confirmed' as const } : m))
+    )
+    setShowMedConfirm(false)
+  }
+
+  const skipMed = (medName: string, reason: string) => {
+    setMeds((prev) =>
+      prev.map((m) => (m.name === medName ? { ...m, status: 'skipped' as const, skipReason: reason } : m))
+    )
+    setShowSkipReason(false)
+    setShowMedConfirm(false)
+  }
+
+  const pendingMedsCount = meds.filter((m) => m.status === 'pending').length
+  const allMedsHandled = meds.every((m) => m.status !== 'pending')
 
   if (!visit || !client) {
     return (
@@ -218,6 +240,29 @@ export default function ActiveVisitScreen() {
       </div>
 
       <div className="flex-1 px-4 py-4 overflow-auto">
+        {/* Medication Summary */}
+        <div
+          className="bg-white rounded-2xl p-4 border border-slate-200 mb-3 cursor-pointer"
+          onClick={() => setShowMedConfirm(true)}
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-slate-500">Medications</div>
+              <div className="font-bold text-sm text-slate-800">
+                {meds.filter((m) => m.status === 'confirmed').length}/{meds.length} confirmed
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {pendingMedsCount > 0 && (
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
+                  {pendingMedsCount} pending
+                </span>
+              )}
+              <span className="text-slate-400 text-sm">→</span>
+            </div>
+          </div>
+        </div>
+
         {/* Fluid Counter */}
         <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3 flex items-center justify-between">
           <div>
@@ -295,7 +340,14 @@ export default function ActiveVisitScreen() {
 
         {/* Clock Out */}
         <button
-          onClick={() => setShowClockOut(true)}
+          onClick={() => {
+            if (!allMedsHandled) {
+              alert('Please confirm or skip all medications before clocking out.')
+              setShowMedConfirm(true)
+              return
+            }
+            setShowClockOut(true)
+          }}
           className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none mb-6"
           style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
         >
@@ -419,6 +471,94 @@ export default function ActiveVisitScreen() {
                 Confirm Clock Out
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Medication Confirmation Modal */}
+      {showMedConfirm && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="bg-white rounded-2xl p-5 max-w-sm w-full max-h-[80vh] overflow-auto">
+            <h3 className="font-bold text-slate-800 mb-1">Medication Confirmation</h3>
+            <p className="text-xs text-slate-500 mb-4">{client.name} · Tap to confirm each medication</p>
+            <div className="flex flex-col gap-2 mb-4">
+              {meds.map((med) => (
+                <div
+                  key={med.name}
+                  className="flex items-center justify-between p-3 rounded-xl border"
+                  style={{
+                    background: med.status === 'confirmed' ? 'rgba(79,209,197,0.06)' : med.status === 'skipped' ? 'rgba(255,90,95,0.04)' : 'white',
+                    borderColor: med.status === 'confirmed' ? 'rgba(79,209,197,0.3)' : med.status === 'skipped' ? 'rgba(255,90,95,0.2)' : 'rgba(0,0,0,0.08)',
+                  }}
+                >
+                  <div>
+                    <div className="font-semibold text-sm text-slate-700">{med.name}</div>
+                    <div className="text-xs text-slate-400">{med.dose}</div>
+                    {med.status === 'skipped' && med.skipReason && (
+                      <div className="text-[10px] text-red-400 mt-0.5">Skipped: {med.skipReason}</div>
+                    )}
+                  </div>
+                  {med.status === 'pending' ? (
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => confirmMed(med.name)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white border-none cursor-pointer"
+                        style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => { setSelectedMed(med.name); setShowSkipReason(true) }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer"
+                        style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs font-medium px-2 py-1 rounded-full" style={{ color: med.status === 'confirmed' ? COLORS.teal : COLORS.red, background: med.status === 'confirmed' ? 'rgba(79,209,197,0.1)' : 'rgba(255,90,95,0.08)' }}>
+                      {med.status === 'confirmed' ? '✓ Confirmed' : '⊘ Skipped'}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowMedConfirm(false)}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold border cursor-pointer"
+              style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Skip Reason Modal */}
+      {showSkipReason && selectedMed && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
+          <div className="bg-white rounded-2xl p-5 max-w-sm w-full">
+            <h3 className="font-bold text-slate-800 mb-1">Skip {selectedMed}</h3>
+            <p className="text-xs text-slate-500 mb-4">Why was this medication not given?</p>
+            <div className="flex flex-col gap-2 mb-4">
+              {['Client refused', 'Client asleep', 'Client unavailable', 'Other'].map((reason) => (
+                <button
+                  key={reason}
+                  onClick={() => skipMed(selectedMed, reason)}
+                  className="w-full text-left px-4 py-3 rounded-xl text-sm border cursor-pointer hover:bg-slate-50 transition-colors"
+                  style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#475569', background: 'white' }}
+                >
+                  {reason}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => { setShowSkipReason(false); setSelectedMed(null) }}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold border cursor-pointer"
+              style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
