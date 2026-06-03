@@ -73,6 +73,13 @@ export default function LoginScreen() {
         >
           {loading ? 'Sending code…' : 'Send OTP'}
         </button>
+
+        <button
+          onClick={() => setLocation('/manager/login')}
+          className="w-full mt-4 text-sm text-slate-400 bg-transparent border-none cursor-pointer hover:text-slate-600"
+        >
+          Manager Login →
+        </button>
       </div>
     </div>
   )

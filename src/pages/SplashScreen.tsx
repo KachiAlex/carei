@@ -98,6 +98,13 @@ export default function SplashScreen() {
               <span className="inline-flex w-5 h-5 rounded-full border-2 border-white items-center justify-center text-[10px]">▶</span>
               Watch Demo
             </button>
+            <button
+              onClick={() => setLocation('/manager/login')}
+              className="w-full py-2.5 px-6 rounded-full border-none text-white/60 text-xs cursor-pointer hover:text-white transition-colors"
+              style={{ background: 'transparent' }}
+            >
+              Manager Portal →
+            </button>
           </div>
         </div>
 

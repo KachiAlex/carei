@@ -6,6 +6,8 @@ import CarerDashboard from './pages/CarerDashboard'
 import ActiveVisitScreen from './pages/ActiveVisitScreen'
 import AICopilotScreen from './pages/AICopilotScreen'
 import VisitSummaryScreen from './pages/VisitSummaryScreen'
+import ManagerLoginScreen from './pages/ManagerLoginScreen'
+import ManagerDashboard from './pages/ManagerDashboard'
 
 function App() {
   return (
@@ -17,6 +19,8 @@ function App() {
       <Route path="/visit/:id" component={ActiveVisitScreen} />
       <Route path="/summary/:id" component={VisitSummaryScreen} />
       <Route path="/copilot" component={AICopilotScreen} />
+      <Route path="/manager/login" component={ManagerLoginScreen} />
+      <Route path="/manager" component={ManagerDashboard} />
     </Router>
   )
 }
