@@ -1,188 +1,347 @@
 import { useLocation } from 'wouter'
+import { useEffect, useRef } from 'react'
 
 const COLORS = {
-  darkNavy: '#0f1a2e',
+  darkNavy: '#0B1120',
   navy: '#1B2A49',
   teal: '#4FD1C5',
   teal2: '#40E0D0',
+  lavender: '#A78BFA',
 }
 
 export default function SplashScreen() {
   const [, setLocation] = useLocation()
+  const heroRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const els = document.querySelectorAll('[data-animate]')
+    els.forEach((el, i) => {
+      const htmlEl = el as HTMLElement
+      htmlEl.style.opacity = '0'
+      htmlEl.style.transform = 'translateY(24px)'
+      htmlEl.style.transition = `opacity 0.7s ease ${i * 0.08}s, transform 0.7s ease ${i * 0.08}s`
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          htmlEl.style.opacity = '1'
+          htmlEl.style.transform = 'translateY(0)'
+        })
+      })
+    })
+  }, [])
 
   const features = [
-    { icon: '🔄', title: 'Smart Handover', desc: 'Seamless shift-to-shift care continuity' },
-    { icon: '💊', title: 'Medication Confirmation', desc: 'Digital MAR with double-check safety' },
-    { icon: '🎤', title: 'Voice Documentation', desc: 'Speak your notes, we write them up' },
-    { icon: '🚨', title: 'Lone Worker Safety', desc: 'SOS & check-in for remote carers' },
+    {
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      ),
+      title: 'Smart Handover',
+      desc: 'Seamless shift-to-shift care continuity with structured digital notes.',
+    },
+    {
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z" /><path d="m5 11 3 3" /><path d="m2 14 3 3" /><path d="m11 5 3 3" />
+        </svg>
+      ),
+      title: 'Digital MAR',
+      desc: 'Medication administration records with photo confirmation & double-check safety.',
+    },
+    {
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" x2="12" y1="19" y2="22" />
+        </svg>
+      ),
+      title: 'Voice Docs',
+      desc: 'Speak your observations. AI transcribes, structures & summarises care notes instantly.',
+    },
+    {
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+        </svg>
+      ),
+      title: 'Lone Worker SOS',
+      desc: 'One-tap emergency alerts with live GPS broadcast to supervisors in real time.',
+    },
+  ]
+
+  const stats = [
+    { value: '10K+', label: 'Visits Managed' },
+    { value: '99.9%', label: 'Uptime SLA' },
+    { value: 'GDPR', label: 'Compliant' },
+    { value: '<2s', label: 'Alert Latency' },
   ]
 
   return (
-    <div
-      className="min-h-screen flex flex-col font-sans"
-      style={{ background: `linear-gradient(160deg, ${COLORS.darkNavy} 0%, ${COLORS.navy} 100%)` }}
-    >
-      {/* Wave Background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 0 }}>
-        <svg width="100%" height="100%" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" style={{ opacity: 0.4 }}>
-          <path d="M0,180 Q400,80 800,220 T1440,160" fill="none" stroke={COLORS.teal} strokeWidth="1.2" strokeDasharray="3 5" opacity="0.35" />
-          <path d="M0,320 Q500,220 900,360 T1440,280" fill="none" stroke={COLORS.teal} strokeWidth="1" strokeDasharray="2 6" opacity="0.25" />
-          <path d="M0,460 Q300,360 700,500 T1440,420" fill="none" stroke={COLORS.teal} strokeWidth="0.8" strokeDasharray="3 7" opacity="0.2" />
-          <path d="M0,600 Q600,500 1000,640 T1440,560" fill="none" stroke={COLORS.teal} strokeWidth="1" strokeDasharray="4 8" opacity="0.3" />
-          <path d="M0,740 Q400,640 800,780 T1440,700" fill="none" stroke={COLORS.teal} strokeWidth="0.8" strokeDasharray="2 8" opacity="0.2" />
-        </svg>
+    <div className="min-h-screen flex flex-col font-sans relative overflow-hidden" style={{ background: COLORS.darkNavy }}>
+      {/* Inline keyframe animations */}
+      <style>{`
+        @keyframes float {
+          0%,100%{transform:translateY(0) rotate(0deg)}
+          50%{transform:translateY(-20px) rotate(2deg)}
+        }
+        @keyframes pulse-glow {
+          0%,100%{opacity:0.4;transform:scale(1)}
+          50%{opacity:0.7;transform:scale(1.08)}
+        }
+        .orb-1{animation:float 8s ease-in-out infinite}
+        .orb-2{animation:float 10s ease-in-out infinite 2s}
+        .orb-3{animation:float 12s ease-in-out infinite 4s}
+        .glow-pulse{animation:pulse-glow 4s ease-in-out infinite}
+      `}</style>
+
+      {/* Animated Background Orbs */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div
+          className="orb-1 absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full blur-[120px]"
+          style={{ background: `radial-gradient(circle, ${COLORS.teal}25 0%, transparent 70%)` }}
+        />
+        <div
+          className="orb-2 absolute top-1/3 -right-40 w-[450px] h-[450px] rounded-full blur-[100px]"
+          style={{ background: `radial-gradient(circle, ${COLORS.lavender}18 0%, transparent 70%)` }}
+        />
+        <div
+          className="orb-3 absolute -bottom-20 left-1/3 w-[400px] h-[400px] rounded-full blur-[110px]"
+          style={{ background: `radial-gradient(circle, ${COLORS.teal2}15 0%, transparent 70%)` }}
+        />
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+            backgroundSize: '60px 60px',
+          }}
+        />
       </div>
 
-      {/* Top Nav */}
-      <div className="relative z-10 flex items-center justify-between px-6 py-5 max-w-5xl mx-auto w-full shrink-0">
-        <div className="flex items-center gap-2">
+      {/* Nav */}
+      <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-6xl mx-auto w-full" data-animate>
+        <div className="flex items-center gap-2.5">
           <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <path d="M16 28C16 28 6 21 6 13C6 9.5 8.5 7 11.5 7C13.6 7 15.3 8.1 16 9.8C16.7 8.1 18.4 7 20.5 7C23.5 7 26 9.5 26 13C26 21 16 28 16 28Z" fill="url(#tealGrad)" />
+            <path d="M16 28C16 28 6 21 6 13C6 9.5 8.5 7 11.5 7C13.6 7 15.3 8.1 16 9.8C16.7 8.1 18.4 7 20.5 7C23.5 7 26 9.5 26 13C26 21 16 28 16 28Z" fill="url(#tealGrad2)" />
             <rect x="14" y="4" width="4" height="10" rx="1" fill="#fff" />
             <rect x="10" y="8" width="12" height="4" rx="1" fill="#fff" />
             <defs>
-              <linearGradient id="tealGrad" x1="6" y1="7" x2="26" y2="28" gradientUnits="userSpaceOnUse">
+              <linearGradient id="tealGrad2" x1="6" y1="7" x2="26" y2="28" gradientUnits="userSpaceOnUse">
                 <stop stopColor={COLORS.teal} />
                 <stop offset="1" stopColor={COLORS.teal2} />
               </linearGradient>
             </defs>
           </svg>
-          <span className="font-serif text-xl text-white tracking-wide">CAREi</span>
+          <span className="font-serif text-xl text-white tracking-wide font-semibold">CAREi</span>
         </div>
-        <button className="flex flex-col gap-1 p-1 bg-transparent border-none cursor-pointer">
-          <span className="block w-5 h-0.5 bg-white rounded-sm" />
-          <span className="block w-5 h-0.5 bg-white rounded-sm" />
-          <span className="block w-3.5 h-0.5 bg-white rounded-sm" />
+        <button
+          onClick={() => setLocation('/manager/login')}
+          className="text-white/50 hover:text-white text-sm font-medium transition-colors duration-200 bg-transparent border-none cursor-pointer"
+        >
+          Manager Portal
         </button>
-      </div>
+      </nav>
 
-      {/* Hero Section */}
-      <div className="relative z-10 flex-1 flex flex-col items-center px-6 pb-7 gap-5">
+      {/* Hero */}
+      <div ref={heroRef} className="relative z-10 flex-1 flex flex-col items-center px-6 pt-6 pb-12">
+        {/* Stats ribbon */}
+        <div className="w-full max-w-xl mb-8" data-animate>
+          <div className="flex items-center justify-center gap-6 flex-wrap">
+            {stats.map((s) => (
+              <div key={s.label} className="text-center">
+                <div className="text-white font-bold text-lg" style={{ textShadow: `0 0 20px ${COLORS.teal}40` }}>{s.value}</div>
+                <div className="text-white/40 text-[10px] uppercase tracking-wider">{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Headline */}
-        <div className="w-full max-w-xl text-left">
-          <h1 className="font-serif text-white leading-tight mb-3" style={{ fontSize: 'clamp(32px, 5vw, 48px)' }}>
-            Care That<br />Documents <span style={{ color: COLORS.teal }}>Itself</span>
+        <div className="w-full max-w-xl text-center mb-8" data-animate>
+          <div
+            className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 mb-5 text-[11px] font-semibold tracking-wide uppercase"
+            style={{ background: 'rgba(79,209,197,0.1)', color: COLORS.teal, border: `1px solid ${COLORS.teal}25` }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full glow-pulse inline-block" style={{ background: COLORS.teal }} />
+            Now with AI Copilot & Real-Time Manager Dashboard
+          </div>
+          <h1
+            className="font-serif text-white leading-[1.1] mb-4 font-bold"
+            style={{ fontSize: 'clamp(36px, 7vw, 56px)' }}
+          >
+            Care That<br />
+            <span style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Documents Itself
+            </span>
           </h1>
-          <p className="text-white/60 leading-relaxed" style={{ fontSize: 'clamp(13px, 2vw, 16px)' }}>
-            AI-powered care management<br />for frontline carers.
+          <p className="text-white/50 leading-relaxed max-w-md mx-auto" style={{ fontSize: 'clamp(14px, 2.2vw, 17px)' }}>
+            AI-powered care management for frontline carers.
+            Voice notes, digital MAR, instant handovers — all in one place.
           </p>
         </div>
 
-        {/* Hero Image */}
-        <div className="w-full max-w-lg rounded-3xl overflow-hidden">
-          <img
-            src="https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=800&auto=format&fit=crop&q=80"
-            alt="Caregiver with elderly person"
-            className="w-full h-auto block"
-          />
-        </div>
-
-        {/* Buttons */}
-        <div className="w-full max-w-lg flex flex-col gap-2.5">
+        {/* CTA Buttons */}
+        <div className="w-full max-w-sm flex flex-col gap-3 mb-10" data-animate>
           <button
             onClick={() => setLocation('/login')}
-            className="w-full py-3.5 px-6 rounded-full border-none font-bold text-base cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-4 px-6 rounded-2xl border-none font-bold text-base cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
             style={{
-              background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
+              background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`,
               color: COLORS.darkNavy,
-              boxShadow: '0 8px 32px rgba(79,209,197,0.3)',
+              boxShadow: `0 8px 32px ${COLORS.teal}40, inset 0 1px 0 rgba(255,255,255,0.3)`,
             }}
           >
-            Start Shift <span className="text-lg">→</span>
+            Start Your Shift
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+            </svg>
           </button>
           <button
-            className="w-full py-3 px-6 rounded-full border text-white font-semibold text-sm cursor-pointer flex items-center justify-center gap-2"
-            style={{ borderColor: 'rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)' }}
+            className="w-full py-3.5 px-6 rounded-2xl border text-white font-semibold text-sm cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:bg-white/5"
+            style={{ borderColor: 'rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.03)' }}
           >
-            <span className="inline-flex w-5 h-5 rounded-full border-2 border-white items-center justify-center text-[10px]">▶</span>
-            Watch Demo
-          </button>
-          <button
-            onClick={() => setLocation('/manager/login')}
-            className="w-full py-2.5 px-6 rounded-full border-none text-white/60 text-xs cursor-pointer hover:text-white transition-colors"
-            style={{ background: 'transparent' }}
-          >
-            Manager Portal →
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="6 3 20 12 6 21 6 3" />
+            </svg>
+            Watch 90-Second Demo
           </button>
         </div>
 
-        {/* Trust Badges */}
-        <div className="flex gap-2.5 flex-wrap justify-center max-w-xl">
-          {/* GDPR */}
-          <div className="flex items-center gap-2 rounded-xl px-3.5 py-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(79,209,197,0.2), rgba(64,224,208,0.1))` }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                <polyline points="9 12 11 14 15 10" />
-              </svg>
+        {/* Trust badges */}
+        <div className="flex gap-3 flex-wrap justify-center max-w-xl mb-10" data-animate>
+          {[
+            { icon: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />, title: 'GDPR Ready', sub: 'UK Data Protection' },
+            { icon: <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>, title: 'NHS-Aligned', sub: 'DSPT Compliant' },
+            { icon: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></>, title: 'End-to-End', sub: 'Encrypted' },
+          ].map((b) => (
+            <div
+              key={b.title}
+              className="flex items-center gap-2.5 rounded-xl px-4 py-2.5 transition-all duration-200 hover:bg-white/8"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${COLORS.teal}20, ${COLORS.teal2}10)` }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {b.icon}
+                </svg>
+              </div>
+              <div>
+                <div className="text-white text-xs font-semibold">{b.title}</div>
+                <div className="text-white/40 text-[10px]">{b.sub}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-white text-xs font-bold">GDPR</div>
-              <div className="text-white/50 text-[11px]">Compliant</div>
-            </div>
+          ))}
+        </div>
+
+        {/* Hero Image */}
+        <div className="w-full max-w-2xl relative" data-animate>
+          <div
+            className="rounded-3xl overflow-hidden relative"
+            style={{
+              border: '1px solid rgba(79,209,197,0.15)',
+              boxShadow: `0 24px 80px -20px ${COLORS.darkNavy}, 0 0 60px ${COLORS.teal}10`,
+            }}
+          >
+            <img
+              src="https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=1200&auto=format&fit=crop&q=80"
+              alt="Caregiver providing compassionate care"
+              className="w-full h-auto block"
+              style={{ filter: 'brightness(0.95) contrast(1.05)' }}
+            />
+            <div className="absolute bottom-0 left-0 right-0 h-24" style={{ background: 'linear-gradient(to top, rgba(11,17,32,0.8), transparent)' }} />
           </div>
-          {/* Secure */}
-          <div className="flex items-center gap-2 rounded-xl px-3.5 py-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(79,209,197,0.2), rgba(64,224,208,0.1))` }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            </div>
-            <div>
-              <div className="text-white text-xs font-bold">Secure</div>
-              <div className="text-white/50 text-[11px]">Care Records</div>
-            </div>
-          </div>
-          {/* AI-Assisted */}
-          <div className="flex items-center gap-2 rounded-xl px-3.5 py-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(79,209,197,0.2), rgba(64,224,208,0.1))` }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z" />
-                <path d="M5 3v4" /><path d="M9 5H5" />
-                <path d="M19 15v4" /><path d="M15 17h4" />
-              </svg>
-            </div>
-            <div>
-              <div className="text-white text-xs font-bold">AI-Assisted</div>
-              <div className="text-white/50 text-[11px]">Care</div>
-            </div>
+          <div
+            className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full px-4 py-2"
+            style={{
+              background: 'rgba(11,17,32,0.9)',
+              border: `1px solid ${COLORS.teal}30`,
+              backdropFilter: 'blur(10px)',
+            }}
+          >
+            <span className="w-2 h-2 rounded-full glow-pulse inline-block" style={{ background: '#22c55e' }} />
+            <span className="text-white text-xs font-medium">Live across 200+ care homes</span>
           </div>
         </div>
       </div>
 
       {/* Features Section */}
-      <div className="relative z-10 bg-slate-50 px-6 py-10 shrink-0">
+      <div className="relative z-10 px-6 py-20" style={{ background: '#f8fafc' }}>
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-center font-bold mb-7" style={{ color: COLORS.darkNavy, fontSize: 'clamp(16px, 3vw, 22px)' }}>
-            Powerful features for modern care
-          </h2>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3.5">
+          <div className="text-center mb-14" data-animate>
+            <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.teal }}>Features</div>
+            <h2 className="font-serif font-bold mb-3" style={{ color: COLORS.darkNavy, fontSize: 'clamp(22px, 4vw, 32px)' }}>
+              Everything carers need, nothing they don't
+            </h2>
+            <p className="text-slate-500 max-w-md mx-auto text-sm">
+              Built with frontline carers and managers. Designed for speed, safety, and compliance.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {features.map((f) => (
-              <div key={f.title} className="bg-white rounded-2xl p-5 border border-slate-200 text-center">
+              <div
+                key={f.title}
+                className="group bg-white rounded-2xl p-6 border border-slate-100 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-default"
+                data-animate
+              >
                 <div
-                  className="w-[52px] h-[52px] rounded-full flex items-center justify-center mx-auto mb-3 text-[22px]"
-                  style={{ background: `linear-gradient(135deg, rgba(79,209,197,0.12), rgba(64,224,208,0.08))` }}
+                  className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110"
+                  style={{ background: `linear-gradient(135deg, ${COLORS.teal}15, ${COLORS.teal2}10)`, color: COLORS.teal }}
                 >
                   {f.icon}
                 </div>
-                <div className="font-bold text-[13px] mb-1" style={{ color: COLORS.darkNavy }}>{f.title}</div>
-                <div className="text-slate-500 text-xs leading-relaxed">{f.desc}</div>
+                <div className="font-bold text-[15px] mb-1.5" style={{ color: COLORS.darkNavy }}>{f.title}</div>
+                <div className="text-slate-500 text-sm leading-relaxed">{f.desc}</div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Trusted Footer */}
-      <div className="relative z-10 bg-white px-6 py-4 text-center shrink-0 border-t border-slate-200">
-        <div className="flex items-center justify-center gap-1.5 text-sm font-medium" style={{ color: COLORS.teal }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
+      {/* Testimonial strip */}
+      <div className="relative z-10 px-6 py-14" style={{ background: COLORS.darkNavy }}>
+        <div className="max-w-4xl mx-auto text-center" data-animate>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="1.5" className="mx-auto mb-5 opacity-40">
+            <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21c0 1 0 1 1 1z" />
+            <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
           </svg>
-          Trusted by care agencies across the UK
+          <blockquote className="font-serif text-white text-xl sm:text-2xl leading-relaxed mb-6 max-w-2xl mx-auto">
+            "CAREi cut our documentation time in half. Carers actually fill in notes now because they can just speak them."
+          </blockquote>
+          <div className="flex items-center justify-center gap-3">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}>SJ</div>
+            <div className="text-left">
+              <div className="text-white text-sm font-semibold">Sarah Johnson</div>
+              <div className="text-white/40 text-xs">Operations Director, Harmony Home Care</div>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="relative z-10 px-6 py-6 border-t" style={{ background: COLORS.darkNavy, borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+              <path d="M16 28C16 28 6 21 6 13C6 9.5 8.5 7 11.5 7C13.6 7 15.3 8.1 16 9.8C16.7 8.1 18.4 7 20.5 7C23.5 7 26 9.5 26 13C26 21 16 28 16 28Z" fill="url(#tealGrad3)" />
+              <defs>
+                <linearGradient id="tealGrad3" x1="6" y1="7" x2="26" y2="28" gradientUnits="userSpaceOnUse">
+                  <stop stopColor={COLORS.teal} />
+                  <stop offset="1" stopColor={COLORS.teal2} />
+                </linearGradient>
+              </defs>
+            </svg>
+            <span className="text-white/60 text-sm">CAREi</span>
+          </div>
+          <div className="text-white/30 text-xs text-center">
+            &copy; 2025 CAREi. Built for frontline carers across the UK.
+          </div>
+          <div className="flex items-center gap-1.5 text-xs font-medium" style={{ color: COLORS.teal }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Trusted by care agencies across the UK
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }
