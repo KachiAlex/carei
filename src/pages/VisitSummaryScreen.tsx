@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useRoute } from 'wouter'
 import { summarizeTranscript, saveVisit } from '../api/client'
+import { useAutoSave } from '../hooks/useAutoSave'
+import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
+import { enqueue } from '../utils/offlineQueue'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -43,6 +46,8 @@ export default function VisitSummaryScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
+  useAutoSave(`carei_handover_${visitId}`, { handoverNote }, 3000)
+
   useEffect(() => {
     const raw = localStorage.getItem(`carei_visit_${visitId}`)
     if (raw) {
@@ -51,6 +56,13 @@ export default function VisitSummaryScreen() {
       } catch {
         // ignore
       }
+    }
+    const savedHandover = localStorage.getItem(`carei_handover_${visitId}`)
+    if (savedHandover) {
+      try {
+        const d = JSON.parse(savedHandover)
+        if (d.handoverNote) setHandoverNote(d.handoverNote)
+      } catch {}
     }
   }, [visitId])
 
@@ -82,14 +94,24 @@ export default function VisitSummaryScreen() {
 
   const submitHandover = async () => {
     if (!snapshot) return
+    const payload = {
+      ...snapshot,
+      handoverNote,
+      submittedAt: new Date().toISOString(),
+    }
+    if (!navigator.onLine) {
+      await enqueue({ type: 'visit', payload })
+      triggerHaptic(HAPTIC_PATTERNS.success)
+      setSubmitted(true)
+      setTimeout(() => setLocation('/dashboard'), 1500)
+      return
+    }
     setSubmitting(true)
     try {
-      await saveVisit(visitId, {
-        ...snapshot,
-        handoverNote,
-        submittedAt: new Date().toISOString(),
-      })
+      await saveVisit(visitId, payload)
       localStorage.removeItem(`carei_visit_${visitId}`)
+      localStorage.removeItem(`carei_handover_${visitId}`)
+      triggerHaptic(HAPTIC_PATTERNS.success)
       setSubmitted(true)
       setTimeout(() => setLocation('/dashboard'), 1500)
     } catch {

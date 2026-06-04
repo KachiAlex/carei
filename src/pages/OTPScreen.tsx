@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useLocation, useSearch } from 'wouter'
+import { useLocation } from 'wouter'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -10,12 +10,9 @@ const COLORS = {
 
 export default function OTPScreen() {
   const [, setLocation] = useLocation()
-  const [search] = useSearch()
-  const params = new URLSearchParams(search)
-  const phone = params.get('phone') || ''
-  const email = params.get('email') || ''
-  const expectedOtp = params.get('otp') || ''
-  const target = phone || email
+  const method = sessionStorage.getItem('carei_otp_method') || 'sms'
+  const target = sessionStorage.getItem('carei_otp_target') || ''
+  const expectedOtp = sessionStorage.getItem('carei_otp') || ''
 
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState('')
@@ -73,7 +70,7 @@ export default function OTPScreen() {
           ← Back
         </button>
 
-        <h1 className="font-serif text-white text-3xl mb-2">Verify your {phone ? 'number' : 'email'}</h1>
+        <h1 className="font-serif text-white text-3xl mb-2">Verify your {method === 'sms' ? 'number' : 'email'}</h1>
         <p className="text-white/50 mb-4">
           Enter the 6-digit code sent to <span className="text-white/80">{target}</span>
         </p>

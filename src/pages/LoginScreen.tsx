@@ -53,7 +53,10 @@ export default function LoginScreen() {
     await new Promise((r) => setTimeout(r, 800))
     setLoading(false)
 
-    setLocation(`/otp?${method === 'sms' ? 'phone' : 'email'}=${encodeURIComponent(target)}&otp=${otp}`)
+    sessionStorage.setItem('carei_otp', otp)
+    sessionStorage.setItem('carei_otp_method', method)
+    sessionStorage.setItem('carei_otp_target', target)
+    setLocation(`/otp`)
   }
 
   return (

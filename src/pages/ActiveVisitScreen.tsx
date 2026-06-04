@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useParams } from 'wouter'
 import { todayVisits, clients } from '../data/clients'
+import { useAutoSave } from '../hooks/useAutoSave'
+import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
+import { enqueue } from '../utils/offlineQueue'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -30,12 +33,18 @@ export default function ActiveVisitScreen() {
   const [transcript, setTranscript] = useState('')
   const [showClockOut, setShowClockOut] = useState(false)
   const [showSOSConfirm, setShowSOSConfirm] = useState(false)
-  const [meds, setMeds] = useState<{ name: string; dose: string; status: 'pending' | 'confirmed' | 'skipped'; skipReason?: string }[]>(client?.medications.map((m) => ({ name: m.name, dose: m.dose, status: 'pending' })) || [])
+  const [meds, setMeds] = useState<{ name: string; dose: string; status: 'pending' | 'confirmed' | 'skipped'; skipReason?: string }[]>(() => {
+    const saved = localStorage.getItem(`carei_active_${visitId}`)
+    if (saved) try { const d = JSON.parse(saved); if (d.meds) return d.meds } catch {}
+    return client?.medications.map((m) => ({ name: m.name, dose: m.dose, status: 'pending' })) || []
+  })
   const [showMedConfirm, setShowMedConfirm] = useState(false)
   const [selectedMed, setSelectedMed] = useState<string | null>(null)
   const [showSkipReason, setShowSkipReason] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recognitionRef = useRef<any>(null)
+
+  useAutoSave(`carei_active_${visitId}`, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn }, 3000)
 
   useEffect(() => {
     if (clockedIn) {
@@ -52,9 +61,13 @@ export default function ActiveVisitScreen() {
 
   const toggleTask = (idx: number) => {
     setTasks((prev) => prev.map((t, i) => (i === idx ? { ...t, done: !t.done } : t)))
+    triggerHaptic(HAPTIC_PATTERNS.tap)
   }
 
-  const addFluid = () => setFluid((f) => f + 250)
+  const addFluid = () => {
+    setFluid((f) => f + 250)
+    triggerHaptic(HAPTIC_PATTERNS.tap)
+  }
 
   const startVoiceDoc = () => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
@@ -91,11 +104,19 @@ export default function ActiveVisitScreen() {
 
   const handleSOS = () => {
     setShowSOSConfirm(true)
+    triggerHaptic(HAPTIC_PATTERNS.sos)
     setTimeout(() => setShowSOSConfirm(false), 15000)
   }
 
-  const confirmSOS = () => {
+  const confirmSOS = async () => {
     setShowSOSConfirm(false)
+    triggerHaptic(HAPTIC_PATTERNS.sos)
+    const payload = { visitId, location: client?.address, timestamp: new Date().toISOString() }
+    if (!navigator.onLine) {
+      await enqueue({ type: 'sos', payload })
+      alert('SOS queued — will send when back online.')
+      return
+    }
     alert('SOS Alert Sent! Supervisor notified.')
   }
 
@@ -103,6 +124,7 @@ export default function ActiveVisitScreen() {
     setMeds((prev) =>
       prev.map((m) => (m.name === medName ? { ...m, status: 'confirmed' as const } : m))
     )
+    triggerHaptic(HAPTIC_PATTERNS.confirm)
     setShowMedConfirm(false)
   }
 
@@ -110,6 +132,7 @@ export default function ActiveVisitScreen() {
     setMeds((prev) =>
       prev.map((m) => (m.name === medName ? { ...m, status: 'skipped' as const, skipReason: reason } : m))
     )
+    triggerHaptic(HAPTIC_PATTERNS.confirm)
     setShowSkipReason(false)
     setShowMedConfirm(false)
   }
@@ -324,15 +347,17 @@ export default function ActiveVisitScreen() {
         <div className="grid grid-cols-2 gap-2 mb-3">
           <button
             onClick={() => setShowVoiceDoc(true)}
-            className="py-3 rounded-xl text-xs font-semibold border cursor-pointer flex items-center justify-center gap-1"
+            className="py-3.5 rounded-xl text-xs font-semibold border cursor-pointer flex items-center justify-center gap-1 min-h-[48px]"
             style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b', background: 'white' }}
+            aria-label="Voice documentation"
           >
             🎤 Voice Doc
           </button>
           <button
             onClick={() => setShowBodyMap(true)}
-            className="py-3 rounded-xl text-xs font-semibold border cursor-pointer flex items-center justify-center gap-1"
+            className="py-3.5 rounded-xl text-xs font-semibold border cursor-pointer flex items-center justify-center gap-1 min-h-[48px]"
             style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b', background: 'white' }}
+            aria-label="Body map photo"
           >
             🩹 Body Map
           </button>
@@ -463,6 +488,7 @@ export default function ActiveVisitScreen() {
               <button
                 onClick={() => {
                   setShowClockOut(false)
+                  triggerHaptic(HAPTIC_PATTERNS.clockOut)
                   const snapshot = {
                     visitId: visit.id,
                     clientName: client.name,

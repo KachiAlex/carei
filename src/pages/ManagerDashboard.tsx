@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { todayVisits, clients } from '../data/clients'
 
@@ -35,6 +35,33 @@ export default function ManagerDashboard() {
   const [, setLocation] = useLocation()
   const [tab, setTab] = useState<'overview' | 'carers' | 'mar' | 'incidents'>('overview')
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null)
+  const [liveIncidents, setLiveIncidents] = useState(incidents)
+  const [sseConnected, setSseConnected] = useState(false)
+
+  useEffect(() => {
+    const eventSource = new EventSource('/api/events')
+    eventSource.onopen = () => setSseConnected(true)
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === 'sos') {
+          setLiveIncidents((prev) => [
+            {
+              id: data.alertId,
+              carer: data.carerId || 'Unknown carer',
+              client: data.location || 'Unknown location',
+              type: 'SOS alert (live)',
+              time: new Date(data.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+              severity: 'high' as const,
+            },
+            ...prev,
+          ])
+        }
+      } catch {}
+    }
+    eventSource.onerror = () => setSseConnected(false)
+    return () => { eventSource.close() }
+  }, [])
 
   const stats = useMemo(() => {
     const total = todayVisits.length
@@ -46,6 +73,8 @@ export default function ManagerDashboard() {
     return { total, completed, inProgress, pending, medConfirmed, medSkipped }
   }, [])
 
+  const highSeverityCount = liveIncidents.filter((i) => i.severity === 'high').length
+
   const renderOverview = () => (
     <div className="flex flex-col gap-3">
       {/* Stats */}
@@ -54,7 +83,7 @@ export default function ManagerDashboard() {
           { label: 'Visits Today', value: stats.total, sub: `${stats.completed} done · ${stats.inProgress} active` },
           { label: 'Medications', value: `${stats.medConfirmed}/${medicationsToday.length}`, sub: `${stats.medSkipped} skipped` },
           { label: 'Carers On Duty', value: '4', sub: '2 in visit · 1 traveling' },
-          { label: 'Alerts', value: `${incidents.length}`, sub: '1 high · 1 medium', alert: true },
+          { label: 'Alerts', value: `${liveIncidents.length}`, sub: `${highSeverityCount} high · ${liveIncidents.length - highSeverityCount} medium`, alert: true },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl p-3 border border-slate-200">
             <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-1">{s.label}</div>
@@ -103,11 +132,11 @@ export default function ManagerDashboard() {
       </div>
 
       {/* Recent Incidents */}
-      {incidents.length > 0 && (
+      {liveIncidents.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-slate-200">
           <h3 className="font-bold text-sm text-slate-800 mb-3">Recent Alerts</h3>
           <div className="flex flex-col gap-2">
-            {incidents.map((inc) => (
+            {liveIncidents.map((inc) => (
               <button
                 key={inc.id}
                 onClick={() => setSelectedIncident(inc.id)}
@@ -203,7 +232,7 @@ export default function ManagerDashboard() {
 
   const renderIncidents = () => (
     <div className="flex flex-col gap-3">
-      {incidents.map((inc) => (
+      {liveIncidents.map((inc) => (
         <div key={inc.id} className="bg-white rounded-2xl p-4 border border-slate-200">
           <div className="flex items-center gap-2 mb-2">
             <span
@@ -251,12 +280,18 @@ export default function ManagerDashboard() {
               <div className="text-xs text-white/50">Operations Dashboard</div>
             </div>
           </div>
-          <button
-            onClick={() => setLocation('/manager/login')}
-            className="text-white/60 hover:text-white text-xs bg-transparent border-none cursor-pointer"
-          >
-            Log out
-          </button>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 ${sseConnected ? 'bg-teal/20 text-teal' : 'bg-white/10 text-white/50'}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${sseConnected ? 'bg-teal animate-pulse' : 'bg-white/30'}`} />
+              {sseConnected ? 'Live' : 'Offline'}
+            </span>
+            <button
+              onClick={() => setLocation('/manager/login')}
+              className="text-white/60 hover:text-white text-xs bg-transparent border-none cursor-pointer"
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </div>
 
@@ -279,8 +314,8 @@ export default function ManagerDashboard() {
               }}
             >
               {t.label}
-              {t.key === 'incidents' && incidents.length > 0 && (
-                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-red-400 text-white">{incidents.length}</span>
+              {t.key === 'incidents' && liveIncidents.length > 0 && (
+                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-red-400 text-white">{liveIncidents.length}</span>
               )}
             </button>
           ))}
