@@ -4,6 +4,7 @@ import { todayVisits } from '../data/clients'
 import type { Visit } from '../data/clients'
 import { getVisits, sendSOS } from '../api/client'
 import { enqueue } from '../utils/offlineQueue'
+import { sendVisitStartReminder, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -45,7 +46,15 @@ export default function CarerDashboard() {
   useEffect(() => {
     getVisits()
       .then((data) => {
-        if (data.visits?.length) setVisits(data.visits)
+        if (data.visits?.length) {
+          setVisits(data.visits)
+          requestNotificationPermission().then(() => {
+            const pending = data.visits.filter((v: Visit) => v.status === 'pending')
+            if (pending.length > 0) {
+              sendVisitStartReminder(pending[0].clientName, pending[0].time)
+            }
+          })
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false))

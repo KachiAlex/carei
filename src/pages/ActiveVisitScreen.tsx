@@ -5,6 +5,7 @@ import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
 import { fetchVisit, saveVisit, sendSOS } from '../api/client'
+import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -65,6 +66,17 @@ export default function ActiveVisitScreen() {
       })
       .catch(() => {})
   }, [visitId])
+
+  // Medication reminder notification
+  useEffect(() => {
+    if (!meds.length || !client) return
+    const pending = meds.filter((m) => m.status === 'pending')
+    if (pending.length > 0) {
+      requestNotificationPermission().then(() => {
+        sendMedicationReminder(client.name, pending[0].name)
+      })
+    }
+  }, [])
 
   // Debounced auto-save to DB
   useEffect(() => {

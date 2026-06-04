@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { todayVisits, clients } from '../data/clients'
 import { getManagerData } from '../api/client'
+import { sendSOSAlert, sendSOSResolved, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -37,6 +38,7 @@ export default function ManagerDashboard() {
   const [, setLocation] = useLocation()
   const [tab, setTab] = useState<'overview' | 'carers' | 'mar' | 'incidents'>('overview')
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null)
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set())
   const [liveIncidents, setLiveIncidents] = useState(incidents)
   const [sseConnected, setSseConnected] = useState(false)
   const [dbCarers, setDbCarers] = useState<any[]>([])
@@ -73,6 +75,9 @@ export default function ManagerDashboard() {
             },
             ...prev,
           ])
+          requestNotificationPermission().then(() => {
+            sendSOSAlert(data.location || 'Unknown location')
+          })
         }
       } catch {}
     }
@@ -87,7 +92,7 @@ export default function ManagerDashboard() {
     type: 'SOS Alert',
     time: new Date(a.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
     severity: 'high' as const,
-  })), ...liveIncidents]
+  })), ...liveIncidents].filter((inc) => !resolvedIds.has(inc.id))
 
   const stats = useMemo(() => {
     const total = dbVisits.length || todayVisits.length
@@ -422,7 +427,14 @@ export default function ManagerDashboard() {
           </div>
           <div className="flex gap-2">
             <button className="flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all hover:bg-slate-50" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>Review</button>
-            <button className="flex-1 py-2 rounded-xl text-xs font-semibold text-white border-none cursor-pointer transition-all hover:opacity-90" style={{ background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.darkNavy})` }}>Escalate</button>
+            <button
+              onClick={() => {
+                setResolvedIds((prev) => new Set([...prev, inc.id]))
+                sendSOSResolved(inc.client)
+              }}
+              className="flex-1 py-2 rounded-xl text-xs font-semibold border-none cursor-pointer transition-all hover:opacity-90 text-white"
+              style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+            >Resolve</button>
           </div>
         </div>
       ))}

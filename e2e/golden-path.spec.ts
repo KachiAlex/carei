@@ -61,4 +61,48 @@ test.describe('CAREi Golden Path', () => {
     await page.getByRole('button', { name: /submit handover/i }).click()
     await expect(page.getByText(/dashboard/i)).toBeVisible()
   })
+
+  test('manager can login, view dashboard, navigate to clients and schedule', async ({ page }) => {
+    // 1. Manager Login
+    await page.goto('/manager/login')
+    await page.getByPlaceholder(/manager@agency/i).fill('manager@carei.dev')
+    await page.getByRole('button', { name: /send otp/i }).click()
+    await expect(page.getByText(/development.*otp code/i)).toBeVisible()
+    const otpText = await page.locator('div.font-mono').textContent()
+    const otp = otpText?.trim() || '000000'
+    for (const digit of otp) {
+      await page.locator('input[maxLength="1"]').first().fill(digit)
+    }
+    await page.getByRole('button', { name: /verify/i }).click()
+
+    // 2. Manager Dashboard
+    await expect(page.getByText(/operations dashboard/i)).toBeVisible()
+    await expect(page.getByText(/live/i)).toBeVisible()
+
+    // 3. Navigate to Client Management
+    await page.getByRole('button', { name: /client management/i }).click()
+    await expect(page.getByText(/client management/i)).toBeVisible()
+
+    // 4. Add a new client
+    await page.getByRole('button', { name: /add client/i }).click()
+    await page.getByPlaceholder(/client name/i).fill('E2E Test Client')
+    await page.getByPlaceholder(/age/i).fill('75')
+    await page.getByPlaceholder(/address/i).fill('123 Test Street')
+    await page.getByRole('button', { name: /save client/i }).click()
+    await expect(page.getByText(/e2e test client/i)).toBeVisible()
+
+    // 5. Search for the client
+    await page.getByPlaceholder(/search clients/i).fill('E2E Test')
+    await expect(page.getByText(/e2e test client/i)).toBeVisible()
+
+    // 6. Navigate to Visit Scheduling
+    await page.goto('/manager/schedule')
+    await expect(page.getByText(/visit scheduling/i)).toBeVisible()
+
+    // 7. Add a scheduled visit
+    await page.getByRole('button', { name: /schedule visit/i }).click()
+    await page.locator('select').first().selectOption({ label: 'E2E Test Client' })
+    await page.getByRole('button', { name: /schedule visit/i }).nth(1).click()
+    await expect(page.getByText(/e2e test client/i)).toBeVisible()
+  })
 })
