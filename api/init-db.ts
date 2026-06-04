@@ -53,6 +53,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       )
     `
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS scheduled_visits (
+        id TEXT PRIMARY KEY,
+        client_id TEXT,
+        client_name TEXT NOT NULL,
+        time TEXT,
+        duration TEXT,
+        status TEXT DEFAULT 'pending',
+        tasks JSONB,
+        flags JSONB,
+        visit_date DATE DEFAULT CURRENT_DATE
+      )
+    `
+
     // Seed mock carers if empty
     const existing = await sql`SELECT COUNT(*) FROM carers` as any[]
     if (existing[0]?.count === '0') {
@@ -62,6 +76,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ('c2', 'James Brown', 'in-visit', '45 Elm Ave', 'Robert Davies', '10:00', 'JB'),
         ('c3', 'Amina Patel', 'traveling', 'En route', 'Dorothy Lewis', '—', 'AP'),
         ('c4', 'David Chen', 'available', '—', '—', '—', 'DC')
+      `
+    }
+
+    // Seed scheduled visits if empty for today
+    const visitCount = await sql`SELECT COUNT(*) FROM scheduled_visits WHERE visit_date = CURRENT_DATE` as any[]
+    if (visitCount[0]?.count === '0') {
+      await sql`
+        INSERT INTO scheduled_visits (id, client_id, client_name, time, duration, status, tasks, flags, visit_date) VALUES
+        ('v1', 'c1', 'Mary Johnson', '09:00', '1 hr', 'pending', '["Personal care", "Medication", "Breakfast"]', '["Dementia - use simple language", "Prefers female carers"]', CURRENT_DATE),
+        ('v2', 'c2', 'Tom Adams', '10:30', '45 min', 'pending', '["Vitals", "Medication", "Wound check"]', '["O2 sat below target yesterday"]', CURRENT_DATE),
+        ('v3', 'c3', 'Aisha Khan', '12:00', '45 min', 'pending', '["Medication", "Meal prep", "Mobility"]', '[]', CURRENT_DATE),
+        ('v4', 'c4', 'Grace Mensah', '14:00', '1 hr', 'pending', '["Personal care", "Thickened fluids", "Medication"]', '["Thickened fluids only"]', CURRENT_DATE),
+        ('v5', 'c1', 'Mary Johnson', '16:30', '30 min', 'pending', '["Evening check", "Medication"]', '["Sundowning risk after 4pm"]', CURRENT_DATE)
       `
     }
 

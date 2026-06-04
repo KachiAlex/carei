@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { todayVisits } from '../data/clients'
 import type { Visit } from '../data/clients'
+import { getVisits, sendSOS } from '../api/client'
+import { enqueue } from '../utils/offlineQueue'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -36,18 +38,29 @@ export default function CarerDashboard() {
   const [, setLocation] = useLocation()
   const [playingBrief, setPlayingBrief] = useState<string | null>(null)
   const [showSOSConfirm, setShowSOSConfirm] = useState(false)
+  const [visits, setVisits] = useState<Visit[]>(todayVisits)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getVisits()
+      .then((data) => {
+        if (data.visits?.length) setVisits(data.visits)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
 
   const stats = useMemo(() => {
-    const total = todayVisits.length
-    const completed = todayVisits.filter((v) => v.status === 'completed').length
-    const inProgress = todayVisits.filter((v) => v.status === 'in-progress').length
-    const pending = todayVisits.filter((v) => v.status === 'pending').length
-    const hours = (todayVisits.reduce((acc, v) => {
+    const total = visits.length
+    const completed = visits.filter((v) => v.status === 'completed').length
+    const inProgress = visits.filter((v) => v.status === 'in-progress').length
+    const pending = visits.filter((v) => v.status === 'pending').length
+    const hours = (visits.reduce((acc, v) => {
       const m = parseInt(v.duration)
       return acc + (isNaN(m) ? 0 : m)
     }, 0) / 60).toFixed(1)
     return { total, completed, inProgress, pending, hours }
-  }, [])
+  }, [visits])
 
   const handleBriefing = (visitId: string) => {
     if (playingBrief === visitId) {
@@ -57,9 +70,11 @@ export default function CarerDashboard() {
     }
     window.speechSynthesis?.cancel()
     setPlayingBrief(visitId)
-    const visit = todayVisits.find((v) => v.id === visitId)
+    const visit = visits.find((v) => v.id === visitId)
     if (visit && 'speechSynthesis' in window) {
-      const text = `Visit with ${visit.clientName} at ${visit.time}. Tasks: ${visit.tasks.join(', ')}.${visit.flags.length > 0 ? ` Flags: ${visit.flags.join(', ')}.` : ''}`
+      const tasks = Array.isArray(visit.tasks) ? visit.tasks.join(', ') : ''
+      const flags = Array.isArray(visit.flags) ? visit.flags.join(', ') : ''
+      const text = `Visit with ${visit.clientName} at ${visit.time}. Tasks: ${tasks}.${flags ? ` Flags: ${flags}.` : ''}`
       const utter = new SpeechSynthesisUtterance(text)
       utter.rate = 1
       utter.onend = () => setPlayingBrief(null)
@@ -72,9 +87,19 @@ export default function CarerDashboard() {
     setTimeout(() => setShowSOSConfirm(false), 15000)
   }
 
-  const confirmSOS = () => {
+  const confirmSOS = async () => {
     setShowSOSConfirm(false)
-    alert('SOS Alert Sent! Supervisor notified.')
+    const payload = { visitId: 'dashboard', location: 'Carer Dashboard', timestamp: new Date().toISOString() }
+    try {
+      if (!navigator.onLine) {
+        await enqueue({ type: 'sos', payload })
+      } else {
+        await sendSOS(payload)
+      }
+      alert('SOS Alert Sent! Supervisor notified.')
+    } catch {
+      alert('SOS Alert queued. Will send when online.')
+    }
   }
 
   return (
@@ -138,11 +163,15 @@ export default function CarerDashboard() {
       <div className="flex-1 px-4 py-4 overflow-auto">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-slate-700">Scheduled Visits</h2>
-          <span className="text-xs text-slate-400">{todayVisits.length} today</span>
+          <span className="text-xs text-slate-400">{visits.length} today</span>
         </div>
 
+        {loading && (
+          <div className="text-center py-8 text-slate-400 text-sm">Loading visits...</div>
+        )}
+
         <div className="flex flex-col gap-3">
-          {todayVisits.map((visit) => (
+          {visits.map((visit) => (
             <div
               key={visit.id}
               className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm"

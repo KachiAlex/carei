@@ -4,6 +4,7 @@ import { todayVisits, clients } from '../data/clients'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
+import { fetchVisit, saveVisit, sendSOS } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -43,8 +44,49 @@ export default function ActiveVisitScreen() {
   const [showSkipReason, setShowSkipReason] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recognitionRef = useRef<any>(null)
+  const dbSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useAutoSave(`carei_active_${visitId}`, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn }, 3000)
+
+  // Load existing visit data from DB on mount
+  useEffect(() => {
+    if (!visitId) return
+    fetchVisit(visitId)
+      .then((data) => {
+        if (data && data.id && data.elapsed != null) {
+          setElapsed(data.elapsed)
+          if (data.tasks) setTasks(data.tasks)
+          if (data.fluid != null) setFluid(data.fluid)
+          if (data.notes) setNotes(data.notes)
+          if (data.medications) setMeds(data.medications)
+          if (data.clock_out_at) setClockedIn(false)
+        }
+      })
+      .catch(() => {})
+  }, [visitId])
+
+  // Debounced auto-save to DB
+  useEffect(() => {
+    if (!visitId || !clockedIn) return
+    if (dbSyncRef.current) clearTimeout(dbSyncRef.current)
+    dbSyncRef.current = setTimeout(() => {
+      const payload = {
+        visitId,
+        clientName: client?.name,
+        clientAge: client?.age,
+        clientAddress: client?.address,
+        visitTime: visit?.time,
+        visitDuration: visit?.duration,
+        elapsed,
+        tasks,
+        fluid,
+        notes,
+        medications: meds,
+      }
+      saveVisit(visitId, payload).catch(() => {})
+    }, 5000)
+    return () => { if (dbSyncRef.current) clearTimeout(dbSyncRef.current) }
+  }, [visitId, elapsed, tasks, fluid, notes, meds, clockedIn, client, visit])
 
   useEffect(() => {
     if (clockedIn) {
@@ -117,7 +159,12 @@ export default function ActiveVisitScreen() {
       alert('SOS queued — will send when back online.')
       return
     }
-    alert('SOS Alert Sent! Supervisor notified.')
+    try {
+      await sendSOS(payload)
+      alert('SOS Alert Sent! Supervisor notified.')
+    } catch {
+      alert('Failed to send SOS. Please retry.')
+    }
   }
 
   const confirmMed = (medName: string) => {
@@ -486,7 +533,7 @@ export default function ActiveVisitScreen() {
                 Cancel
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setShowClockOut(false)
                   triggerHaptic(HAPTIC_PATTERNS.clockOut)
                   const snapshot = {
@@ -504,6 +551,7 @@ export default function ActiveVisitScreen() {
                     clockOutAt: new Date().toISOString(),
                   }
                   localStorage.setItem(`carei_visit_${visit.id}`, JSON.stringify(snapshot))
+                  try { await saveVisit(visit.id, snapshot) } catch {}
                   setLocation(`/summary/${visit.id}`)
                 }}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"

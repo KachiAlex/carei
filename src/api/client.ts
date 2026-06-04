@@ -42,6 +42,14 @@ export async function getManagerData() {
   return get('/manager/data')
 }
 
+export async function getVisits() {
+  return get('/visits')
+}
+
+export async function fetchVisit(visitId: string) {
+  return get(`/visit/${visitId}`)
+}
+
 export async function initDatabase() {
   return post('/init-db', {})
 }
