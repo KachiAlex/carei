@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { sql } from './db'
+import { sql } from './_utils/db'
 import { broadcast } from './events'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
