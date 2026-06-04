@@ -219,7 +219,7 @@ export default function ActiveVisitScreen() {
           <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] opacity-15 pointer-events-none" style={{ background: COLORS.teal }} />
           <button
             onClick={() => setLocation('/dashboard')}
-            className="relative z-10 text-white/60 hover:text-white text-sm flex items-center gap-1 mb-4 bg-transparent border-none cursor-pointer transition-colors"
+            className="relative z-10 text-white/60 hover:text-white text-sm flex items-center gap-1 mb-4 bg-transparent border-none cursor-pointer transition-colors py-1 px-1 -ml-1 rounded-lg"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
             Back
@@ -339,9 +339,9 @@ export default function ActiveVisitScreen() {
         <div className="relative z-10 flex items-center justify-between mb-3">
           <button
             onClick={() => setClockedIn(false)}
-            className="text-white/60 hover:text-white text-xs bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors"
+            className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors py-1 px-1 -ml-1 rounded-lg"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
             Back
           </button>
           <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg" style={{ background: 'rgba(79,209,197,0.15)', border: '1px solid rgba(79,209,197,0.2)' }}>
@@ -350,7 +350,7 @@ export default function ActiveVisitScreen() {
           </div>
         </div>
         <div className="relative z-10 flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
             {client.name.split(' ').map((n) => n[0]).join('')}
           </div>
           <div>
@@ -392,7 +392,7 @@ export default function ActiveVisitScreen() {
           </div>
           <button
             onClick={addFluid}
-            className="w-10 h-10 rounded-full text-white text-xl font-bold flex items-center justify-center cursor-pointer border-none"
+            className="w-11 h-11 rounded-full text-white text-xl font-bold flex items-center justify-center cursor-pointer border-none touch-target"
             style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
             aria-label="Add 250ml fluid"
           >
@@ -408,7 +408,7 @@ export default function ActiveVisitScreen() {
               <button
                 key={idx}
                 onClick={() => toggleTask(idx)}
-                className="flex items-center gap-3 text-left p-2 rounded-xl cursor-pointer border-none bg-transparent hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-3 text-left py-3 px-2 rounded-xl cursor-pointer border-none bg-transparent hover:bg-slate-50 transition-colors min-h-[48px]"
               >
                 <div
                   className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 border transition-colors"

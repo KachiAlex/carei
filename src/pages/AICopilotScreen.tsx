@@ -86,13 +86,13 @@ export default function AICopilotScreen() {
       >
         <button
           onClick={() => setLocation('/dashboard')}
-          className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer"
+          className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer py-1 px-1 -ml-1 rounded-lg"
         >
           ← Back
         </button>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.15)' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+          <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.15)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
               <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z" />
             </svg>
           </div>
@@ -138,10 +138,10 @@ export default function AICopilotScreen() {
         <div className="flex items-center gap-2">
           <button
             onClick={isRecording ? stopVoice : startVoice}
-            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 cursor-pointer border-none"
+            className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 cursor-pointer border-none touch-target"
             style={{ background: isRecording ? COLORS.red : 'rgba(79,209,197,0.1)' }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isRecording ? 'white' : COLORS.teal} strokeWidth="2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={isRecording ? 'white' : COLORS.teal} strokeWidth="2">
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
               <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
               <line x1="12" y1="19" x2="12" y2="23" />
@@ -159,10 +159,10 @@ export default function AICopilotScreen() {
           <button
             onClick={sendMessage}
             disabled={!input.trim() || loading}
-            className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 cursor-pointer border-none disabled:opacity-40"
+            className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 cursor-pointer border-none disabled:opacity-40 touch-target"
             style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
               <line x1="22" y1="2" x2="11" y2="13" />
               <polygon points="22 2 15 22 11 13 2 9 22 2" />
             </svg>

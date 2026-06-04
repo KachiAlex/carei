@@ -67,7 +67,7 @@ export default function LoginScreen() {
       <div className="flex-1 flex flex-col justify-center px-6 max-w-md mx-auto w-full">
         <button
           onClick={() => setLocation('/')}
-          className="self-start mb-8 text-white/60 hover:text-white transition-colors text-sm flex items-center gap-1 bg-transparent border-none cursor-pointer"
+          className="self-start mb-8 text-white/60 hover:text-white transition-colors text-sm flex items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-1 -ml-1 rounded-lg"
         >
           ← Back
         </button>
@@ -79,7 +79,7 @@ export default function LoginScreen() {
         <div className="flex gap-1 bg-white/5 rounded-xl p-1 mb-6">
           <button
             onClick={() => { setMethod('sms'); setError('') }}
-            className="flex-1 py-2 rounded-lg text-xs font-semibold cursor-pointer border-none transition-colors"
+            className="flex-1 py-3 rounded-lg text-xs font-semibold cursor-pointer border-none transition-colors"
             style={{
               background: method === 'sms' ? COLORS.teal : 'transparent',
               color: method === 'sms' ? COLORS.darkNavy : 'white',
@@ -89,7 +89,7 @@ export default function LoginScreen() {
           </button>
           <button
             onClick={() => { setMethod('email'); setError('') }}
-            className="flex-1 py-2 rounded-lg text-xs font-semibold cursor-pointer border-none transition-colors"
+            className="flex-1 py-3 rounded-lg text-xs font-semibold cursor-pointer border-none transition-colors"
             style={{
               background: method === 'email' ? COLORS.teal : 'transparent',
               color: method === 'email' ? COLORS.darkNavy : 'white',

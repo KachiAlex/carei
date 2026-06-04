@@ -138,7 +138,7 @@ export default function CarerDashboard() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setLocation('/copilot')}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer"
+              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
               title="AI Copilot"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -147,7 +147,7 @@ export default function CarerDashboard() {
             </button>
             <button
               onClick={() => setLocation('/')}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer"
+              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
               title="Log out"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -179,7 +179,7 @@ export default function CarerDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="relative z-10 grid grid-cols-4 gap-2.5">
+        <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {[
             { label: 'Visits', value: stats.total, icon: (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
@@ -197,7 +197,7 @@ export default function CarerDashboard() {
             <div key={s.label} className="rounded-xl px-2 py-3 text-center" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="flex justify-center mb-1 text-white/30">{s.icon}</div>
               <div className="text-lg font-bold">{s.value}</div>
-              <div className="text-[9px] text-white/40 uppercase tracking-wider">{s.label}</div>
+              <div className="text-[11px] sm:text-xs text-white/40 uppercase tracking-wider">{s.label}</div>
             </div>
           ))}
         </div>
@@ -261,7 +261,7 @@ export default function CarerDashboard() {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2.5">
                   <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                    className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
                     style={{
                       background: visit.status === 'completed'
                         ? 'rgba(34,197,94,0.1)' : visit.status === 'in-progress'

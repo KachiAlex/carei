@@ -65,7 +65,7 @@ export default function OTPScreen() {
       <div className="flex-1 flex flex-col justify-center px-6 max-w-md mx-auto w-full">
         <button
           onClick={() => setLocation('/login')}
-          className="self-start mb-8 text-white/60 hover:text-white transition-colors text-sm flex items-center gap-1 bg-transparent border-none cursor-pointer"
+          className="self-start mb-8 text-white/60 hover:text-white transition-colors text-sm flex items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-1 -ml-1 rounded-lg"
         >
           ← Back
         </button>
