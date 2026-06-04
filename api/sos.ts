@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { sql } from './lib/db'
 import { broadcast } from './events'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -7,23 +8,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const { carerId, location, timestamp } = req.body || {}
+  const { visitId, location, timestamp } = req.body || {}
+  const alertId = `SOS-${Date.now()}`
+
+  await sql`
+    INSERT INTO sos_alerts (id, visit_id, location, timestamp)
+    VALUES (${alertId}, ${visitId}, ${location}, ${timestamp || new Date().toISOString()})
+  `
 
   const alert = {
     type: 'sos',
-    alertId: `SOS-${Date.now()}`,
-    carerId,
+    alertId,
+    visitId,
     location,
     timestamp: timestamp || new Date().toISOString(),
     receivedAt: new Date().toISOString(),
   }
 
-  // Broadcast to all connected SSE clients (manager dashboards)
   broadcast(alert)
 
   res.status(200).json({
     status: 'alert_sent',
-    alertId: alert.alertId,
+    alertId,
     escalatedTo: 'supervisor',
     message: 'SOS alert received. Supervisor notified.',
   })

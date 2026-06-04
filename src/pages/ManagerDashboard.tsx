@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { todayVisits, clients } from '../data/clients'
+import { getManagerData } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -37,6 +38,21 @@ export default function ManagerDashboard() {
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null)
   const [liveIncidents, setLiveIncidents] = useState(incidents)
   const [sseConnected, setSseConnected] = useState(false)
+  const [dbCarers, setDbCarers] = useState<any[]>([])
+  const [dbVisits, setDbVisits] = useState<any[]>([])
+  const [dbAlerts, setDbAlerts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getManagerData()
+      .then((data) => {
+        setDbCarers(data.carers || [])
+        setDbVisits(data.visits || [])
+        setDbAlerts(data.alerts || [])
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
 
   useEffect(() => {
     const eventSource = new EventSource('/api/events')
@@ -48,7 +64,7 @@ export default function ManagerDashboard() {
           setLiveIncidents((prev) => [
             {
               id: data.alertId,
-              carer: data.carerId || 'Unknown carer',
+              carer: data.visitId || 'Unknown visit',
               client: data.location || 'Unknown location',
               type: 'SOS alert (live)',
               time: new Date(data.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
@@ -63,17 +79,26 @@ export default function ManagerDashboard() {
     return () => { eventSource.close() }
   }, [])
 
+  const allIncidents = [...dbAlerts.map((a: any) => ({
+    id: a.id,
+    carer: a.visit_id || 'Unknown',
+    client: a.location || 'Unknown',
+    type: 'SOS Alert',
+    time: new Date(a.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+    severity: 'high' as const,
+  })), ...liveIncidents]
+
   const stats = useMemo(() => {
-    const total = todayVisits.length
-    const completed = todayVisits.filter((v) => v.status === 'completed').length
-    const inProgress = todayVisits.filter((v) => v.status === 'in-progress').length
-    const pending = todayVisits.filter((v) => v.status === 'pending').length
+    const total = dbVisits.length || todayVisits.length
+    const completed = dbVisits.filter((v: any) => v.status === 'completed').length || todayVisits.filter((v) => v.status === 'completed').length
+    const inProgress = dbVisits.filter((v: any) => v.status === 'in-progress').length || todayVisits.filter((v) => v.status === 'in-progress').length
+    const pending = dbVisits.filter((v: any) => v.status === 'pending').length || todayVisits.filter((v) => v.status === 'pending').length
     const medConfirmed = medicationsToday.filter((m) => m.status === 'confirmed').length
     const medSkipped = medicationsToday.filter((m) => m.status === 'skipped').length
     return { total, completed, inProgress, pending, medConfirmed, medSkipped }
-  }, [])
+  }, [dbVisits])
 
-  const highSeverityCount = liveIncidents.filter((i) => i.severity === 'high').length
+  const highSeverityCount = allIncidents.filter((i) => i.severity === 'high').length
 
   const renderOverview = () => (
     <div className="flex flex-col gap-3">
@@ -83,7 +108,7 @@ export default function ManagerDashboard() {
           { label: 'Visits Today', value: stats.total, sub: `${stats.completed} done · ${stats.inProgress} active` },
           { label: 'Medications', value: `${stats.medConfirmed}/${medicationsToday.length}`, sub: `${stats.medSkipped} skipped` },
           { label: 'Carers On Duty', value: '4', sub: '2 in visit · 1 traveling' },
-          { label: 'Alerts', value: `${liveIncidents.length}`, sub: `${highSeverityCount} high · ${liveIncidents.length - highSeverityCount} medium`, alert: true },
+          { label: 'Alerts', value: `${allIncidents.length}`, sub: `${highSeverityCount} high · ${allIncidents.length - highSeverityCount} medium`, alert: true },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl p-3 border border-slate-200">
             <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-1">{s.label}</div>
@@ -103,7 +128,7 @@ export default function ManagerDashboard() {
           </span>
         </div>
         <div className="flex flex-col gap-2">
-          {carers.map((carer) => (
+          {(dbCarers.length ? dbCarers : carers).map((carer: any) => (
             <div key={carer.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors">
               <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ background: COLORS.navy }}>
                 {carer.avatar}
@@ -132,11 +157,11 @@ export default function ManagerDashboard() {
       </div>
 
       {/* Recent Incidents */}
-      {liveIncidents.length > 0 && (
+      {allIncidents.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-slate-200">
           <h3 className="font-bold text-sm text-slate-800 mb-3">Recent Alerts</h3>
           <div className="flex flex-col gap-2">
-            {liveIncidents.map((inc) => (
+            {allIncidents.map((inc) => (
               <button
                 key={inc.id}
                 onClick={() => setSelectedIncident(inc.id)}
@@ -167,7 +192,7 @@ export default function ManagerDashboard() {
 
   const renderCarers = () => (
     <div className="flex flex-col gap-3">
-      {carers.map((carer) => (
+      {(dbCarers.length ? dbCarers : carers).map((carer: any) => (
         <div key={carer.id} className="bg-white rounded-2xl p-4 border border-slate-200">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white" style={{ background: COLORS.navy }}>
@@ -232,7 +257,7 @@ export default function ManagerDashboard() {
 
   const renderIncidents = () => (
     <div className="flex flex-col gap-3">
-      {liveIncidents.map((inc) => (
+      {allIncidents.map((inc) => (
         <div key={inc.id} className="bg-white rounded-2xl p-4 border border-slate-200">
           <div className="flex items-center gap-2 mb-2">
             <span
@@ -314,8 +339,8 @@ export default function ManagerDashboard() {
               }}
             >
               {t.label}
-              {t.key === 'incidents' && liveIncidents.length > 0 && (
-                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-red-400 text-white">{liveIncidents.length}</span>
+              {t.key === 'incidents' && allIncidents.length > 0 && (
+                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-red-400 text-white">{allIncidents.length}</span>
               )}
             </button>
           ))}
