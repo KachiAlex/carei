@@ -6,11 +6,12 @@ import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
 
 const COLORS = {
-  darkNavy: '#0f1a2e',
+  darkNavy: '#0B1120',
   navy: '#1B2A49',
   teal: '#4FD1C5',
   teal2: '#40E0D0',
   red: '#FF5A5F',
+  amber: '#F6B73C',
 }
 
 interface VisitSnapshot {
@@ -144,92 +145,121 @@ export default function VisitSummaryScreen() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       {/* Header */}
       <div
-        className="px-6 py-5 text-white shrink-0"
+        className="px-6 pt-5 pb-6 text-white shrink-0 relative overflow-hidden"
         style={{ background: `linear-gradient(160deg, ${COLORS.darkNavy} 0%, ${COLORS.navy} 100%)` }}
       >
-        <div className="flex items-center justify-between mb-3">
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] opacity-15 pointer-events-none" style={{ background: COLORS.teal }} />
+        <div className="relative z-10 flex items-center justify-between mb-4">
           <button
             onClick={() => setLocation('/dashboard')}
-            className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer"
+            className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors"
           >
-            ← Dashboard
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            Dashboard
           </button>
           <button
             onClick={handlePrint}
-            className="text-white/60 hover:text-white text-xs bg-transparent border-none cursor-pointer flex items-center gap-1"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer"
+            title="Print / PDF"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="6 9 6 2 18 2 18 9" />
               <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
               <rect x="6" y="14" width="12" height="8" />
             </svg>
-            Print / PDF
           </button>
         </div>
-        <h1 className="font-serif text-xl">Visit Summary</h1>
-        <p className="text-white/50 text-sm">{snapshot.clientName} · {snapshot.visitTime} · {snapshot.visitDuration}</p>
+        <div className="relative z-10 flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
+            {snapshot.clientName.split(' ').map((n) => n[0]).join('')}
+          </div>
+          <div>
+            <h1 className="font-serif text-xl font-bold">Visit Summary</h1>
+            <p className="text-white/50 text-sm">{snapshot.clientName} · {snapshot.visitTime} · {snapshot.visitDuration}</p>
+          </div>
+        </div>
+        <div className="relative z-10 flex items-center gap-1.5 mt-3">
+          <span className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          <span className="text-[11px] font-medium" style={{ color: '#22c55e' }}>Visit completed successfully</span>
+        </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 px-4 py-4 overflow-auto">
         {/* Key Metrics */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="grid grid-cols-3 gap-2.5 mb-4">
           {[
-            { label: 'Duration', value: formatTime(snapshot.elapsed) },
-            { label: 'Tasks Done', value: `${doneTasks}/${snapshot.tasks.length}` },
-            { label: 'Fluid', value: `${snapshot.fluid}ml` },
+            { label: 'Duration', value: formatTime(snapshot.elapsed), icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
+            { label: 'Tasks Done', value: `${doneTasks}/${snapshot.tasks.length}`, icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> },
+            { label: 'Fluid', value: `${snapshot.fluid}ml`, icon: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0L12 2.69z"/></svg> },
           ].map((m) => (
-            <div key={m.label} className="bg-white rounded-xl p-3 border border-slate-200 text-center">
-              <div className="text-lg font-bold text-slate-800">{m.value}</div>
-              <div className="text-[10px] text-slate-400 uppercase tracking-wide">{m.label}</div>
+            <div key={m.label} className="bg-white rounded-xl p-3 border border-slate-100 text-center shadow-sm">
+              <div className="flex justify-center mb-1 text-slate-300">{m.icon}</div>
+              <div className="text-base font-bold text-slate-800">{m.value}</div>
+              <div className="text-[9px] text-slate-400 uppercase tracking-wider">{m.label}</div>
             </div>
           ))}
         </div>
 
         {/* Medications */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
-          <h3 className="font-bold text-sm text-slate-800 mb-3">Medications</h3>
-          <div className="flex flex-col gap-2">
+        <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-sm text-slate-800">Medications</h3>
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>{confirmedMeds}/{snapshot.medications.length} confirmed</span>
+          </div>
+          <div className="flex flex-col gap-2.5">
             {snapshot.medications.map((med) => (
               <div key={med.name} className="flex items-center justify-between text-xs">
-                <div>
-                  <div className="font-semibold text-slate-700">{med.name}</div>
-                  <div className="text-slate-400">{med.dose}</div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: med.status === 'confirmed' ? 'rgba(79,209,197,0.08)' : med.status === 'skipped' ? 'rgba(255,90,95,0.06)' : 'rgba(148,163,184,0.08)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={med.status === 'confirmed' ? COLORS.teal : med.status === 'skipped' ? COLORS.red : '#94a3b8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-slate-700">{med.name}</div>
+                    <div className="text-slate-400">{med.dose}</div>
+                  </div>
                 </div>
                 <span
-                  className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                  className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0"
                   style={{
                     color: med.status === 'confirmed' ? COLORS.teal : med.status === 'skipped' ? COLORS.red : '#94a3b8',
-                    background: med.status === 'confirmed' ? 'rgba(79,209,197,0.1)' : med.status === 'skipped' ? 'rgba(255,90,95,0.08)' : '#f1f5f9',
+                    background: med.status === 'confirmed' ? 'rgba(79,209,197,0.08)' : med.status === 'skipped' ? 'rgba(255,90,95,0.06)' : '#f1f5f9',
+                    border: `1px solid ${med.status === 'confirmed' ? 'rgba(79,209,197,0.15)' : med.status === 'skipped' ? 'rgba(255,90,95,0.1)' : 'transparent'}`,
                   }}
                 >
-                  {med.status === 'confirmed' ? '✓ Confirmed' : med.status === 'skipped' ? `⊘ ${med.skipReason || 'Skipped'}` : 'Pending'}
+                  {med.status === 'confirmed' ? 'Confirmed' : med.status === 'skipped' ? `${med.skipReason || 'Skipped'}` : 'Pending'}
                 </span>
               </div>
             ))}
           </div>
           {skippedMeds.length > 0 && (
-            <div className="mt-2 text-[10px] text-amber-600 bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
-              ⚠️ {skippedMeds.length} medication(s) skipped — flagged for review.
+            <div className="mt-3 text-[10px] text-amber-700 rounded-lg px-3 py-2.5 flex items-center gap-1.5" style={{ background: 'rgba(246,183,60,0.08)', border: '1px solid rgba(246,183,60,0.12)' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.amber} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+              {skippedMeds.length} medication(s) skipped — flagged for review.
             </div>
           )}
         </div>
 
         {/* Tasks */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
-          <h3 className="font-bold text-sm text-slate-800 mb-3">Tasks</h3>
-          <div className="flex flex-col gap-1.5">
+        <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-sm text-slate-800">Tasks</h3>
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>{doneTasks}/{snapshot.tasks.length}</span>
+          </div>
+          <div className="flex flex-col gap-2">
             {snapshot.tasks.map((task, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm">
+              <div key={i} className="flex items-center gap-2.5 text-sm">
                 <div
-                  className="w-4 h-4 rounded flex items-center justify-center shrink-0"
+                  className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 transition-colors"
                   style={{
                     background: task.done ? COLORS.teal : 'transparent',
-                    border: `1px solid ${task.done ? COLORS.teal : '#cbd5e1'}`,
+                    border: `1.5px solid ${task.done ? COLORS.teal : '#cbd5e1'}`,
                   }}
                 >
                   {task.done && (
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   )}
@@ -242,23 +272,24 @@ export default function VisitSummaryScreen() {
 
         {/* Notes */}
         {snapshot.notes && (
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
+          <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
             <h3 className="font-bold text-sm text-slate-800 mb-2">Care Notes</h3>
             <p className="text-sm text-slate-600 whitespace-pre-wrap">{snapshot.notes}</p>
           </div>
         )}
 
         {/* Handover Note */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
+        <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-bold text-sm text-slate-800">Handover Note</h3>
             <button
               onClick={generateHandover}
               disabled={generating}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer border-none disabled:opacity-50"
-              style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
+              className="text-[11px] font-semibold px-3 py-1.5 rounded-xl cursor-pointer border-none disabled:opacity-50 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5"
+              style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
             >
-              {generating ? 'Generating...' : '✨ Auto-Generate'}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/><path d="M2 12h20"/></svg>
+              {generating ? 'Generating...' : 'Auto-Generate'}
             </button>
           </div>
           <textarea
@@ -274,10 +305,16 @@ export default function VisitSummaryScreen() {
         <button
           onClick={submitHandover}
           disabled={submitting || submitted}
-          className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none mb-6 disabled:opacity-50"
-          style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
+          className="w-full py-4 rounded-2xl font-bold text-base cursor-pointer border-none mb-6 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-50"
+          style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy, boxShadow: `0 8px 32px ${COLORS.teal}30` }}
         >
-          {submitted ? '✓ Handover Submitted' : submitting ? 'Submitting...' : 'Submit Handover →'}
+          {submitted ? (
+            <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Handover Submitted</>
+          ) : submitting ? (
+            <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Submitting...</>
+          ) : (
+            <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Submit Handover</>
+          )}
         </button>
       </div>
     </div>

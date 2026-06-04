@@ -11,6 +11,8 @@ const AICopilotScreen = lazy(() => import('./pages/AICopilotScreen'))
 const VisitSummaryScreen = lazy(() => import('./pages/VisitSummaryScreen'))
 const ManagerLoginScreen = lazy(() => import('./pages/ManagerLoginScreen'))
 const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'))
+const ClientManagement = lazy(() => import('./pages/ClientManagement'))
+const VisitScheduling = lazy(() => import('./pages/VisitScheduling'))
 
 function LoadingFallback() {
   return (
@@ -34,6 +36,8 @@ function App() {
         <Route path="/copilot" component={AICopilotScreen} />
         <Route path="/manager/login" component={ManagerLoginScreen} />
         <Route path="/manager" component={ManagerDashboard} />
+        <Route path="/manager/clients" component={ClientManagement} />
+        <Route path="/manager/schedule" component={VisitScheduling} />
       </Suspense>
     </Router>
   )

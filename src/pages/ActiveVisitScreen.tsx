@@ -7,12 +7,13 @@ import { enqueue } from '../utils/offlineQueue'
 import { fetchVisit, saveVisit, sendSOS } from '../api/client'
 
 const COLORS = {
-  darkNavy: '#0f1a2e',
+  darkNavy: '#0B1120',
   navy: '#1B2A49',
   teal: '#4FD1C5',
   teal2: '#40E0D0',
   red: '#FF5A5F',
   amber: '#F6B73C',
+  lavender: '#A78BFA',
 }
 
 export default function ActiveVisitScreen() {
@@ -203,57 +204,74 @@ export default function ActiveVisitScreen() {
           className="px-6 py-5 text-white shrink-0"
           style={{ background: `linear-gradient(160deg, ${COLORS.darkNavy} 0%, ${COLORS.navy} 100%)` }}
         >
+          <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] opacity-15 pointer-events-none" style={{ background: COLORS.teal }} />
           <button
             onClick={() => setLocation('/dashboard')}
-            className="text-white/60 hover:text-white text-sm flex items-center gap-1 mb-3 bg-transparent border-none cursor-pointer"
+            className="relative z-10 text-white/60 hover:text-white text-sm flex items-center gap-1 mb-4 bg-transparent border-none cursor-pointer transition-colors"
           >
-            ← Back
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            Back
           </button>
-          <h1 className="font-serif text-xl">Pre-Visit Briefing</h1>
-          <p className="text-white/50 text-sm">{client.name} — {visit.time}</p>
+          <div className="relative z-10 flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
+              {client.name.split(' ').map((n) => n[0]).join('')}
+            </div>
+            <div>
+              <h1 className="font-serif text-xl font-bold">{client.name}</h1>
+              <p className="text-white/50 text-sm">{visit.time} · {visit.duration}</p>
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 px-4 py-4 overflow-auto">
-          {/* Client Card */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
-            <div className="font-bold text-slate-800 mb-1">{client.name}</div>
-            <div className="text-xs text-slate-500 mb-2">{client.age} years · {client.address}</div>
-            {visit.flags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+          {/* Flags */}
+          {visit.flags.length > 0 && (
+            <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                <div className="text-xs font-bold text-slate-700">Important Flags</div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
                 {visit.flags.map((f) => (
-                  <span key={f} className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,90,95,0.08)', color: COLORS.red, border: '1px solid rgba(255,90,95,0.15)' }}>
+                  <span key={f} className="text-[10px] font-medium px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,90,95,0.06)', color: COLORS.red, border: '1px solid rgba(255,90,95,0.1)' }}>
                     {f}
                   </span>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Three-Point Briefing */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
+          {/* Briefing Cards */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
             <h3 className="font-bold text-sm text-slate-800 mb-3">Shift Briefing</h3>
             <div className="flex flex-col gap-3">
               <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm" style={{ background: 'rgba(79,209,197,0.1)' }}>👁️</div>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.teal}12, ${COLORS.teal2}08)` }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </div>
                 <div>
                   <div className="text-xs font-bold text-slate-700">Key Observations</div>
                   <div className="text-xs text-slate-500">{client.conditions.join(', ')}</div>
                 </div>
               </div>
               <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm" style={{ background: 'rgba(79,209,197,0.1)' }}>📋</div>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.teal}12, ${COLORS.teal2}08)` }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                </div>
                 <div>
                   <div className="text-xs font-bold text-slate-700">Open Tasks</div>
                   <div className="text-xs text-slate-500">{visit.tasks.join(', ')}</div>
                 </div>
               </div>
               <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm" style={{ background: 'rgba(79,209,197,0.1)' }}>🚩</div>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.teal}12, ${COLORS.teal2}08)` }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
                 <div>
-                  <div className="text-xs font-bold text-slate-700">Flags</div>
+                  <div className="text-xs font-bold text-slate-700">Care Preferences</div>
                   <div className="text-xs text-slate-500">{client.preferences}</div>
                   {client.emergencyContact && (
-                    <div className="text-xs text-slate-500 mt-1">Emergency: {client.emergencyContact}</div>
+                    <div className="text-[11px] text-slate-400 mt-1">Emergency: {client.emergencyContact}</div>
                   )}
                 </div>
               </div>
@@ -261,16 +279,24 @@ export default function ActiveVisitScreen() {
           </div>
 
           {/* Medications */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-4">
-            <h3 className="font-bold text-sm text-slate-800 mb-3">Medications Due</h3>
+          <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-sm text-slate-800">Medications Due</h3>
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>{client.medications.length} items</span>
+            </div>
             <div className="flex flex-col gap-2">
               {client.medications.map((med) => (
-                <div key={med.name} className="flex items-center justify-between text-xs py-2 border-b border-slate-100 last:border-0">
-                  <div>
-                    <div className="font-semibold text-slate-700">{med.name}</div>
-                    <div className="text-slate-400">{med.dose} · {med.frequency}</div>
+                <div key={med.name} className="flex items-center justify-between text-xs py-2.5 border-b border-slate-50 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(79,209,197,0.08)' }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-700">{med.name}</div>
+                      <div className="text-slate-400">{med.dose} · {med.frequency}</div>
+                    </div>
                   </div>
-                  <span className="w-2 h-2 rounded-full bg-teal shrink-0" />
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: COLORS.teal }} />
                 </div>
               ))}
             </div>
@@ -278,10 +304,11 @@ export default function ActiveVisitScreen() {
 
           <button
             onClick={() => setClockedIn(true)}
-            className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none"
-            style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
+            className="w-full py-4 rounded-2xl font-bold text-base cursor-pointer border-none transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+            style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy, boxShadow: `0 8px 32px ${COLORS.teal}30` }}
           >
-            Clock In →
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
+            Clock In
           </button>
         </div>
       </div>
@@ -293,20 +320,32 @@ export default function ActiveVisitScreen() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative">
       {/* Header */}
       <div
-        className="px-4 py-4 text-white shrink-0"
+        className="px-4 py-4 text-white shrink-0 relative overflow-hidden"
         style={{ background: `linear-gradient(160deg, ${COLORS.darkNavy} 0%, ${COLORS.navy} 100%)` }}
       >
-        <div className="flex items-center justify-between mb-2">
+        <div className="absolute top-0 right-0 w-48 h-48 rounded-full blur-[60px] opacity-15 pointer-events-none" style={{ background: COLORS.teal }} />
+        <div className="relative z-10 flex items-center justify-between mb-3">
           <button
             onClick={() => setClockedIn(false)}
-            className="text-white/60 hover:text-white text-xs bg-transparent border-none cursor-pointer"
+            className="text-white/60 hover:text-white text-xs bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors"
           >
-            ← Back
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            Back
           </button>
-          <div className="font-mono text-sm font-bold">{formatTime(elapsed)}</div>
+          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg" style={{ background: 'rgba(79,209,197,0.15)', border: '1px solid rgba(79,209,197,0.2)' }}>
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: COLORS.teal }} />
+            <div className="font-mono text-xs font-bold" style={{ color: COLORS.teal }}>{formatTime(elapsed)}</div>
+          </div>
         </div>
-        <div className="font-bold text-sm">{client.name}</div>
-        <div className="text-xs text-white/50">{visit.time} · {visit.duration}</div>
+        <div className="relative z-10 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
+            {client.name.split(' ').map((n) => n[0]).join('')}
+          </div>
+          <div>
+            <div className="font-bold text-sm">{client.name}</div>
+            <div className="text-[11px] text-white/40">{visit.time} · {visit.duration}</div>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 px-4 py-4 overflow-auto">
@@ -391,22 +430,24 @@ export default function ActiveVisitScreen() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="grid grid-cols-2 gap-2.5 mb-4">
           <button
             onClick={() => setShowVoiceDoc(true)}
-            className="py-3.5 rounded-xl text-xs font-semibold border cursor-pointer flex items-center justify-center gap-1 min-h-[48px]"
-            style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b', background: 'white' }}
+            className="py-3.5 rounded-xl text-xs font-semibold border cursor-pointer flex items-center justify-center gap-1.5 min-h-[48px] transition-all duration-200 hover:shadow-sm"
+            style={{ borderColor: 'rgba(0,0,0,0.06)', color: '#64748b', background: 'white' }}
             aria-label="Voice documentation"
           >
-            🎤 Voice Doc
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+            Voice Doc
           </button>
           <button
             onClick={() => setShowBodyMap(true)}
-            className="py-3.5 rounded-xl text-xs font-semibold border cursor-pointer flex items-center justify-center gap-1 min-h-[48px]"
-            style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b', background: 'white' }}
+            className="py-3.5 rounded-xl text-xs font-semibold border cursor-pointer flex items-center justify-center gap-1.5 min-h-[48px] transition-all duration-200 hover:shadow-sm"
+            style={{ borderColor: 'rgba(0,0,0,0.06)', color: '#64748b', background: 'white' }}
             aria-label="Body map photo"
           >
-            🩹 Body Map
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.2 7.8l-7.7 7.7-4-4-5.7 5.7"/><path d="M15 7h6v6"/></svg>
+            Body Map
           </button>
         </div>
 
@@ -420,10 +461,11 @@ export default function ActiveVisitScreen() {
             }
             setShowClockOut(true)
           }}
-          className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none mb-6"
-          style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
+          className="w-full py-4 rounded-2xl font-bold text-base cursor-pointer border-none mb-6 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+          style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy, boxShadow: `0 8px 32px ${COLORS.teal}30` }}
         >
-          Clock Out →
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+          Clock Out
         </button>
       </div>
 

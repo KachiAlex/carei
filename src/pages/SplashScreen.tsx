@@ -144,7 +144,7 @@ export default function SplashScreen() {
       {/* Hero */}
       <div ref={heroRef} className="relative z-10 flex-1 flex flex-col items-center px-6 pt-6 pb-12">
         {/* Stats ribbon */}
-        <div className="w-full max-w-xl mb-8" data-animate>
+        <div className="w-full max-w-6xl mb-8" data-animate>
           <div className="flex items-center justify-center gap-6 flex-wrap">
             {stats.map((s) => (
               <div key={s.label} className="text-center">
@@ -155,109 +155,115 @@ export default function SplashScreen() {
           </div>
         </div>
 
-        {/* Headline */}
-        <div className="w-full max-w-xl text-center mb-8" data-animate>
-          <div
-            className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 mb-5 text-[11px] font-semibold tracking-wide uppercase"
-            style={{ background: 'rgba(79,209,197,0.1)', color: COLORS.teal, border: `1px solid ${COLORS.teal}25` }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full glow-pulse inline-block" style={{ background: COLORS.teal }} />
-            Now with AI Copilot & Real-Time Manager Dashboard
-          </div>
-          <h1
-            className="font-serif text-white leading-[1.1] mb-4 font-bold"
-            style={{ fontSize: 'clamp(36px, 7vw, 56px)' }}
-          >
-            Care That<br />
-            <span style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              Documents Itself
-            </span>
-          </h1>
-          <p className="text-white/50 leading-relaxed max-w-md mx-auto" style={{ fontSize: 'clamp(14px, 2.2vw, 17px)' }}>
-            AI-powered care management for frontline carers.
-            Voice notes, digital MAR, instant handovers — all in one place.
-          </p>
-        </div>
-
-        {/* CTA Buttons */}
-        <div className="w-full max-w-sm flex flex-col gap-3 mb-10" data-animate>
-          <button
-            onClick={() => setLocation('/login')}
-            className="w-full py-4 px-6 rounded-2xl border-none font-bold text-base cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-            style={{
-              background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`,
-              color: COLORS.darkNavy,
-              boxShadow: `0 8px 32px ${COLORS.teal}40, inset 0 1px 0 rgba(255,255,255,0.3)`,
-            }}
-          >
-            Start Your Shift
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-            </svg>
-          </button>
-          <button
-            className="w-full py-3.5 px-6 rounded-2xl border text-white font-semibold text-sm cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:bg-white/5"
-            style={{ borderColor: 'rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.03)' }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="6 3 20 12 6 21 6 3" />
-            </svg>
-            Watch 90-Second Demo
-          </button>
-        </div>
-
-        {/* Trust badges */}
-        <div className="flex gap-3 flex-wrap justify-center max-w-xl mb-10" data-animate>
-          {[
-            { icon: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />, title: 'GDPR Ready', sub: 'UK Data Protection' },
-            { icon: <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>, title: 'NHS-Aligned', sub: 'DSPT Compliant' },
-            { icon: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></>, title: 'End-to-End', sub: 'Encrypted' },
-          ].map((b) => (
-            <div
-              key={b.title}
-              className="flex items-center gap-2.5 rounded-xl px-4 py-2.5 transition-all duration-200 hover:bg-white/8"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-            >
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${COLORS.teal}20, ${COLORS.teal2}10)` }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  {b.icon}
-                </svg>
+        {/* Two-column hero content */}
+        <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* Left: Text + CTAs + Badges */}
+          <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
+            {/* Headline */}
+            <div className="w-full mb-8" data-animate>
+              <div
+                className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 mb-5 text-[11px] font-semibold tracking-wide uppercase"
+                style={{ background: 'rgba(79,209,197,0.1)', color: COLORS.teal, border: `1px solid ${COLORS.teal}25` }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full glow-pulse inline-block" style={{ background: COLORS.teal }} />
+                Now with AI Copilot & Real-Time Manager Dashboard
               </div>
-              <div>
-                <div className="text-white text-xs font-semibold">{b.title}</div>
-                <div className="text-white/40 text-[10px]">{b.sub}</div>
-              </div>
+              <h1
+                className="font-serif text-white leading-[1.1] mb-4 font-bold"
+                style={{ fontSize: 'clamp(36px, 7vw, 56px)' }}
+              >
+                Care That<br />
+                <span style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                  Documents Itself
+                </span>
+              </h1>
+              <p className="text-white/50 leading-relaxed max-w-md mx-auto lg:mx-0" style={{ fontSize: 'clamp(14px, 2.2vw, 17px)' }}>
+                AI-powered care management for frontline carers.
+                Voice notes, digital MAR, instant handovers — all in one place.
+              </p>
             </div>
-          ))}
-        </div>
 
-        {/* Hero Image */}
-        <div className="w-full max-w-2xl relative" data-animate>
-          <div
-            className="rounded-3xl overflow-hidden relative"
-            style={{
-              border: '1px solid rgba(79,209,197,0.15)',
-              boxShadow: `0 24px 80px -20px ${COLORS.darkNavy}, 0 0 60px ${COLORS.teal}10`,
-            }}
-          >
-            <img
-              src="https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=1200&auto=format&fit=crop&q=80"
-              alt="Caregiver providing compassionate care"
-              className="w-full h-auto block"
-              style={{ filter: 'brightness(0.95) contrast(1.05)' }}
-            />
-            <div className="absolute bottom-0 left-0 right-0 h-24" style={{ background: 'linear-gradient(to top, rgba(11,17,32,0.8), transparent)' }} />
+            {/* CTA Buttons */}
+            <div className="w-full max-w-sm flex flex-col gap-3 mb-10" data-animate>
+              <button
+                onClick={() => setLocation('/login')}
+                className="w-full py-4 px-6 rounded-2xl border-none font-bold text-base cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                style={{
+                  background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`,
+                  color: COLORS.darkNavy,
+                  boxShadow: `0 8px 32px ${COLORS.teal}40, inset 0 1px 0 rgba(255,255,255,0.3)`,
+                }}
+              >
+                Start Your Shift
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+                </svg>
+              </button>
+              <button
+                className="w-full py-3.5 px-6 rounded-2xl border text-white font-semibold text-sm cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:bg-white/5"
+                style={{ borderColor: 'rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.03)' }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="6 3 20 12 6 21 6 3" />
+                </svg>
+                Watch 90-Second Demo
+              </button>
+            </div>
+
+            {/* Trust badges */}
+            <div className="flex gap-3 flex-wrap justify-center lg:justify-start max-w-xl" data-animate>
+              {[
+                { icon: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />, title: 'GDPR Ready', sub: 'UK Data Protection' },
+                { icon: <><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>, title: 'NHS-Aligned', sub: 'DSPT Compliant' },
+                { icon: <><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></>, title: 'End-to-End', sub: 'Encrypted' },
+              ].map((b) => (
+                <div
+                  key={b.title}
+                  className="flex items-center gap-2.5 rounded-xl px-4 py-2.5 transition-all duration-200 hover:bg-white/8"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${COLORS.teal}20, ${COLORS.teal2}10)` }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      {b.icon}
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="text-white text-xs font-semibold">{b.title}</div>
+                    <div className="text-white/40 text-[10px]">{b.sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div
-            className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full px-4 py-2"
-            style={{
-              background: 'rgba(11,17,32,0.9)',
-              border: `1px solid ${COLORS.teal}30`,
-              backdropFilter: 'blur(10px)',
-            }}
-          >
-            <span className="w-2 h-2 rounded-full glow-pulse inline-block" style={{ background: '#22c55e' }} />
-            <span className="text-white text-xs font-medium">Live across 200+ care homes</span>
+
+          {/* Right: Hero Image */}
+          <div className="w-full relative" data-animate>
+            <div
+              className="rounded-3xl overflow-hidden relative"
+              style={{
+                border: '1px solid rgba(79,209,197,0.15)',
+                boxShadow: `0 24px 80px -20px ${COLORS.darkNavy}, 0 0 60px ${COLORS.teal}10`,
+              }}
+            >
+              <img
+                src="https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=1200&auto=format&fit=crop&q=80"
+                alt="Caregiver providing compassionate care"
+                className="w-full h-auto block"
+                style={{ filter: 'brightness(0.95) contrast(1.05)' }}
+              />
+              <div className="absolute bottom-0 left-0 right-0 h-24" style={{ background: 'linear-gradient(to top, rgba(11,17,32,0.8), transparent)' }} />
+            </div>
+            <div
+              className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full px-4 py-2"
+              style={{
+                background: 'rgba(11,17,32,0.9)',
+                border: `1px solid ${COLORS.teal}30`,
+                backdropFilter: 'blur(10px)',
+              }}
+            >
+              <span className="w-2 h-2 rounded-full glow-pulse inline-block" style={{ background: '#22c55e' }} />
+              <span className="text-white text-xs font-medium">Live across 200+ care homes</span>
+            </div>
           </div>
         </div>
       </div>

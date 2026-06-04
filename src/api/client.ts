@@ -53,3 +53,109 @@ export async function fetchVisit(visitId: string) {
 export async function initDatabase() {
   return post('/init-db', {})
 }
+
+export async function getClients() {
+  return get('/clients')
+}
+
+export async function createClient(data: {
+  id: string
+  name: string
+  age?: number
+  address?: string
+  conditions?: string[]
+  medications?: { name: string; dose: string; frequency: string }[]
+  preferences?: string
+  emergencyContact?: string
+}) {
+  return post('/clients', data)
+}
+
+export async function updateClient(clientId: string, data: Partial<{
+  name: string
+  age: number
+  address: string
+  conditions: string[]
+  medications: { name: string; dose: string; frequency: string }[]
+  preferences: string
+  emergencyContact: string
+}>) {
+  const res = await fetch(`${API_BASE}/clients/${clientId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function deleteClient(clientId: string) {
+  const res = await fetch(`${API_BASE}/clients/${clientId}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function getScheduledVisits(from?: string, to?: string) {
+  const qs = from && to ? `?from=${from}&to=${to}` : ''
+  return get(`/schedule${qs}`)
+}
+
+export async function createScheduledVisit(data: {
+  id: string
+  clientId?: string
+  clientName: string
+  carerId?: string
+  carerName?: string
+  time?: string
+  duration?: string
+  tasks?: string[]
+  flags?: string[]
+  recurring?: string
+  visitDate: string
+}) {
+  return post('/schedule', data)
+}
+
+export async function updateScheduledVisit(visitId: string, data: Partial<{
+  clientId: string
+  clientName: string
+  carerId: string
+  carerName: string
+  time: string
+  duration: string
+  status: string
+  tasks: string[]
+  flags: string[]
+  recurring: string
+  visitDate: string
+}>) {
+  const res = await fetch(`${API_BASE}/schedule/${visitId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function deleteScheduledVisit(visitId: string) {
+  const res = await fetch(`${API_BASE}/schedule/${visitId}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
