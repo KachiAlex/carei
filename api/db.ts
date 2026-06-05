@@ -110,6 +110,37 @@ async function runInit() {
     )
   `
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS incidents (
+      id TEXT PRIMARY KEY,
+      carer_id TEXT,
+      carer_name TEXT,
+      client_id TEXT,
+      client_name TEXT,
+      type TEXT NOT NULL,
+      description TEXT,
+      severity TEXT DEFAULT 'medium',
+      timestamp TIMESTAMPTZ DEFAULT NOW(),
+      resolved BOOLEAN DEFAULT FALSE
+    )
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS medication_logs (
+      id TEXT PRIMARY KEY,
+      client_id TEXT,
+      client_name TEXT,
+      carer_id TEXT,
+      carer_name TEXT,
+      medication_name TEXT NOT NULL,
+      dose TEXT,
+      scheduled_time TEXT,
+      status TEXT DEFAULT 'pending',
+      reason TEXT,
+      timestamp TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+
   // Seed mock carers if empty
   const existing = await sql`SELECT COUNT(*) FROM carers` as any[]
   if (existing[0]?.count === '0') {

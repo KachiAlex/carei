@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation } from 'wouter'
-import { todayVisits, clients } from '../data/clients'
 import { getManagerData } from '../api/client'
 import { sendSOSAlert, sendSOSResolved, requestNotificationPermission } from '../utils/notifications'
 
@@ -15,36 +14,18 @@ const COLORS = {
   lavender: '#A78BFA',
 }
 
-// Mock carer data for manager view
-const carers = [
-  { id: 'c1', name: 'Sarah Johnson', status: 'in-visit', location: '12 Oak St', client: 'Margaret Wilson', since: '09:15', avatar: 'SJ' },
-  { id: 'c2', name: 'James Brown', status: 'in-visit', location: '45 Elm Ave', client: 'Robert Davies', since: '10:00', avatar: 'JB' },
-  { id: 'c3', name: 'Amina Patel', status: 'traveling', location: 'En route', client: 'Dorothy Lewis', since: '—', avatar: 'AP' },
-  { id: 'c4', name: 'David Chen', status: 'available', location: '—', client: '—', since: '—', avatar: 'DC' },
-]
-
-const incidents = [
-  { id: 'i1', carer: 'Sarah Johnson', client: 'Margaret Wilson', type: 'Medication skipped', time: '09:45', severity: 'medium' as const },
-  { id: 'i2', carer: 'James Brown', client: 'Robert Davies', type: 'SOS alert', time: '10:22', severity: 'high' as const },
-]
-
-const medicationsToday = [
-  { name: 'Donepezil', client: 'Margaret Wilson', time: '09:00', status: 'confirmed' as const, carer: 'Sarah Johnson' },
-  { name: 'Metformin', client: 'Margaret Wilson', time: '09:00', status: 'skipped' as const, carer: 'Sarah Johnson', reason: 'Client refused' },
-  { name: 'Amlodipine', client: 'Robert Davies', time: '10:00', status: 'confirmed' as const, carer: 'James Brown' },
-  { name: 'Warfarin', client: 'Dorothy Lewis', time: '11:00', status: 'pending' as const, carer: 'Amina Patel' },
-]
-
 export default function ManagerDashboard() {
   const [, setLocation] = useLocation()
   const [tab, setTab] = useState<'overview' | 'carers' | 'mar' | 'incidents'>('overview')
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null)
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set())
-  const [liveIncidents, setLiveIncidents] = useState(incidents)
+  const [liveIncidents, setLiveIncidents] = useState<any[]>([])
   const [sseConnected, setSseConnected] = useState(false)
   const [dbCarers, setDbCarers] = useState<any[]>([])
   const [dbVisits, setDbVisits] = useState<any[]>([])
   const [dbAlerts, setDbAlerts] = useState<any[]>([])
+  const [dbIncidents, setDbIncidents] = useState<any[]>([])
+  const [dbMedications, setDbMedications] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -53,6 +34,8 @@ export default function ManagerDashboard() {
         setDbCarers(data.carers || [])
         setDbVisits(data.visits || [])
         setDbAlerts(data.alerts || [])
+        setDbIncidents(data.incidents || [])
+        setDbMedications(data.medications || [])
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -86,24 +69,35 @@ export default function ManagerDashboard() {
     return () => { eventSource.close() }
   }, [])
 
-  const allIncidents = [...dbAlerts.map((a: any) => ({
-    id: a.id,
-    carer: a.visit_id || 'Unknown',
-    client: a.location || 'Unknown',
-    type: 'SOS Alert',
-    time: new Date(a.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-    severity: 'high' as const,
-  })), ...liveIncidents].filter((inc) => !resolvedIds.has(inc.id))
+  const allIncidents = [
+    ...dbAlerts.map((a: any) => ({
+      id: a.id,
+      carer: a.visit_id || 'Unknown',
+      client: a.location || 'Unknown',
+      type: 'SOS Alert',
+      time: new Date(a.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      severity: 'high' as const,
+    })),
+    ...dbIncidents.map((i: any) => ({
+      id: i.id,
+      carer: i.carer_name || 'Unknown',
+      client: i.client_name || 'Unknown',
+      type: i.type,
+      time: new Date(i.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+      severity: (i.severity || 'medium') as 'high' | 'medium',
+    })),
+    ...liveIncidents,
+  ].filter((inc) => !resolvedIds.has(inc.id))
 
   const stats = useMemo(() => {
-    const total = dbVisits.length || todayVisits.length
-    const completed = dbVisits.filter((v: any) => v.status === 'completed').length || todayVisits.filter((v) => v.status === 'completed').length
-    const inProgress = dbVisits.filter((v: any) => v.status === 'in-progress').length || todayVisits.filter((v) => v.status === 'in-progress').length
-    const pending = dbVisits.filter((v: any) => v.status === 'pending').length || todayVisits.filter((v) => v.status === 'pending').length
-    const medConfirmed = medicationsToday.filter((m) => m.status === 'confirmed').length
-    const medSkipped = medicationsToday.filter((m) => m.status === 'skipped').length
+    const total = dbVisits.length
+    const completed = dbVisits.filter((v: any) => v.status === 'completed').length
+    const inProgress = dbVisits.filter((v: any) => v.status === 'in-progress').length
+    const pending = dbVisits.filter((v: any) => v.status === 'pending').length
+    const medConfirmed = dbMedications.filter((m: any) => m.status === 'confirmed').length
+    const medSkipped = dbMedications.filter((m: any) => m.status === 'skipped').length
     return { total, completed, inProgress, pending, medConfirmed, medSkipped }
-  }, [dbVisits])
+  }, [dbVisits, dbMedications])
 
   const highSeverityCount = allIncidents.filter((i) => i.severity === 'high').length
 
@@ -178,8 +172,8 @@ export default function ManagerDashboard() {
       <div className="grid grid-cols-2 gap-2.5">
         {[
           { label: 'Visits Today', value: stats.total, sub: `${stats.completed} done · ${stats.inProgress} active`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg> },
-          { label: 'Medications', value: `${stats.medConfirmed}/${medicationsToday.length}`, sub: `${stats.medSkipped} skipped`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg> },
-          { label: 'Carers On Duty', value: '4', sub: '2 in visit · 1 traveling', icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+          { label: 'Medications', value: `${stats.medConfirmed}/${Math.max(dbMedications.length, 1)}`, sub: `${stats.medSkipped} skipped`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg> },
+          { label: 'Carers On Duty', value: dbCarers.length, sub: `${dbCarers.filter((c: any) => c.status === 'in-visit').length} in visit · ${dbCarers.filter((c: any) => c.status === 'traveling').length} traveling`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
           { label: 'Alerts', value: `${allIncidents.length}`, sub: `${highSeverityCount} high · ${allIncidents.length - highSeverityCount} medium`, alert: true, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl p-3 border border-slate-100 shadow-sm">
@@ -200,7 +194,10 @@ export default function ManagerDashboard() {
           </span>
         </div>
         <div className="flex flex-col gap-2">
-          {(dbCarers.length ? dbCarers : carers).map((carer: any) => (
+          {dbCarers.length === 0 && (
+            <div className="text-center py-6 text-slate-400 text-sm">No carers on duty</div>
+          )}
+          {dbCarers.map((carer: any) => (
             <div key={carer.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors">
               <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.darkNavy})` }}>
                 {carer.avatar}
@@ -276,7 +273,13 @@ export default function ManagerDashboard() {
 
   const renderCarers = () => (
     <div className="flex flex-col gap-3">
-      {(dbCarers.length ? dbCarers : carers).map((carer: any) => (
+      {dbCarers.length === 0 && (
+        <div className="text-center py-12">
+          <div className="text-slate-500 text-sm font-medium mb-1">No carers found</div>
+          <div className="text-slate-400 text-xs">Add carers in the admin panel.</div>
+        </div>
+      )}
+      {dbCarers.map((carer: any) => (
         <div key={carer.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.darkNavy})` }}>
@@ -320,9 +323,10 @@ export default function ManagerDashboard() {
   )
 
   const renderMAR = () => {
-    const confirmed = medicationsToday.filter((m) => m.status === 'confirmed').length
-    const skipped = medicationsToday.filter((m) => m.status === 'skipped').length
-    const pending = medicationsToday.filter((m) => m.status === 'pending').length
+    const confirmed = dbMedications.filter((m: any) => m.status === 'confirmed').length
+    const skipped = dbMedications.filter((m: any) => m.status === 'skipped').length
+    const pending = dbMedications.filter((m: any) => m.status === 'pending').length
+    const medCount = dbMedications.length
     return (
       <div className="flex flex-col gap-3">
         {/* MAR Summary */}
@@ -331,30 +335,34 @@ export default function ManagerDashboard() {
             <h3 className="font-bold text-sm text-slate-800">MAR Summary</h3>
             <span className="text-xs text-slate-400 font-mono">{new Date().toLocaleDateString('en-GB')}</span>
           </div>
-          <div className="flex items-center justify-center mb-3 relative">
-            <svg width="100" height="100" viewBox="0 0 100 100" className="transform -rotate-90">
-              <circle cx="50" cy="50" r="38" fill="none" stroke="#f1f5f9" strokeWidth="10" />
-              <circle
-                cx="50" cy="50" r="38" fill="none"
-                stroke={COLORS.teal}
-                strokeWidth="10"
-                strokeDasharray={`${(confirmed / medicationsToday.length) * 239} 239`}
-                strokeLinecap="round"
-              />
-              <circle
-                cx="50" cy="50" r="38" fill="none"
-                stroke={COLORS.red}
-                strokeWidth="10"
-                strokeDasharray={`${(skipped / medicationsToday.length) * 239} 239`}
-                strokeDashoffset={`-${(confirmed / medicationsToday.length) * 239}`}
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="text-xl font-bold text-slate-800">{confirmed}</div>
-              <div className="text-[10px] text-slate-400">of {medicationsToday.length}</div>
+          {medCount > 0 ? (
+            <div className="flex items-center justify-center mb-3 relative">
+              <svg width="100" height="100" viewBox="0 0 100 100" className="transform -rotate-90">
+                <circle cx="50" cy="50" r="38" fill="none" stroke="#f1f5f9" strokeWidth="10" />
+                <circle
+                  cx="50" cy="50" r="38" fill="none"
+                  stroke={COLORS.teal}
+                  strokeWidth="10"
+                  strokeDasharray={`${(confirmed / medCount) * 239} 239`}
+                  strokeLinecap="round"
+                />
+                <circle
+                  cx="50" cy="50" r="38" fill="none"
+                  stroke={COLORS.red}
+                  strokeWidth="10"
+                  strokeDasharray={`${(skipped / medCount) * 239} 239`}
+                  strokeDashoffset={`-${(confirmed / medCount) * 239}`}
+                  strokeLinecap="round"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <div className="text-xl font-bold text-slate-800">{confirmed}</div>
+                <div className="text-[10px] text-slate-400">of {medCount}</div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="text-center py-6 text-slate-400 text-sm">No medications logged today</div>
+          )}
           <div className="flex justify-center gap-4 mt-1">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full" style={{ background: COLORS.teal }} />
@@ -374,12 +382,15 @@ export default function ManagerDashboard() {
         {/* Medication List */}
         <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
           <h3 className="font-bold text-sm text-slate-800 mb-3">Medication Log</h3>
+          {dbMedications.length === 0 && (
+            <div className="text-center py-6 text-slate-400 text-sm">No medication records</div>
+          )}
           <div className="flex flex-col gap-2">
-            {medicationsToday.map((med, i) => (
+            {dbMedications.map((med: any, i: number) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-slate-50" style={{ background: med.status === 'skipped' ? 'rgba(255,90,95,0.03)' : 'white' }}>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-slate-700">{med.name}</span>
+                    <span className="font-semibold text-sm text-slate-700">{med.medication_name}</span>
                     <span
                       className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
                       style={{
@@ -391,7 +402,7 @@ export default function ManagerDashboard() {
                       {med.status}
                     </span>
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5">{med.client} · {med.time} · {med.carer}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">{med.client_name} · {med.scheduled_time} · {med.carer_name}</div>
                   {med.reason && <div className="text-[10px] mt-0.5" style={{ color: COLORS.red }}>Reason: {med.reason}</div>}
                 </div>
                 <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: med.status === 'confirmed' ? 'rgba(79,209,197,0.1)' : med.status === 'skipped' ? 'rgba(255,90,95,0.1)' : 'rgba(0,0,0,0.03)' }}>

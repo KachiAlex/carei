@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useLocation } from 'wouter'
-import { getScheduledVisits, createScheduledVisit, updateScheduledVisit, deleteScheduledVisit, getClients } from '../api/client'
+import { getScheduledVisits, createScheduledVisit, updateScheduledVisit, deleteScheduledVisit, getClients, getCarers } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -32,12 +32,6 @@ interface Client {
   name: string
 }
 
-const mockCarers = [
-  { id: 'c1', name: 'Sarah Johnson' },
-  { id: 'c2', name: 'James Brown' },
-  { id: 'c3', name: 'Amina Patel' },
-  { id: 'c4', name: 'David Chen' },
-]
 
 function generateId() {
   return 'v' + Math.random().toString(36).slice(2, 9)
@@ -68,6 +62,7 @@ export default function VisitScheduling() {
   const [selectedDate, setSelectedDate] = useState<string>(formatDateKey(today))
   const [visits, setVisits] = useState<ScheduledVisit[]>([])
   const [clients, setClients] = useState<Client[]>([])
+  const [carers, setCarers] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -93,15 +88,18 @@ export default function VisitScheduling() {
     try {
       const from = formatDateKey(new Date(viewYear, viewMonth, 1))
       const to = formatDateKey(new Date(viewYear, viewMonth + 1, 0))
-      const [scheduleData, clientData] = await Promise.all([
+      const [scheduleData, clientData, carerData] = await Promise.all([
         getScheduledVisits(from, to),
         getClients(),
+        getCarers(),
       ])
       setVisits(scheduleData.visits || [])
       setClients(clientData || [])
+      setCarers(carerData?.carers || [])
     } catch {
       setVisits([])
       setClients([])
+      setCarers([])
     } finally {
       setLoading(false)
     }
@@ -148,7 +146,7 @@ export default function VisitScheduling() {
 
   const handleSave = async () => {
     const client = clients.find((c) => c.id === form.clientId)
-    const carer = mockCarers.find((c) => c.id === form.carerId)
+    const carer = carers.find((c) => c.id === form.carerId)
     if (!client) return
     setSaving(true)
     const payload = {
@@ -351,7 +349,7 @@ export default function VisitScheduling() {
                   <label className="text-xs font-semibold text-slate-500 mb-1 block">Assigned Carer</label>
                   <select value={form.carerId} onChange={(e) => setForm((f) => ({ ...f, carerId: e.target.value }))} className="w-full px-3 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-teal focus:ring-1 focus:ring-teal/20 transition-all">
                     <option value="">Unassigned</option>
-                    {mockCarers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {carers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>

@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation, useParams } from 'wouter'
-import { todayVisits, clients } from '../data/clients'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
-import { fetchVisit, saveVisit, sendSOS, saveVisitDraft, getVisitDraft } from '../api/client'
+import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft } from '../api/client'
 import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
@@ -22,12 +21,13 @@ export default function ActiveVisitScreen() {
   const visitId = params?.id || ''
   const [, setLocation] = useLocation()
 
-  const visit = todayVisits.find((v) => v.id === visitId)
-  const client = visit ? clients.find((c) => c.id === visit.clientId) : null
+  const [visit, setVisit] = useState<any>(null)
+  const [client, setClient] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
   const [clockedIn, setClockedIn] = useState(false)
   const [elapsed, setElapsed] = useState(0)
-  const [tasks, setTasks] = useState(visit?.tasks.map((t) => ({ name: t, done: false })) || [])
+  const [tasks, setTasks] = useState<{ name: string; done: boolean }[]>([])
   const [fluid, setFluid] = useState(0)
   const [notes, setNotes] = useState('')
   const [showBodyMap, setShowBodyMap] = useState(false)
@@ -36,9 +36,7 @@ export default function ActiveVisitScreen() {
   const [transcript, setTranscript] = useState('')
   const [showClockOut, setShowClockOut] = useState(false)
   const [showSOSConfirm, setShowSOSConfirm] = useState(false)
-  const [meds, setMeds] = useState<{ name: string; dose: string; status: 'pending' | 'confirmed' | 'skipped'; skipReason?: string }[]>(
-    client?.medications.map((m) => ({ name: m.name, dose: m.dose, status: 'pending' })) || []
-  )
+  const [meds, setMeds] = useState<{ name: string; dose: string; status: 'pending' | 'confirmed' | 'skipped'; skipReason?: string }[]>([])
   const [showMedConfirm, setShowMedConfirm] = useState(false)
   const [selectedMed, setSelectedMed] = useState<string | null>(null)
   const [showSkipReason, setShowSkipReason] = useState(false)
@@ -48,32 +46,59 @@ export default function ActiveVisitScreen() {
 
   useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn }, 3000)
 
-  // Load existing visit data from DB + draft on mount
+  // Load visit + client from API, then DB data + draft
   useEffect(() => {
     if (!visitId) return
-    fetchVisit(visitId)
-      .then((data) => {
-        if (data && data.id && data.elapsed != null) {
-          setElapsed(data.elapsed)
-          if (data.tasks) setTasks(data.tasks)
-          if (data.fluid != null) setFluid(data.fluid)
-          if (data.notes) setNotes(data.notes)
-          if (data.medications) setMeds(data.medications)
-          if (data.clock_out_at) setClockedIn(false)
+    let mounted = true
+
+    async function load() {
+      try {
+        const v = await fetchVisit(visitId)
+        if (!mounted) return
+        if (v && v.id) setVisit(v)
+
+        let c = null
+        if (v?.clientId) {
+          try { c = await fetchClient(v.clientId) } catch {}
         }
-      })
-      .catch(() => {})
-    getVisitDraft(visitId)
-      .then((draft) => {
-        if (!draft) return
-        if (draft.elapsed != null) setElapsed(draft.elapsed)
-        if (draft.tasks) setTasks(draft.tasks)
-        if (draft.fluid != null) setFluid(draft.fluid)
-        if (draft.notes) setNotes(draft.notes)
-        if (draft.meds) setMeds(draft.meds)
-        if (draft.clockedIn != null) setClockedIn(draft.clockedIn)
-      })
-      .catch(() => {})
+        if (!mounted) return
+        if (c) setClient(c)
+
+        // Initialize tasks and meds from scheduled visit / client
+        if (v?.tasks && Array.isArray(v.tasks)) {
+          setTasks(v.tasks.map((t: string) => ({ name: t, done: false })))
+        }
+        if (c?.medications && Array.isArray(c.medications)) {
+          setMeds(c.medications.map((m: any) => ({ name: m.name, dose: m.dose || '', status: 'pending' as const })))
+        }
+
+        // Load saved visit data from DB
+        if (v && v.elapsed != null) {
+          setElapsed(v.elapsed)
+          if (v.tasks && Array.isArray(v.tasks)) setTasks(v.tasks)
+          if (v.fluid != null) setFluid(v.fluid)
+          if (v.notes) setNotes(v.notes)
+          if (v.medications) setMeds(v.medications)
+          if (v.clock_out_at) setClockedIn(false)
+        }
+
+        // Load draft
+        try {
+          const draft = await getVisitDraft(visitId)
+          if (!mounted || !draft) return
+          if (draft.elapsed != null) setElapsed(draft.elapsed)
+          if (draft.tasks) setTasks(draft.tasks)
+          if (draft.fluid != null) setFluid(draft.fluid)
+          if (draft.notes) setNotes(draft.notes)
+          if (draft.meds) setMeds(draft.meds)
+          if (draft.clockedIn != null) setClockedIn(draft.clockedIn)
+        } catch {}
+      } catch {}
+      if (mounted) setLoading(false)
+    }
+
+    load()
+    return () => { mounted = false }
   }, [visitId])
 
   // Medication reminder notification
@@ -85,7 +110,7 @@ export default function ActiveVisitScreen() {
         sendMedicationReminder(client.name, pending[0].name)
       })
     }
-  }, [])
+  }, [client, meds])
 
   // Debounced auto-save to DB
   useEffect(() => {
@@ -209,6 +234,17 @@ export default function ActiveVisitScreen() {
   const pendingMedsCount = meds.filter((m) => m.status === 'pending').length
   const allMedsHandled = meds.every((m) => m.status !== 'pending')
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-500">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-slate-200 border-t-teal-400 rounded-full animate-spin" />
+          <div className="text-sm">Loading visit...</div>
+        </div>
+      </div>
+    )
+  }
+
   if (!visit || !client) {
     return (
       <div className="min-h-screen flex items-center justify-center text-slate-500">
@@ -235,7 +271,7 @@ export default function ActiveVisitScreen() {
           </button>
           <div className="relative z-10 flex items-center gap-3 mb-2">
             <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
-              {client.name.split(' ').map((n) => n[0]).join('')}
+              {client.name.split(' ').map((n: string) => n[0]).join('')}
             </div>
             <div>
               <h1 className="font-serif text-xl font-bold">{client.name}</h1>
@@ -253,7 +289,7 @@ export default function ActiveVisitScreen() {
                 <div className="text-xs font-bold text-slate-700">Important Flags</div>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {visit.flags.map((f) => (
+                {visit.flags.map((f: string) => (
                   <span key={f} className="text-[10px] font-medium px-2.5 py-1 rounded-lg" style={{ background: 'rgba(255,90,95,0.06)', color: COLORS.red, border: '1px solid rgba(255,90,95,0.1)' }}>
                     {f}
                   </span>
@@ -306,7 +342,7 @@ export default function ActiveVisitScreen() {
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>{client.medications.length} items</span>
             </div>
             <div className="flex flex-col gap-2">
-              {client.medications.map((med) => (
+              {client.medications.map((med: any) => (
                 <div key={med.name} className="flex items-center justify-between text-xs py-2.5 border-b border-slate-50 last:border-0">
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(79,209,197,0.08)' }}>
@@ -360,7 +396,7 @@ export default function ActiveVisitScreen() {
         </div>
         <div className="relative z-10 flex items-center gap-2.5">
           <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
-            {client.name.split(' ').map((n) => n[0]).join('')}
+            {client.name.split(' ').map((n: string) => n[0]).join('')}
           </div>
           <div>
             <div className="font-bold text-sm">{client.name}</div>

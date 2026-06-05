@@ -60,6 +60,14 @@ export async function getClients() {
   return get('/clients')
 }
 
+export async function getCarers() {
+  return get('/carers')
+}
+
+export async function fetchClient(clientId: string) {
+  return get(`/clients/${clientId}`)
+}
+
 export async function createClient(data: {
   id: string
   name: string

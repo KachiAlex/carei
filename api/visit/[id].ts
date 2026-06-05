@@ -17,7 +17,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sql = getSql()
     if (req.method === 'GET') {
       const rows = await sql`SELECT * FROM visits WHERE id = ${visitId}`
-      res.status(200).json(rows[0] || { id: visitId, status: 'pending', data: null })
+      if (rows[0]) {
+        res.status(200).json(rows[0])
+        return
+      }
+      const scheduled = await sql`
+        SELECT
+          id,
+          client_id AS "clientId",
+          client_name AS "clientName",
+          time,
+          duration,
+          status,
+          tasks,
+          flags
+        FROM scheduled_visits
+        WHERE id = ${visitId}
+      `
+      if (scheduled[0]) {
+        res.status(200).json({ ...scheduled[0], status: 'pending' })
+        return
+      }
+      res.status(200).json({ id: visitId, status: 'pending', data: null })
       return
     }
 

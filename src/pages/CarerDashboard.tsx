@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation } from 'wouter'
-import { todayVisits } from '../data/clients'
 import type { Visit } from '../data/clients'
 import { getVisits, sendSOS, getMe, logoutUser } from '../api/client'
 import { enqueue } from '../utils/offlineQueue'
@@ -56,7 +55,7 @@ export default function CarerDashboard() {
   const [showSOSConfirm, setShowSOSConfirm] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [user, setUser] = useState<UserProfile | null>(null)
-  const [visits, setVisits] = useState<Visit[]>(todayVisits)
+  const [visits, setVisits] = useState<Visit[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -68,15 +67,13 @@ export default function CarerDashboard() {
   useEffect(() => {
     getVisits()
       .then((data) => {
-        if (data.visits?.length) {
-          setVisits(data.visits)
-          requestNotificationPermission().then(() => {
-            const pending = data.visits.filter((v: Visit) => v.status === 'pending')
-            if (pending.length > 0) {
-              sendVisitStartReminder(pending[0].clientName, pending[0].time)
-            }
-          })
-        }
+        setVisits(data.visits || [])
+        requestNotificationPermission().then(() => {
+          const pending = (data.visits || []).filter((v: Visit) => v.status === 'pending')
+          if (pending.length > 0) {
+            sendVisitStartReminder(pending[0].clientName, pending[0].time)
+          }
+        })
       })
       .catch(() => {})
       .finally(() => setLoading(false))

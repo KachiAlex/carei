@@ -15,11 +15,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const carers = await sql`SELECT * FROM carers ORDER BY name`
     const visits = await sql`SELECT * FROM visits ORDER BY submitted_at DESC LIMIT 50`
     const alerts = await sql`SELECT * FROM sos_alerts WHERE resolved = FALSE ORDER BY timestamp DESC LIMIT 20`
+    const incidents = await sql`SELECT * FROM incidents WHERE resolved = FALSE ORDER BY timestamp DESC LIMIT 50`
+    const medications = await sql`SELECT * FROM medication_logs WHERE DATE(timestamp) = CURRENT_DATE ORDER BY scheduled_time NULLS LAST LIMIT 100`
 
     res.status(200).json({
       carers,
       visits,
       alerts,
+      incidents,
+      medications,
     })
   } catch (err: any) {
     res.status(500).json({ error: err.message })
