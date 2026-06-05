@@ -30,8 +30,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       INSERT INTO users (id, name, email, phone, region, pin, role, token)
       VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role}, ${token})
     `
+    res.setHeader('Set-Cookie', `carei_token=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`)
     res.status(201).json({
-      token,
       user: { id, name, email: email.toLowerCase(), phone, region, role },
     })
   } catch (err: any) {

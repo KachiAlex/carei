@@ -1,16 +1,11 @@
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
-
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('carei_token')
-  const h: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) h['Authorization'] = `Bearer ${token}`
-  return h
-}
+const jsonHeaders = { 'Content-Type': 'application/json' }
 
 async function post(path: string, body: unknown) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: jsonHeaders,
+    credentials: 'include',
     body: JSON.stringify(body),
   })
   if (!res.ok) {
@@ -21,7 +16,7 @@ async function post(path: string, body: unknown) {
 }
 
 async function get(path: string) {
-  const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders() })
+  const res = await fetch(`${API_BASE}${path}`, { credentials: 'include' })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
@@ -89,7 +84,8 @@ export async function updateClient(clientId: string, data: Partial<{
 }>) {
   const res = await fetch(`${API_BASE}/clients/${clientId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonHeaders,
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) {
@@ -102,6 +98,7 @@ export async function updateClient(clientId: string, data: Partial<{
 export async function deleteClient(clientId: string) {
   const res = await fetch(`${API_BASE}/clients/${clientId}`, {
     method: 'DELETE',
+    credentials: 'include',
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
@@ -146,7 +143,8 @@ export async function updateScheduledVisit(visitId: string, data: Partial<{
 }>) {
   const res = await fetch(`${API_BASE}/schedule/${visitId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonHeaders,
+    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) {
@@ -159,7 +157,7 @@ export async function updateScheduledVisit(visitId: string, data: Partial<{
 export async function deleteScheduledVisit(visitId: string) {
   const res = await fetch(`${API_BASE}/schedule/${visitId}`, {
     method: 'DELETE',
-    headers: authHeaders(),
+    credentials: 'include',
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
@@ -184,6 +182,30 @@ export async function loginUser(data: { email: string; pin: string }) {
   return post('/auth/login', data)
 }
 
+export async function logoutUser() {
+  return post('/auth/logout', {})
+}
+
 export async function getMe() {
   return get('/auth/me')
+}
+
+export async function saveVisitDraft(visitId: string, data: unknown) {
+  return post(`/visit/${visitId}/draft`, data)
+}
+
+export async function getVisitDraft(visitId: string) {
+  return get(`/visit/${visitId}/draft`)
+}
+
+export async function deleteVisitDraft(visitId: string) {
+  const res = await fetch(`${API_BASE}/visit/${visitId}/draft`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
 }

@@ -35,8 +35,7 @@ export default function LoginScreen() {
 
     setLoading(true)
     try {
-      const res = await loginUser({ email: email.trim().toLowerCase(), pin })
-      localStorage.setItem('carei_token', res.token)
+      await loginUser({ email: email.trim().toLowerCase(), pin })
       setLoading(false)
       setLocation('/dashboard')
     } catch (err: any) {

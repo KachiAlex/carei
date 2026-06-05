@@ -10,9 +10,6 @@ const COLORS = {
 
 export default function OTPScreen() {
   const [, setLocation] = useLocation()
-  const method = sessionStorage.getItem('carei_otp_method') || 'sms'
-  const target = sessionStorage.getItem('carei_otp_target') || ''
-  const expectedOtp = sessionStorage.getItem('carei_otp') || ''
 
   const [code, setCode] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState('')
@@ -47,13 +44,6 @@ export default function OTPScreen() {
     setLoading(true)
     await new Promise((r) => setTimeout(r, 800))
     setLoading(false)
-    // In development, accept the generated OTP. In production, verify server-side.
-    if (expectedOtp && full !== expectedOtp) {
-      setError('Invalid code. Try again.')
-      setCode(['', '', '', '', '', ''])
-      inputRefs.current[0]?.focus()
-      return
-    }
     setLocation('/dashboard')
   }
 
@@ -70,19 +60,10 @@ export default function OTPScreen() {
           ← Back
         </button>
 
-        <h1 className="font-serif text-white text-3xl mb-2">Verify your {method === 'sms' ? 'number' : 'email'}</h1>
-        <p className="text-white/50 mb-4">
-          Enter the 6-digit code sent to <span className="text-white/80">{target}</span>
+        <h1 className="font-serif text-white text-3xl mb-2">Verify your account</h1>
+        <p className="text-white/50 mb-6">
+          Enter the 6-digit code sent to your email.
         </p>
-
-        {/* Development OTP display */}
-        {expectedOtp && (
-          <div className="bg-teal/10 border border-teal/30 rounded-xl p-4 mb-6 text-center">
-            <div className="text-xs text-teal mb-1">Development — Your OTP code</div>
-            <div className="text-2xl font-mono font-bold tracking-widest" style={{ color: COLORS.teal }}>{expectedOtp}</div>
-            <div className="text-[10px] text-white/40 mt-1">This appears because domain verification is pending</div>
-          </div>
-        )}
 
         <div className="flex gap-2 mb-6 justify-center">
           {code.map((digit, i) => (

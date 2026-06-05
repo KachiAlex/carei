@@ -40,8 +40,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const token = generateToken()
     await sql`UPDATE users SET token = ${token} WHERE id = ${user.id}`
 
+    res.setHeader('Set-Cookie', `carei_token=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`)
     res.status(200).json({
-      token,
       user: {
         id: user.id,
         name: user.name,

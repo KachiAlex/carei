@@ -48,7 +48,7 @@ export default function CreateAccountScreen() {
 
     setLoading(true)
     try {
-      const res = await registerUser({
+      await registerUser({
         id: crypto.randomUUID ? crypto.randomUUID() : `u-${Date.now()}`,
         name: name.trim(),
         email: email.trim().toLowerCase(),
@@ -57,7 +57,6 @@ export default function CreateAccountScreen() {
         pin,
         role: 'carer',
       })
-      localStorage.setItem('carei_token', res.token)
       setLoading(false)
       setLocation('/dashboard')
     } catch (err: any) {

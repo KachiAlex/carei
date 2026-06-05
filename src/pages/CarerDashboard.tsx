@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { todayVisits } from '../data/clients'
 import type { Visit } from '../data/clients'
-import { getVisits, sendSOS, getMe } from '../api/client'
+import { getVisits, sendSOS, getMe, logoutUser } from '../api/client'
 import { enqueue } from '../utils/offlineQueue'
 import { sendVisitStartReminder, requestNotificationPermission } from '../utils/notifications'
 
@@ -433,8 +433,8 @@ export default function CarerDashboard() {
                 Close
               </button>
               <button
-                onClick={() => {
-                  localStorage.removeItem('carei_token')
+                onClick={async () => {
+                  try { await logoutUser() } catch {}
                   setLocation('/')
                 }}
                 className="flex-1 py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"

@@ -4,7 +4,7 @@ import { todayVisits, clients } from '../data/clients'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
-import { fetchVisit, saveVisit, sendSOS } from '../api/client'
+import { fetchVisit, saveVisit, sendSOS, saveVisitDraft, getVisitDraft } from '../api/client'
 import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
@@ -36,11 +36,9 @@ export default function ActiveVisitScreen() {
   const [transcript, setTranscript] = useState('')
   const [showClockOut, setShowClockOut] = useState(false)
   const [showSOSConfirm, setShowSOSConfirm] = useState(false)
-  const [meds, setMeds] = useState<{ name: string; dose: string; status: 'pending' | 'confirmed' | 'skipped'; skipReason?: string }[]>(() => {
-    const saved = localStorage.getItem(`carei_active_${visitId}`)
-    if (saved) try { const d = JSON.parse(saved); if (d.meds) return d.meds } catch {}
-    return client?.medications.map((m) => ({ name: m.name, dose: m.dose, status: 'pending' })) || []
-  })
+  const [meds, setMeds] = useState<{ name: string; dose: string; status: 'pending' | 'confirmed' | 'skipped'; skipReason?: string }[]>(
+    client?.medications.map((m) => ({ name: m.name, dose: m.dose, status: 'pending' })) || []
+  )
   const [showMedConfirm, setShowMedConfirm] = useState(false)
   const [selectedMed, setSelectedMed] = useState<string | null>(null)
   const [showSkipReason, setShowSkipReason] = useState(false)
@@ -48,9 +46,9 @@ export default function ActiveVisitScreen() {
   const recognitionRef = useRef<any>(null)
   const dbSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useAutoSave(`carei_active_${visitId}`, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn }, 3000)
+  useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn }, 3000)
 
-  // Load existing visit data from DB on mount
+  // Load existing visit data from DB + draft on mount
   useEffect(() => {
     if (!visitId) return
     fetchVisit(visitId)
@@ -63,6 +61,17 @@ export default function ActiveVisitScreen() {
           if (data.medications) setMeds(data.medications)
           if (data.clock_out_at) setClockedIn(false)
         }
+      })
+      .catch(() => {})
+    getVisitDraft(visitId)
+      .then((draft) => {
+        if (!draft) return
+        if (draft.elapsed != null) setElapsed(draft.elapsed)
+        if (draft.tasks) setTasks(draft.tasks)
+        if (draft.fluid != null) setFluid(draft.fluid)
+        if (draft.notes) setNotes(draft.notes)
+        if (draft.meds) setMeds(draft.meds)
+        if (draft.clockedIn != null) setClockedIn(draft.clockedIn)
       })
       .catch(() => {})
   }, [visitId])
@@ -604,7 +613,7 @@ export default function ActiveVisitScreen() {
                     medications: meds.map((m) => ({ name: m.name, dose: m.dose, status: m.status, skipReason: m.skipReason })),
                     clockOutAt: new Date().toISOString(),
                   }
-                  localStorage.setItem(`carei_visit_${visit.id}`, JSON.stringify(snapshot))
+                  try { await saveVisitDraft(visit.id, { snapshot }) } catch {}
                   try { await saveVisit(visit.id, snapshot) } catch {}
                   setLocation(`/summary/${visit.id}`)
                 }}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useRoute } from 'wouter'
-import { summarizeTranscript, saveVisit } from '../api/client'
+import { summarizeTranscript, saveVisit, getVisitDraft, deleteVisitDraft } from '../api/client'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
@@ -47,24 +47,17 @@ export default function VisitSummaryScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  useAutoSave(`carei_handover_${visitId}`, { handoverNote }, 3000)
+  useAutoSave(visitId, { handoverNote }, 3000)
 
   useEffect(() => {
-    const raw = localStorage.getItem(`carei_visit_${visitId}`)
-    if (raw) {
-      try {
-        setSnapshot(JSON.parse(raw))
-      } catch {
-        // ignore
-      }
-    }
-    const savedHandover = localStorage.getItem(`carei_handover_${visitId}`)
-    if (savedHandover) {
-      try {
-        const d = JSON.parse(savedHandover)
-        if (d.handoverNote) setHandoverNote(d.handoverNote)
-      } catch {}
-    }
+    if (!visitId) return
+    getVisitDraft(visitId)
+      .then((data) => {
+        if (!data) return
+        if (data.snapshot) setSnapshot(data.snapshot)
+        if (data.handoverNote) setHandoverNote(data.handoverNote)
+      })
+      .catch(() => {})
   }, [visitId])
 
   const generateHandover = async () => {
@@ -110,8 +103,7 @@ export default function VisitSummaryScreen() {
     setSubmitting(true)
     try {
       await saveVisit(visitId, payload)
-      localStorage.removeItem(`carei_visit_${visitId}`)
-      localStorage.removeItem(`carei_handover_${visitId}`)
+      try { await deleteVisitDraft(visitId) } catch {}
       triggerHaptic(HAPTIC_PATTERNS.success)
       setSubmitted(true)
       setTimeout(() => setLocation('/dashboard'), 1500)
