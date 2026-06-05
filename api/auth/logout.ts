@@ -1,11 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { neon } from '@neondatabase/serverless'
-
-const connectionString = process.env.DATABASE_URL
-if (!connectionString) throw new Error('DATABASE_URL not set')
-const sql = neon(connectionString)
+import { getSql, setCors } from '../_db'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(res)
+  if (req.method === 'OPTIONS') { res.status(200).end(); return }
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' })
     return
@@ -17,6 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (token) {
     try {
+      const sql = getSql()
       await sql`UPDATE users SET token = NULL WHERE token = ${token}`
     } catch {}
   }

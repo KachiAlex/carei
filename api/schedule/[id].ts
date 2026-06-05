@@ -1,11 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { neon } from '@neondatabase/serverless'
-
-const connectionString = process.env.DATABASE_URL
-if (!connectionString) throw new Error('DATABASE_URL not set')
-const sql = neon(connectionString)
+import { getSql, setCors } from '../../_db'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(res)
+  if (req.method === 'OPTIONS') { res.status(200).end(); return }
   const { id } = req.query
   const visitId = Array.isArray(id) ? id[0] : id
 
@@ -14,10 +12,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  if (req.method === 'PATCH' || req.method === 'PUT') {
-    const body = req.body || {}
-    const { clientId, clientName, carerId, carerName, time, duration, status, tasks, flags, recurring, visitDate } = body
-    try {
+  try {
+    const sql = getSql()
+    if (req.method === 'PATCH' || req.method === 'PUT') {
+      const body = req.body || {}
+      const { clientId, clientName, carerId, carerName, time, duration, status, tasks, flags, recurring, visitDate } = body
       await sql`
         UPDATE scheduled_visits SET
           client_id = COALESCE(${clientId || null}, client_id),
@@ -34,21 +33,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         WHERE id = ${visitId}
       `
       res.status(200).json({ status: 'updated', id: visitId })
-    } catch (err: any) {
-      res.status(500).json({ error: err.message })
+      return
     }
-    return
-  }
 
-  if (req.method === 'DELETE') {
-    try {
+    if (req.method === 'DELETE') {
       await sql`DELETE FROM scheduled_visits WHERE id = ${visitId}`
       res.status(200).json({ status: 'deleted', id: visitId })
-    } catch (err: any) {
-      res.status(500).json({ error: err.message })
+      return
     }
-    return
-  }
 
-  res.status(405).json({ error: 'Method not allowed' })
+    res.status(405).json({ error: 'Method not allowed' })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
 }

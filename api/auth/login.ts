@@ -1,15 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { neon } from '@neondatabase/serverless'
-
-const connectionString = process.env.DATABASE_URL
-if (!connectionString) throw new Error('DATABASE_URL not set')
-const sql = neon(connectionString)
+import { getSql, setCors } from '../_db'
 
 function generateToken(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(res)
+  if (req.method === 'OPTIONS') { res.status(200).end(); return }
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' })
     return
@@ -24,6 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const sql = getSql()
     const rows = await sql`
       SELECT id, name, email, phone, region, pin, role
       FROM users

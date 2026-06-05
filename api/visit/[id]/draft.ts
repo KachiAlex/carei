@@ -1,11 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { neon } from '@neondatabase/serverless'
-
-const connectionString = process.env.DATABASE_URL
-if (!connectionString) throw new Error('DATABASE_URL not set')
-const sql = neon(connectionString)
+import { getSql, setCors } from '../../../_db'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(res)
+  if (req.method === 'OPTIONS') { res.status(200).end(); return }
   const { id } = req.query
   const visitId = Array.isArray(id) ? id[0] : id
 
@@ -14,18 +12,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  if (req.method === 'GET') {
-    try {
+  try {
+    const sql = getSql()
+    if (req.method === 'GET') {
       const rows = await sql`SELECT data FROM visit_drafts WHERE visit_id = ${visitId}` as any[]
       res.status(200).json(rows[0]?.data || null)
-    } catch (err: any) {
-      res.status(500).json({ error: err.message })
+      return
     }
-    return
-  }
 
-  if (req.method === 'POST') {
-    try {
+    if (req.method === 'POST') {
       const data = req.body || {}
       await sql`
         INSERT INTO visit_drafts (visit_id, data, updated_at)
@@ -35,21 +30,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           updated_at = NOW()
       `
       res.status(200).json({ status: 'saved' })
-    } catch (err: any) {
-      res.status(500).json({ error: err.message })
+      return
     }
-    return
-  }
 
-  if (req.method === 'DELETE') {
-    try {
+    if (req.method === 'DELETE') {
       await sql`DELETE FROM visit_drafts WHERE visit_id = ${visitId}`
       res.status(200).json({ status: 'deleted' })
-    } catch (err: any) {
-      res.status(500).json({ error: err.message })
+      return
     }
-    return
-  }
 
-  res.status(405).json({ error: 'Method not allowed' })
+    res.status(405).json({ error: 'Method not allowed' })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
 }

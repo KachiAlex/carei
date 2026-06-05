@@ -1,12 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { neon } from '@neondatabase/serverless'
+import { getSql, setCors } from './_db'
 import { broadcast } from './events'
 
-const connectionString = process.env.DATABASE_URL
-if (!connectionString) throw new Error('DATABASE_URL not set')
-const sql = neon(connectionString)
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(res)
+  if (req.method === 'OPTIONS') { res.status(200).end(); return }
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' })
     return
@@ -15,10 +13,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { visitId, location, timestamp } = req.body || {}
   const alertId = `SOS-${Date.now()}`
 
-  await sql`
-    INSERT INTO sos_alerts (id, visit_id, location, timestamp)
-    VALUES (${alertId}, ${visitId}, ${location}, ${timestamp || new Date().toISOString()})
-  `
+  try {
+    const sql = getSql()
+    await sql`
+      INSERT INTO sos_alerts (id, visit_id, location, timestamp)
+      VALUES (${alertId}, ${visitId}, ${location}, ${timestamp || new Date().toISOString()})
+    `
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+    return
+  }
 
   const alert = {
     type: 'sos',

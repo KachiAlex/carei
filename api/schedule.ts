@@ -1,14 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { neon } from '@neondatabase/serverless'
-
-const connectionString = process.env.DATABASE_URL
-if (!connectionString) throw new Error('DATABASE_URL not set')
-const sql = neon(connectionString)
+import { getSql, setCors } from './_db'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(res)
+  if (req.method === 'OPTIONS') { res.status(200).end(); return }
   if (req.method === 'GET') {
     const { from, to } = req.query as { from?: string; to?: string }
     try {
+      const sql = getSql()
       let rows
       if (from && to) {
         rows = await sql`
@@ -64,6 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
     try {
+      const sql = getSql()
       await sql`
         INSERT INTO scheduled_visits (
           id, client_id, client_name, carer_id, carer_name,
