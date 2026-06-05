@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { useLocation } from 'wouter'
 import { todayVisits, clients } from '../data/clients'
 import { getManagerData } from '../api/client'
@@ -158,8 +159,8 @@ export default function ManagerDashboard() {
             { day: 'Sat', value: 4 },
             { day: 'Sun', value: 3 },
           ].map((d) => (
-            <div key={d.day} className="flex-1 flex flex-col items-center gap-1.5">
-              <div className="w-full relative rounded-lg overflow-hidden" style={{ height: `${(d.value / 16) * 100}%`, minHeight: 8 }}>
+            <div key={d.day} className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer">
+              <div className="w-full relative rounded-lg overflow-hidden transition-all duration-300 group-hover:brightness-110" style={{ height: `${(d.value / 16) * 100}%`, minHeight: 8 }}>
                 <div
                   className="absolute inset-0 rounded-lg transition-all duration-500"
                   style={{
@@ -167,7 +168,7 @@ export default function ManagerDashboard() {
                   }}
                 />
               </div>
-              <span className="text-[10px] text-slate-400 font-medium">{d.day}</span>
+              <span className="text-[10px] text-slate-400 font-medium group-hover:text-slate-600 transition-colors">{d.day}</span>
             </div>
           ))}
         </div>
@@ -330,17 +331,31 @@ export default function ManagerDashboard() {
             <h3 className="font-bold text-sm text-slate-800">MAR Summary</h3>
             <span className="text-xs text-slate-400 font-mono">{new Date().toLocaleDateString('en-GB')}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex-1">
-              <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex">
-                <div className="h-full rounded-full" style={{ width: `${(confirmed / medicationsToday.length) * 100}%`, background: COLORS.teal }} />
-                <div className="h-full rounded-full" style={{ width: `${(skipped / medicationsToday.length) * 100}%`, background: COLORS.red }} />
-                <div className="h-full rounded-full" style={{ width: `${(pending / medicationsToday.length) * 100}%`, background: '#cbd5e1' }} />
-              </div>
+          <div className="flex items-center justify-center mb-3 relative">
+            <svg width="100" height="100" viewBox="0 0 100 100" className="transform -rotate-90">
+              <circle cx="50" cy="50" r="38" fill="none" stroke="#f1f5f9" strokeWidth="10" />
+              <circle
+                cx="50" cy="50" r="38" fill="none"
+                stroke={COLORS.teal}
+                strokeWidth="10"
+                strokeDasharray={`${(confirmed / medicationsToday.length) * 239} 239`}
+                strokeLinecap="round"
+              />
+              <circle
+                cx="50" cy="50" r="38" fill="none"
+                stroke={COLORS.red}
+                strokeWidth="10"
+                strokeDasharray={`${(skipped / medicationsToday.length) * 239} 239`}
+                strokeDashoffset={`-${(confirmed / medicationsToday.length) * 239}`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div className="text-xl font-bold text-slate-800">{confirmed}</div>
+              <div className="text-[10px] text-slate-400">of {medicationsToday.length}</div>
             </div>
-            <span className="text-xs font-bold text-slate-700">{confirmed}/{medicationsToday.length}</span>
           </div>
-          <div className="flex gap-4 mt-2.5">
+          <div className="flex justify-center gap-4 mt-1">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full" style={{ background: COLORS.teal }} />
               <span className="text-[10px] text-slate-500">{confirmed} Confirmed</span>
@@ -531,12 +546,18 @@ export default function ManagerDashboard() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-4 py-4 overflow-auto">
+      <motion.div
+        className="flex-1 px-4 py-4 overflow-auto"
+        key={tab}
+        initial={{ opacity: 0, x: 8 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.2 }}
+      >
         {tab === 'overview' && renderOverview()}
         {tab === 'carers' && renderCarers()}
         {tab === 'mar' && renderMAR()}
         {tab === 'incidents' && renderIncidents()}
-      </div>
+      </motion.div>
     </div>
   )
 }

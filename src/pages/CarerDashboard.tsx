@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { useLocation } from 'wouter'
 import { todayVisits } from '../data/clients'
 import type { Visit } from '../data/clients'
@@ -92,6 +93,8 @@ export default function CarerDashboard() {
     }, 0) / 60).toFixed(1)
     return { total, completed, inProgress, pending, hours }
   }, [visits])
+
+  const nextVisit = useMemo(() => visits.find((v) => v.status === 'pending'), [visits])
 
   const handleBriefing = (visitId: string) => {
     if (playingBrief === visitId) {
@@ -276,12 +279,52 @@ export default function CarerDashboard() {
           </div>
         )}
 
-        <div className="flex flex-col gap-3">
+        {!loading && nextVisit && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35 }}
+            className="mb-4 rounded-2xl p-4 border"
+            style={{ background: `linear-gradient(135deg, ${COLORS.darkNavy}, ${COLORS.navy})`, borderColor: `${COLORS.teal}30` }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Up Next</span>
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/10 text-white/70">{nextVisit.time}</span>
+            </div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: 'rgba(79,209,197,0.2)', color: COLORS.teal }}>
+                {nextVisit.clientName.split(' ').map((n: string) => n[0]).join('')}
+              </div>
+              <div>
+                <div className="font-bold text-sm text-white">{nextVisit.clientName}</div>
+                <div className="text-[11px] text-white/50">{nextVisit.duration} &middot; {nextVisit.tasks.slice(0, 2).join(', ')}{nextVisit.tasks.length > 2 ? '...' : ''}</div>
+              </div>
+            </div>
+            <button
+              onClick={() => setLocation(`/visit/${nextVisit.id}`)}
+              className="w-full py-2.5 rounded-xl text-xs font-semibold text-white border-none cursor-pointer transition-all hover:opacity-90 active:scale-[0.98]"
+              style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+            >
+              Start Visit
+            </button>
+          </motion.div>
+        )}
+
+        <motion.div
+          className="flex flex-col gap-3"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            hidden: { opacity: 0 },
+            visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+          }}
+        >
           {visits.map((visit, idx) => (
-            <div
+            <motion.div
               key={visit.id}
+              variants={{ hidden: { opacity: 0, y: 12 }, visible: { opacity: 1, y: 0 } }}
+              transition={{ duration: 0.3 }}
               className="group bg-white rounded-2xl p-4 border border-slate-100 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
-              style={{ animationDelay: `${idx * 60}ms` }}
             >
               {/* Top row: avatar + name + status */}
               <div className="flex items-center justify-between mb-3">
@@ -380,9 +423,9 @@ export default function CarerDashboard() {
                   {visit.status === 'in-progress' ? 'Continue Visit' : visit.status === 'completed' ? 'View Summary' : 'Start Visit'}
                 </button>
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </div>
 
       {/* SOS Floating Button */}
