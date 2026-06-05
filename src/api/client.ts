@@ -1,9 +1,16 @@
 const API_BASE = import.meta.env.VITE_API_URL || '/api'
 
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('carei_token')
+  const h: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) h['Authorization'] = `Bearer ${token}`
+  return h
+}
+
 async function post(path: string, body: unknown) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(body),
   })
   if (!res.ok) {
@@ -14,7 +21,7 @@ async function post(path: string, body: unknown) {
 }
 
 async function get(path: string) {
-  const res = await fetch(`${API_BASE}${path}`)
+  const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders() })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
@@ -152,10 +159,31 @@ export async function updateScheduledVisit(visitId: string, data: Partial<{
 export async function deleteScheduledVisit(visitId: string) {
   const res = await fetch(`${API_BASE}/schedule/${visitId}`, {
     method: 'DELETE',
+    headers: authHeaders(),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
   return res.json()
+}
+
+export async function registerUser(data: {
+  id: string
+  name: string
+  email: string
+  phone: string
+  region: string
+  pin: string
+  role?: string
+}) {
+  return post('/auth/register', data)
+}
+
+export async function loginUser(data: { email: string; pin: string }) {
+  return post('/auth/login', data)
+}
+
+export async function getMe() {
+  return get('/auth/me')
 }

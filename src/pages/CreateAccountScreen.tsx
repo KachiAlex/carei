@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useLocation } from 'wouter'
+import { registerUser } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -7,16 +8,6 @@ const COLORS = {
   teal: '#4FD1C5',
   teal2: '#40E0D0',
   red: '#FF5A5F',
-}
-
-interface UserProfile {
-  name: string
-  email: string
-  phone: string
-  region: string
-  pin: string
-  role: 'carer'
-  createdAt: string
 }
 
 function validateUKMobile(phone: string): boolean {
@@ -56,22 +47,23 @@ export default function CreateAccountScreen() {
     if (pin !== confirmPin) { setError('PINs do not match'); return }
 
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 600))
-
-    const profile: UserProfile = {
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      phone: phone.replace(/\s/g, ''),
-      region,
-      pin,
-      role: 'carer',
-      createdAt: new Date().toISOString(),
+    try {
+      const res = await registerUser({
+        id: crypto.randomUUID ? crypto.randomUUID() : `u-${Date.now()}`,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.replace(/\s/g, ''),
+        region,
+        pin,
+        role: 'carer',
+      })
+      localStorage.setItem('carei_token', res.token)
+      setLoading(false)
+      setLocation('/dashboard')
+    } catch (err: any) {
+      setLoading(false)
+      setError(err.message || 'Failed to create account')
     }
-
-    localStorage.setItem('carei_user', JSON.stringify(profile))
-    localStorage.setItem('carei_session', JSON.stringify({ email: profile.email, loggedInAt: new Date().toISOString() }))
-    setLoading(false)
-    setLocation('/dashboard')
   }
 
   return (

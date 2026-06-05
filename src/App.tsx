@@ -4,7 +4,6 @@ import { useOnlineSync } from './hooks/useOnlineSync'
 
 const SplashScreen = lazy(() => import('./pages/SplashScreen'))
 const LoginScreen = lazy(() => import('./pages/LoginScreen'))
-const OTPScreen = lazy(() => import('./pages/OTPScreen'))
 const CarerDashboard = lazy(() => import('./pages/CarerDashboard'))
 const ActiveVisitScreen = lazy(() => import('./pages/ActiveVisitScreen'))
 const AICopilotScreen = lazy(() => import('./pages/AICopilotScreen'))
@@ -30,7 +29,6 @@ function App() {
       <Suspense fallback={<LoadingFallback />}>
         <Route path="/" component={SplashScreen} />
         <Route path="/login" component={LoginScreen} />
-        <Route path="/otp" component={OTPScreen} />
         <Route path="/dashboard" component={CarerDashboard} />
         <Route path="/visit/:id" component={ActiveVisitScreen} />
         <Route path="/summary/:id" component={VisitSummaryScreen} />

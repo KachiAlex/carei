@@ -83,6 +83,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       )
     `
 
+    await sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        phone TEXT NOT NULL,
+        region TEXT NOT NULL,
+        pin TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'carer',
+        token TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+
     // Seed mock carers if empty
     const existing = await sql`SELECT COUNT(*) FROM carers` as any[]
     if (existing[0]?.count === '0') {
