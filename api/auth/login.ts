@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from '../_db'
+import { getSql, setCors, ensureTables } from '../db'
 
 function generateToken(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
