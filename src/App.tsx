@@ -13,6 +13,7 @@ const ManagerLoginScreen = lazy(() => import('./pages/ManagerLoginScreen'))
 const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'))
 const ClientManagement = lazy(() => import('./pages/ClientManagement'))
 const VisitScheduling = lazy(() => import('./pages/VisitScheduling'))
+const CreateAccountScreen = lazy(() => import('./pages/CreateAccountScreen'))
 
 function LoadingFallback() {
   return (
@@ -34,6 +35,7 @@ function App() {
         <Route path="/visit/:id" component={ActiveVisitScreen} />
         <Route path="/summary/:id" component={VisitSummaryScreen} />
         <Route path="/copilot" component={AICopilotScreen} />
+        <Route path="/register" component={CreateAccountScreen} />
         <Route path="/manager/login" component={ManagerLoginScreen} />
         <Route path="/manager" component={ManagerDashboard} />
         <Route path="/manager/clients" component={ClientManagement} />

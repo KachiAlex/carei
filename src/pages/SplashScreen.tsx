@@ -200,13 +200,14 @@ export default function SplashScreen() {
                 </svg>
               </button>
               <button
+                onClick={() => setLocation('/register')}
                 className="w-full py-3.5 px-6 rounded-2xl border text-white font-semibold text-sm cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:bg-white/5"
                 style={{ borderColor: 'rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.03)' }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="6 3 20 12 6 21 6 3" />
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" />
                 </svg>
-                Watch 90-Second Demo
+                Create Account
               </button>
             </div>
 

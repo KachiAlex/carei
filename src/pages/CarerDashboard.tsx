@@ -36,12 +36,34 @@ function getStatusLabel(status: Visit['status']) {
   return map[status]
 }
 
+interface UserProfile {
+  name: string
+  email: string
+  phone: string
+  region: string
+  pin: string
+  role: string
+}
+
+function getInitials(name: string) {
+  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
 export default function CarerDashboard() {
   const [, setLocation] = useLocation()
   const [playingBrief, setPlayingBrief] = useState<string | null>(null)
   const [showSOSConfirm, setShowSOSConfirm] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
+  const [user, setUser] = useState<UserProfile | null>(null)
   const [visits, setVisits] = useState<Visit[]>(todayVisits)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const raw = localStorage.getItem('carei_user')
+    if (raw) {
+      try { setUser(JSON.parse(raw)) } catch {}
+    }
+  }, [])
 
   useEffect(() => {
     getVisits()
@@ -123,18 +145,23 @@ export default function CarerDashboard() {
         <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] opacity-20 pointer-events-none" style={{ background: COLORS.teal }} />
 
         <div className="relative z-10 flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${COLORS.teal}30, ${COLORS.teal2}20)` }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+          <button
+            onClick={() => setShowProfile(true)}
+            className="flex items-center gap-3 bg-transparent border-none cursor-pointer rounded-xl p-1 -ml-1 transition-colors hover:bg-white/5"
+          >
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}30, ${COLORS.teal2}20)`, color: COLORS.teal }}>
+              {user ? getInitials(user.name) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              )}
             </div>
-            <div>
-              <div className="text-sm font-bold">Sarah</div>
-              <div className="text-[11px] text-white/40">Carer — Manchester</div>
+            <div className="text-left">
+              <div className="text-sm font-bold">{user?.name || 'Carer'}</div>
+              <div className="text-[11px] text-white/40">{user?.role ? `${user.role.charAt(0).toUpperCase() + user.role.slice(1)}` : 'Carer'}{user?.region ? ` — ${user.region}` : ''}</div>
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setLocation('/copilot')}
@@ -368,6 +395,59 @@ export default function CarerDashboard() {
       >
         SOS
       </button>
+
+      {/* Profile Modal */}
+      {showProfile && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6" onClick={() => setShowProfile(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
+                {user ? getInitials(user.name) : 'C'}
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800">{user?.name || 'Carer'}</h3>
+                <p className="text-xs text-slate-400">{user?.email || ''}</p>
+              </div>
+            </div>
+            {user && (
+              <div className="flex flex-col gap-3 mb-5 text-sm text-slate-600">
+                <div className="flex justify-between py-2 border-b border-slate-100">
+                  <span className="text-slate-400">Phone</span>
+                  <span className="font-medium">{user.phone}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-slate-100">
+                  <span className="text-slate-400">Region</span>
+                  <span className="font-medium">{user.region}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-slate-100">
+                  <span className="text-slate-400">Role</span>
+                  <span className="font-medium capitalize">{user.role}</span>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowProfile(false)}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold border cursor-pointer"
+                style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b', background: 'transparent' }}
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  localStorage.removeItem('carei_user')
+                  localStorage.removeItem('carei_session')
+                  setLocation('/')
+                }}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+                style={{ background: COLORS.red }}
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SOS Confirmation Modal */}
       {showSOSConfirm && (

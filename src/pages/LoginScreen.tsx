@@ -138,8 +138,14 @@ export default function LoginScreen() {
         </button>
 
         <button
-          onClick={() => setLocation('/manager/login')}
+          onClick={() => setLocation('/register')}
           className="w-full mt-4 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
+        >
+          Create Account →
+        </button>
+        <button
+          onClick={() => setLocation('/manager/login')}
+          className="w-full mt-2 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
         >
           Manager Login →
         </button>
