@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors } from '../_db'
+import { getSql, setCors, ensureTables } from '../_db'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res)
@@ -10,6 +10,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    await ensureTables()
     const sql = getSql()
     const carers = await sql`SELECT * FROM carers ORDER BY name`
     const visits = await sql`SELECT * FROM visits ORDER BY submitted_at DESC LIMIT 50`

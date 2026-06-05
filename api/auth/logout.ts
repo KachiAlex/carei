@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors } from '../_db'
+import { getSql, setCors, ensureTables } from '../_db'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res)
@@ -15,6 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (token) {
     try {
+      await ensureTables()
       const sql = getSql()
       await sql`UPDATE users SET token = NULL WHERE token = ${token}`
     } catch {}

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors } from '../_db'
+import { getSql, setCors, ensureTables } from '../_db'
 
 function generateToken(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
@@ -22,6 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    await ensureTables()
     const sql = getSql()
     const rows = await sql`
       SELECT id, name, email, phone, region, pin, role

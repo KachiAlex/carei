@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors } from './_db'
+import { getSql, setCors, ensureTables } from './_db'
 import { broadcast } from './events'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -14,6 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const alertId = `SOS-${Date.now()}`
 
   try {
+    await ensureTables()
     const sql = getSql()
     await sql`
       INSERT INTO sos_alerts (id, visit_id, location, timestamp)

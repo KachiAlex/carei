@@ -1,11 +1,12 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors } from './_db'
+import { getSql, setCors, ensureTables } from './_db'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
   if (req.method === 'GET') {
     try {
+      await ensureTables()
       const sql = getSql()
       const rows = await sql`SELECT * FROM clients ORDER BY name`
       res.status(200).json(rows)
@@ -23,6 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
     try {
+      await ensureTables()
       const sql = getSql()
       await sql`
         INSERT INTO clients (id, name, age, address, conditions, medications, preferences, emergency_contact)

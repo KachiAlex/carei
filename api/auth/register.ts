@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors } from '../_db'
+import { getSql, setCors, ensureTables } from '../_db'
 
 function generateToken(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
@@ -24,6 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const token = generateToken()
 
   try {
+    await ensureTables()
     const sql = getSql()
     await sql`
       INSERT INTO users (id, name, email, phone, region, pin, role, token)

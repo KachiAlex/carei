@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors } from '../../../_db'
+import { getSql, setCors, ensureTables } from '../../../_db'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res)
@@ -13,6 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    await ensureTables()
     const sql = getSql()
     if (req.method === 'GET') {
       const rows = await sql`SELECT data FROM visit_drafts WHERE visit_id = ${visitId}` as any[]
