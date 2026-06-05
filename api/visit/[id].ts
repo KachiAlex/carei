@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from '../../db'
+import { getSql, setCors, ensureTables } from '../db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res)
