@@ -101,10 +101,37 @@ export default function ManagerDashboard() {
 
   const highSeverityCount = allIncidents.filter((i) => i.severity === 'high').length
 
-  const renderOverview = () => (
+  const cardVariants = {
+    hidden: { opacity: 0, y: 16, scale: 0.98 },
+    visible: (i: number) => ({ opacity: 1, y: 0, scale: 1, transition: { delay: i * 0.06, duration: 0.4, ease: 'easeOut' as const } }),
+  }
+
+  const renderSkeleton = () => (
     <div className="flex flex-col gap-3">
+      {[0, 1, 2, 3].map((i) => (
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.08, duration: 0.35 }}
+          className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm"
+        >
+          <div className="h-4 w-32 rounded bg-slate-100 animate-pulse mb-3" />
+          <div className="h-8 w-full rounded bg-slate-100 animate-pulse mb-3" />
+          <div className="grid grid-cols-3 gap-2">
+            <div className="h-10 rounded bg-slate-100 animate-pulse" />
+            <div className="h-10 rounded bg-slate-100 animate-pulse" />
+            <div className="h-10 rounded bg-slate-100 animate-pulse" />
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  )
+
+  const renderOverview = () => (
+    <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
       {/* Completion Rate */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+      <motion.div custom={0} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-300">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="font-bold text-sm text-slate-800">Today's Completion</h3>
@@ -138,10 +165,10 @@ export default function ManagerDashboard() {
             </div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* Weekly Visit Chart */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+      <motion.div custom={1} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
         <h3 className="font-bold text-sm text-slate-800 mb-3">Weekly Visits</h3>
         <div className="flex items-end gap-2 h-24">
           {[
@@ -152,21 +179,30 @@ export default function ManagerDashboard() {
             { day: 'Fri', value: stats.total || 6 },
             { day: 'Sat', value: 4 },
             { day: 'Sun', value: 3 },
-          ].map((d) => (
-            <div key={d.day} className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer">
+          ].map((d, idx) => (
+            <motion.div
+              key={d.day}
+              initial={{ scaleY: 0 }}
+              animate={{ scaleY: 1 }}
+              transition={{ delay: 0.3 + idx * 0.05, duration: 0.5, ease: 'easeOut' }}
+              className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer origin-bottom"
+            >
               <div className="w-full relative rounded-lg overflow-hidden transition-all duration-300 group-hover:brightness-110" style={{ height: `${(d.value / 16) * 100}%`, minHeight: 8 }}>
-                <div
-                  className="absolute inset-0 rounded-lg transition-all duration-500"
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: '100%' }}
+                  transition={{ delay: 0.3 + idx * 0.05, duration: 0.6, ease: 'easeOut' }}
+                  className="absolute bottom-0 left-0 right-0 rounded-lg"
                   style={{
                     background: d.day === 'Fri' ? `linear-gradient(180deg, ${COLORS.teal}, ${COLORS.teal2})` : 'linear-gradient(180deg, #e2e8f0, #cbd5e1)',
                   }}
                 />
               </div>
               <span className="text-[10px] text-slate-400 font-medium group-hover:text-slate-600 transition-colors">{d.day}</span>
-            </div>
+            </motion.div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2.5">
@@ -175,17 +211,24 @@ export default function ManagerDashboard() {
           { label: 'Medications', value: `${stats.medConfirmed}/${Math.max(dbMedications.length, 1)}`, sub: `${stats.medSkipped} skipped`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg> },
           { label: 'Carers On Duty', value: dbCarers.length, sub: `${dbCarers.filter((c: any) => c.status === 'in-visit').length} in visit · ${dbCarers.filter((c: any) => c.status === 'traveling').length} traveling`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
           { label: 'Alerts', value: `${allIncidents.length}`, sub: `${highSeverityCount} high · ${allIncidents.length - highSeverityCount} medium`, alert: true, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> },
-        ].map((s) => (
-          <div key={s.label} className="bg-white rounded-xl p-3 border border-slate-100 shadow-sm">
+        ].map((s, i) => (
+          <motion.div
+            key={s.label}
+            custom={i + 3}
+            variants={cardVariants}
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            className="bg-white rounded-xl p-3 border border-slate-100 shadow-sm cursor-default"
+          >
             <div className="flex items-center gap-1.5 text-slate-300 mb-1.5">{s.icon}<span className="text-[10px] text-slate-400 uppercase tracking-wider">{s.label}</span></div>
             <div className="text-xl font-bold text-slate-800">{s.value}</div>
             <div className={`text-[10px] ${s.alert ? 'text-red-400' : 'text-slate-400'}`}>{s.sub}</div>
-          </div>
+          </motion.div>
         ))}
       </div>
 
       {/* Live Carer Status */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+      <motion.div custom={7} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-sm text-slate-800">Live Carer Status</h3>
           <span className="flex items-center gap-1 text-[10px] font-medium" style={{ color: COLORS.teal }}>
@@ -195,10 +238,17 @@ export default function ManagerDashboard() {
         </div>
         <div className="flex flex-col gap-2">
           {dbCarers.length === 0 && (
-            <div className="text-center py-6 text-slate-400 text-sm">No carers on duty</div>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-6 text-slate-400 text-sm">No carers on duty</motion.div>
           )}
-          {dbCarers.map((carer: any) => (
-            <div key={carer.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+          {dbCarers.map((carer: any, idx: number) => (
+            <motion.div
+              key={carer.id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 + idx * 0.06, duration: 0.3 }}
+              whileHover={{ x: 4, backgroundColor: 'rgba(248,250,252,1)' }}
+              className="flex items-center gap-3 p-2.5 rounded-xl transition-colors cursor-default"
+            >
               <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.darkNavy})` }}>
                 {carer.avatar}
               </div>
@@ -221,24 +271,27 @@ export default function ManagerDashboard() {
                 </div>
               </div>
               <div className="text-xs text-slate-400 shrink-0 font-mono">{carer.since}</div>
-            </div>
+            </motion.div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* Recent Incidents */}
       {allIncidents.length > 0 && (
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+        <motion.div custom={8} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
           <h3 className="font-bold text-sm text-slate-800 mb-3">Recent Alerts</h3>
           <div className="flex flex-col gap-2">
-            {allIncidents.slice(0, 5).map((inc) => (
-              <button
+            {allIncidents.slice(0, 5).map((inc, idx) => (
+              <motion.button
                 key={inc.id}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.5 + idx * 0.05, duration: 0.3 }}
+                whileHover={{ scale: 1.01, backgroundColor: 'rgba(0,0,0,0.04)' }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setSelectedIncident(inc.id)}
                 className="flex items-center gap-3 text-left p-3 rounded-xl cursor-pointer border-none transition-colors"
                 style={{ background: 'rgba(0,0,0,0.02)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.02)')}
               >
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
@@ -255,32 +308,40 @@ export default function ManagerDashboard() {
                   <div className="text-xs text-slate-400">{inc.carer} · {inc.client}</div>
                 </div>
                 <div className="text-xs text-slate-400 shrink-0 font-mono">{inc.time}</div>
-              </button>
+              </motion.button>
             ))}
           </div>
           {allIncidents.length > 5 && (
-            <button
+            <motion.button
+              whileHover={{ x: 2 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => setTab('incidents')}
               className="w-full mt-2 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 bg-transparent border-none cursor-pointer"
             >
               View all {allIncidents.length} alerts →
-            </button>
+            </motion.button>
           )}
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   )
 
   const renderCarers = () => (
-    <div className="flex flex-col gap-3">
+    <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
       {dbCarers.length === 0 && (
-        <div className="text-center py-12">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
           <div className="text-slate-500 text-sm font-medium mb-1">No carers found</div>
           <div className="text-slate-400 text-xs">Add carers in the admin panel.</div>
-        </div>
+        </motion.div>
       )}
-      {dbCarers.map((carer: any) => (
-        <div key={carer.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+      {dbCarers.map((carer: any, idx: number) => (
+        <motion.div
+          key={carer.id}
+          custom={idx}
+          variants={cardVariants}
+          whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}
+          className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm cursor-default"
+        >
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.darkNavy})` }}>
               {carer.avatar}
@@ -317,9 +378,9 @@ export default function ManagerDashboard() {
               <span className="text-slate-700">3 visits</span>
             </div>
           </div>
-        </div>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   )
 
   const renderMAR = () => {
@@ -328,9 +389,9 @@ export default function ManagerDashboard() {
     const pending = dbMedications.filter((m: any) => m.status === 'pending').length
     const medCount = dbMedications.length
     return (
-      <div className="flex flex-col gap-3">
+      <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
         {/* MAR Summary */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+        <motion.div custom={0} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-sm text-slate-800">MAR Summary</h3>
             <span className="text-xs text-slate-400 font-mono">{new Date().toLocaleDateString('en-GB')}</span>
@@ -377,17 +438,25 @@ export default function ManagerDashboard() {
               <span className="text-[10px] text-slate-500">{pending} Pending</span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Medication List */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+        <motion.div custom={1} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
           <h3 className="font-bold text-sm text-slate-800 mb-3">Medication Log</h3>
           {dbMedications.length === 0 && (
-            <div className="text-center py-6 text-slate-400 text-sm">No medication records</div>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-6 text-slate-400 text-sm">No medication records</motion.div>
           )}
           <div className="flex flex-col gap-2">
             {dbMedications.map((med: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-slate-50" style={{ background: med.status === 'skipped' ? 'rgba(255,90,95,0.03)' : 'white' }}>
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + i * 0.04, duration: 0.3 }}
+                whileHover={{ scale: 1.01, backgroundColor: med.status === 'skipped' ? 'rgba(255,90,95,0.05)' : 'rgba(248,250,252,1)' }}
+                className="flex items-center justify-between p-3 rounded-xl border border-slate-50 cursor-default"
+                style={{ background: med.status === 'skipped' ? 'rgba(255,90,95,0.03)' : 'white' }}
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-sm text-slate-700">{med.medication_name}</span>
@@ -416,18 +485,30 @@ export default function ManagerDashboard() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   )}
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     )
   }
 
   const renderIncidents = () => (
-    <div className="flex flex-col gap-3">
-      {allIncidents.map((inc) => (
-        <div key={inc.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+    <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
+      {allIncidents.length === 0 && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
+          <div className="text-slate-500 text-sm font-medium mb-1">No incidents reported</div>
+          <div className="text-slate-400 text-xs">Everything is running smoothly.</div>
+        </motion.div>
+      )}
+      {allIncidents.map((inc, idx) => (
+        <motion.div
+          key={inc.id}
+          custom={idx}
+          variants={cardVariants}
+          whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}
+          className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm cursor-default"
+        >
           <div className="flex items-center gap-2 mb-2">
             <div
               className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
@@ -452,23 +533,25 @@ export default function ManagerDashboard() {
             <div className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg> {inc.client}</div>
           </div>
           <div className="flex gap-2">
-            <button className="flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all hover:bg-slate-50" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>Review</button>
-            <button
+            <motion.button whileTap={{ scale: 0.97 }} className="flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all hover:bg-slate-50" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>Review</motion.button>
+            <motion.button
+              whileTap={{ scale: 0.97 }}
               onClick={() => {
                 setResolvedIds((prev) => new Set([...prev, inc.id]))
                 sendSOSResolved(inc.client)
               }}
               className="flex-1 py-2 rounded-xl text-xs font-semibold border-none cursor-pointer transition-all hover:opacity-90 text-white"
               style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
-            >Resolve</button>
+            >Resolve</motion.button>
           </div>
-        </div>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   )
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans items-center">
+      <div className="w-full max-w-3xl flex flex-col min-h-screen">
       {/* Header */}
       <div
         className="px-6 pt-5 pb-5 text-white shrink-0 relative overflow-hidden"
@@ -537,8 +620,9 @@ export default function ManagerDashboard() {
             { key: 'mar' as const, label: 'MAR' },
             { key: 'incidents' as const, label: 'Alerts' },
           ].map((t) => (
-            <button
+            <motion.button
               key={t.key}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setTab(t.key)}
               className="px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer border-none transition-all duration-200"
               style={{
@@ -551,7 +635,7 @@ export default function ManagerDashboard() {
               {t.key === 'incidents' && allIncidents.length > 0 && (
                 <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: COLORS.red, color: 'white' }}>{allIncidents.length}</span>
               )}
-            </button>
+            </motion.button>
           ))}
         </div>
       </div>
@@ -564,11 +648,13 @@ export default function ManagerDashboard() {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.2 }}
       >
-        {tab === 'overview' && renderOverview()}
-        {tab === 'carers' && renderCarers()}
-        {tab === 'mar' && renderMAR()}
-        {tab === 'incidents' && renderIncidents()}
+        {loading && renderSkeleton()}
+        {!loading && tab === 'overview' && renderOverview()}
+        {!loading && tab === 'carers' && renderCarers()}
+        {!loading && tab === 'mar' && renderMAR()}
+        {!loading && tab === 'incidents' && renderIncidents()}
       </motion.div>
+      </div>
     </div>
   )
 }

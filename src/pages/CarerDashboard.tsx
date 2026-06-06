@@ -134,7 +134,8 @@ export default function CarerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative items-center">
+      <div className="w-full max-w-3xl flex flex-col min-h-screen relative pb-safe">
       {/* Header */}
       <div
         className="px-6 pt-5 pb-6 text-white shrink-0 relative overflow-hidden"
@@ -144,7 +145,8 @@ export default function CarerDashboard() {
         <div className="absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] opacity-20 pointer-events-none" style={{ background: COLORS.teal }} />
 
         <div className="relative z-10 flex items-center justify-between mb-5">
-          <button
+          <motion.button
+            whileTap={{ scale: 0.97 }}
             onClick={() => setShowProfile(true)}
             className="flex items-center gap-3 bg-transparent border-none cursor-pointer rounded-xl p-1 -ml-1 transition-colors hover:bg-white/5"
           >
@@ -160,9 +162,10 @@ export default function CarerDashboard() {
               <div className="text-sm font-bold">{user?.name || 'Carer'}</div>
               <div className="text-[11px] text-white/40">{user?.role ? `${user.role.charAt(0).toUpperCase() + user.role.slice(1)}` : 'Carer'}{user?.region ? ` — ${user.region}` : ''}</div>
             </div>
-          </button>
+          </motion.button>
           <div className="flex items-center gap-2">
-            <button
+            <motion.button
+              whileTap={{ scale: 0.9 }}
               onClick={() => setLocation('/copilot')}
               className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
               title="AI Copilot"
@@ -170,8 +173,9 @@ export default function CarerDashboard() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z" />
               </svg>
-            </button>
-            <button
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
               onClick={() => setLocation('/')}
               className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
               title="Log out"
@@ -179,7 +183,7 @@ export default function CarerDashboard() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" />
               </svg>
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -525,6 +529,7 @@ export default function CarerDashboard() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
