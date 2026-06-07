@@ -28,7 +28,7 @@ const COLORS = {
 
 export default function ManagerDashboard() {
   const [, setLocation] = useLocation()
-  const [tab, setTab] = useState<'overview' | 'carers' | 'mar' | 'incidents' | 'staff' | 'clients' | 'assignments' | 'logs'>('overview')
+  const [tab, setTab] = useState<'overview' | 'team' | 'clients' | 'schedule' | 'logs'>('overview')
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null)
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set())
   const [liveIncidents, setLiveIncidents] = useState<any[]>([])
@@ -329,76 +329,116 @@ export default function ManagerDashboard() {
             ))}
           </div>
           {allIncidents.length > 5 && (
-            <motion.button
-              whileHover={{ x: 2 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setTab('incidents')}
-              className="w-full mt-2 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 bg-transparent border-none cursor-pointer"
-            >
-              View all {allIncidents.length} alerts →
-            </motion.button>
+            <div className="w-full mt-2 py-2 text-xs font-semibold text-slate-400 text-center">
+              +{allIncidents.length - 5} more alerts
+            </div>
           )}
         </motion.div>
       )}
     </motion.div>
   )
 
-  const renderCarers = () => (
-    <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
-      {dbCarers.length === 0 && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
-          <div className="text-slate-500 text-sm font-medium mb-1">No carers found</div>
-          <div className="text-slate-400 text-xs">Add carers in the admin panel.</div>
-        </motion.div>
-      )}
-      {dbCarers.map((carer: any, idx: number) => (
-        <motion.div
-          key={carer.id}
-          custom={idx}
-          variants={cardVariants}
-          whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}
-          className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm cursor-default"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.darkNavy})` }}>
-              {carer.avatar}
+  const renderTeam = () => {
+    const [showAdd, setShowAdd] = useState(false)
+    const [name, setName] = useState('')
+    const [email, setEmail] = useState('')
+    const [phone, setPhone] = useState('')
+    const [region, setRegion] = useState('')
+    const [pin, setPin] = useState('')
+    const [role, setRole] = useState('carer')
+    const [msg, setMsg] = useState('')
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault()
+      try {
+        await createCaregiver({ name, email, phone, region, pin, role })
+        setMsg('Caregiver created')
+        setName(''); setEmail(''); setPhone(''); setRegion(''); setPin('')
+        setShowAdd(false)
+      } catch (err: any) { setMsg(err.message || 'Failed') }
+    }
+
+    return (
+      <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-sm text-slate-800">Caregivers</h2>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowAdd(!showAdd)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer flex items-center gap-1" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            {showAdd ? 'Close' : 'Add'}
+          </motion.button>
+        </div>
+
+        {showAdd && (
+          <motion.form onSubmit={handleSubmit} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Region" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="PIN (4-6 digits)" type="password" maxLength={6} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
+              <option value="carer">Carer</option>
+              <option value="manager">Manager</option>
+            </select>
+            <motion.button whileTap={{ scale: 0.97 }} type="submit" className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Create Caregiver</motion.button>
+            {msg && <div className="text-xs text-slate-500">{msg}</div>}
+          </motion.form>
+        )}
+
+        {dbCarers.length === 0 && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
+            <div className="text-slate-500 text-sm font-medium mb-1">No carers found</div>
+            <div className="text-slate-400 text-xs">Add carers using the button above.</div>
+          </motion.div>
+        )}
+        {dbCarers.map((carer: any, idx: number) => (
+          <motion.div
+            key={carer.id}
+            custom={idx}
+            variants={cardVariants}
+            whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}
+            className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm cursor-default"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.darkNavy})` }}>
+                {carer.avatar}
+              </div>
+              <div className="flex-1">
+                <div className="font-bold text-sm text-slate-800">{carer.name}</div>
+                <span
+                  className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                  style={{
+                    background: carer.status === 'in-visit' ? 'rgba(79,209,197,0.1)' : carer.status === 'traveling' ? 'rgba(246,183,60,0.1)' : '#f1f5f9',
+                    color: carer.status === 'in-visit' ? COLORS.teal : carer.status === 'traveling' ? COLORS.amber : '#94a3b8',
+                    border: `1px solid ${carer.status === 'in-visit' ? 'rgba(79,209,197,0.15)' : carer.status === 'traveling' ? 'rgba(246,183,60,0.15)' : 'transparent'}`,
+                  }}
+                >
+                  {carer.status.replace('-', ' ')}
+                </span>
+              </div>
             </div>
-            <div className="flex-1">
-              <div className="font-bold text-sm text-slate-800">{carer.name}</div>
-              <span
-                className="text-[10px] px-2 py-0.5 rounded-full font-medium"
-                style={{
-                  background: carer.status === 'in-visit' ? 'rgba(79,209,197,0.1)' : carer.status === 'traveling' ? 'rgba(246,183,60,0.1)' : '#f1f5f9',
-                  color: carer.status === 'in-visit' ? COLORS.teal : carer.status === 'traveling' ? COLORS.amber : '#94a3b8',
-                  border: `1px solid ${carer.status === 'in-visit' ? 'rgba(79,209,197,0.15)' : carer.status === 'traveling' ? 'rgba(246,183,60,0.15)' : 'transparent'}`,
-                }}
-              >
-                {carer.status.replace('-', ' ')}
-              </span>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center gap-1.5 text-slate-500">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span className="text-slate-700">{carer.location}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-500">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span className="text-slate-700">{carer.client || '—'}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-500">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span className="text-slate-700">{carer.since}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-slate-500">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                <span className="text-slate-700">3 visits</span>
+              </div>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-1.5 text-slate-500">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-              <span className="text-slate-700">{carer.location}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-500">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              <span className="text-slate-700">{carer.client || '—'}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-500">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span className="text-slate-700">{carer.since}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-500">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-              <span className="text-slate-700">3 visits</span>
-            </div>
-          </div>
-        </motion.div>
-      ))}
-    </motion.div>
-  )
+          </motion.div>
+        ))}
+      </motion.div>
+    )
+  }
 
   const renderMAR = () => {
     const confirmed = dbMedications.filter((m: any) => m.status === 'confirmed').length
@@ -566,47 +606,8 @@ export default function ManagerDashboard() {
     </motion.div>
   )
 
-  function renderStaff() {
-    const [name, setName] = useState('')
-    const [email, setEmail] = useState('')
-    const [phone, setPhone] = useState('')
-    const [region, setRegion] = useState('')
-    const [pin, setPin] = useState('')
-    const [role, setRole] = useState('carer')
-    const [msg, setMsg] = useState('')
-
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault()
-      try {
-        await createCaregiver({ name, email, phone, region, pin, role })
-        setMsg('Caregiver created successfully')
-        setName(''); setEmail(''); setPhone(''); setRegion(''); setPin('')
-      } catch (err: any) {
-        setMsg(err.message || 'Failed to create caregiver')
-      }
-    }
-
-    return (
-      <div className="flex flex-col gap-4">
-        <h2 className="font-bold text-slate-800">Create Caregiver</h2>
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-          <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Region" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-          <input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="PIN (4-6 digits)" type="password" maxLength={6} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-          <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
-            <option value="carer">Carer</option>
-            <option value="manager">Manager</option>
-          </select>
-          <motion.button whileTap={{ scale: 0.97 }} type="submit" className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Create Caregiver</motion.button>
-          {msg && <div className="text-xs text-slate-500">{msg}</div>}
-        </form>
-      </div>
-    )
-  }
-
   function renderClients() {
+    const [showAdd, setShowAdd] = useState(false)
     const [name, setName] = useState('')
     const [age, setAge] = useState('')
     const [address, setAddress] = useState('')
@@ -638,41 +639,50 @@ export default function ManagerDashboard() {
           preferences: preferences || undefined,
           emergencyContact: emergencyContact || undefined,
         })
-        setMsg('Client created successfully')
+        setMsg('Client created')
         setName(''); setAge(''); setAddress(''); setConditions(''); setMedications(''); setPreferences(''); setEmergencyContact('')
-      } catch (err: any) {
-        setMsg(err.message || 'Failed to create client')
-      }
+        setShowAdd(false)
+      } catch (err: any) { setMsg(err.message || 'Failed') }
     }
 
     return (
-      <div className="flex flex-col gap-4">
-        <h2 className="font-bold text-slate-800">Create Client</h2>
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-          <input value={age} onChange={(e) => setAge(e.target.value)} placeholder="Age" type="number" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-          <input value={conditions} onChange={(e) => setConditions(e.target.value)} placeholder="Conditions (comma separated)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-          <input value={medications} onChange={(e) => setMedications(e.target.value)} placeholder="Medications: Name—Dose—Frequency (comma separated)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-          <input value={preferences} onChange={(e) => setPreferences(e.target.value)} placeholder="Care preferences" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-          <input value={emergencyContact} onChange={(e) => setEmergencyContact(e.target.value)} placeholder="Emergency contact" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-          <motion.button whileTap={{ scale: 0.97 }} type="submit" className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Create Client</motion.button>
-          {msg && <div className="text-xs text-slate-500">{msg}</div>}
-        </form>
-        <h3 className="font-bold text-slate-800 mt-2">Existing Clients</h3>
+      <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-sm text-slate-800">Clients</h2>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowAdd(!showAdd)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer flex items-center gap-1" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            {showAdd ? 'Close' : 'Add'}
+          </motion.button>
+        </div>
+
+        {showAdd && (
+          <motion.form onSubmit={handleSubmit} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <input value={age} onChange={(e) => setAge(e.target.value)} placeholder="Age" type="number" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={conditions} onChange={(e) => setConditions(e.target.value)} placeholder="Conditions (comma separated)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={medications} onChange={(e) => setMedications(e.target.value)} placeholder="Medications: Name—Dose—Frequency (comma separated)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={preferences} onChange={(e) => setPreferences(e.target.value)} placeholder="Care preferences" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={emergencyContact} onChange={(e) => setEmergencyContact(e.target.value)} placeholder="Emergency contact" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <motion.button whileTap={{ scale: 0.97 }} type="submit" className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Create Client</motion.button>
+            {msg && <div className="text-xs text-slate-500">{msg}</div>}
+          </motion.form>
+        )}
+
         <div className="flex flex-col gap-2">
-          {clientsList.map((c) => (
-            <div key={c.id} className="bg-white rounded-xl p-3 border border-slate-200 text-sm">
+          {clientsList.length === 0 && <div className="text-center py-8 text-slate-400 text-sm">No clients yet</div>}
+          {clientsList.map((c: any) => (
+            <motion.div key={c.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-xl p-3 border border-slate-200 text-sm">
               <div className="font-semibold text-slate-700">{c.name}</div>
               <div className="text-xs text-slate-400">{c.age ? `${c.age} yrs · ` : ''}{c.address}</div>
-            </div>
+            </motion.div>
           ))}
         </div>
-      </div>
+      </motion.div>
     )
   }
 
-  function renderAssignments() {
+  function renderSchedule() {
     const [caregiverId, setCaregiverId] = useState('')
     const [clientId, setClientId] = useState('')
     const [msg, setMsg] = useState('')
@@ -874,12 +884,9 @@ export default function ManagerDashboard() {
         <div className="flex gap-1 min-w-max">
           {[
             { key: 'overview' as const, label: 'Overview' },
-            { key: 'carers' as const, label: 'Carers' },
-            { key: 'mar' as const, label: 'MAR' },
-            { key: 'incidents' as const, label: 'Alerts' },
-            { key: 'staff' as const, label: 'Staff' },
+            { key: 'team' as const, label: 'Team' },
             { key: 'clients' as const, label: 'Clients' },
-            { key: 'assignments' as const, label: 'Assign' },
+            { key: 'schedule' as const, label: 'Schedule' },
             { key: 'logs' as const, label: 'Logs' },
           ].map((t) => (
             <motion.button
@@ -894,7 +901,7 @@ export default function ManagerDashboard() {
               }}
             >
               {t.label}
-              {t.key === 'incidents' && allIncidents.length > 0 && (
+              {t.key === 'overview' && allIncidents.length > 0 && (
                 <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-bold" style={{ background: COLORS.red, color: 'white' }}>{allIncidents.length}</span>
               )}
             </motion.button>
@@ -912,12 +919,9 @@ export default function ManagerDashboard() {
       >
         {loading && renderSkeleton()}
         {!loading && tab === 'overview' && renderOverview()}
-        {!loading && tab === 'carers' && renderCarers()}
-        {!loading && tab === 'mar' && renderMAR()}
-        {!loading && tab === 'incidents' && renderIncidents()}
-        {!loading && tab === 'staff' && renderStaff()}
+        {!loading && tab === 'team' && renderTeam()}
         {!loading && tab === 'clients' && renderClients()}
-        {!loading && tab === 'assignments' && renderAssignments()}
+        {!loading && tab === 'schedule' && renderSchedule()}
         {!loading && tab === 'logs' && renderLogs()}
       </motion.div>
       </div>
