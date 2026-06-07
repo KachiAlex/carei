@@ -144,38 +144,47 @@ async function runInit() {
   // Seed mock carers if empty
   const existing = await sql`SELECT COUNT(*) FROM carers` as any[]
   if (existing[0]?.count === '0') {
-    await sql`
-      INSERT INTO carers (id, name, status, location, client, since, avatar) VALUES
-      ('c1', 'Sarah Johnson', 'in-visit', '12 Oak St', 'Margaret Wilson', '09:15', 'SJ'),
-      ('c2', 'James Brown', 'in-visit', '45 Elm Ave', 'Robert Davies', '10:00', 'JB'),
-      ('c3', 'Amina Patel', 'traveling', 'En route', 'Dorothy Lewis', '—', 'AP'),
-      ('c4', 'David Chen', 'available', '—', '—', '—', 'DC')
-    `
+    try {
+      await sql`
+        INSERT INTO carers (id, name, status, location, client, since, avatar) VALUES
+        ('c1', 'Sarah Johnson', 'in-visit', '12 Oak St', 'Margaret Wilson', '09:15', 'SJ'),
+        ('c2', 'James Brown', 'in-visit', '45 Elm Ave', 'Robert Davies', '10:00', 'JB'),
+        ('c3', 'Amina Patel', 'traveling', 'En route', 'Dorothy Lewis', '—', 'AP'),
+        ('c4', 'David Chen', 'available', '—', '—', '—', 'DC')
+        ON CONFLICT (id) DO NOTHING
+      `
+    } catch {}
   }
 
   // Seed clients if empty
   const clientCount = await sql`SELECT COUNT(*) FROM clients` as any[]
   if (clientCount[0]?.count === '0') {
-    await sql`
-      INSERT INTO clients (id, name, age, address, conditions, medications, preferences, emergency_contact) VALUES
-      ('c1', 'Mary Johnson', 82, '12 Oak Street, Manchester M1 1AA', '["Dementia (moderate)", "Type 2 diabetes", "Hypertension"]', '[{"name":"Metformin","dose":"500mg","frequency":"twice daily"},{"name":"Amlodipine","dose":"5mg","frequency":"once daily"},{"name":"Donepezil","dose":"10mg","frequency":"once daily"}]', 'Prefers morning visits before 10am. Sundowning from 4pm.', 'Sarah (daughter) — 07700 900001'),
-      ('c2', 'Tom Adams', 74, '45 Pine Road, Leeds LS1 1BB', '["COPD", "Heart failure", "Depression"]', '[{"name":"Furosemide","dose":"40mg","frequency":"once daily"},{"name":"Bisoprolol","dose":"2.5mg","frequency":"once daily"},{"name":"Sertraline","dose":"50mg","frequency":"once daily"}]', 'Oxygen concentrator in situ. Must check O2 levels.', 'James (son) — 07700 900002'),
-      ('c3', 'Aisha Khan', 67, '8 Maple Lane, Birmingham B1 1CC', '["Parkinson''s disease", "Osteoporosis"]', '[{"name":"Levodopa","dose":"100mg","frequency":"three times daily"},{"name":"Calcium + D3","dose":"-","frequency":"once daily"},{"name":"Rivastigmine","dose":"4.6mg patch","frequency":"daily"}]', 'Levodopa timing critical — within 30 min of scheduled time.', 'Ahmed (husband) — 07700 900003'),
-      ('c4', 'Grace Mensah', 79, '3 Birch Close, Glasgow G1 1DD', '["Stroke (right-sided weakness)", "Dysphagia", "AF"]', '[{"name":"Apixaban","dose":"5mg","frequency":"twice daily"},{"name":"Lansoprazole","dose":"15mg","frequency":"once daily"}]', 'Thickened fluids only (Stage 2). Aspiration risk. Left-handed.', 'Kwame (son) — 07700 900004')
-    `
+    try {
+      await sql`
+        INSERT INTO clients (id, name, age, address, conditions, medications, preferences, emergency_contact) VALUES
+        ('c1', 'Mary Johnson', 82, '12 Oak Street, Manchester M1 1AA', '["Dementia (moderate)", "Type 2 diabetes", "Hypertension"]', '[{"name":"Metformin","dose":"500mg","frequency":"twice daily"},{"name":"Amlodipine","dose":"5mg","frequency":"once daily"},{"name":"Donepezil","dose":"10mg","frequency":"once daily"}]', 'Prefers morning visits before 10am. Sundowning from 4pm.', 'Sarah (daughter) — 07700 900001'),
+        ('c2', 'Tom Adams', 74, '45 Pine Road, Leeds LS1 1BB', '["COPD", "Heart failure", "Depression"]', '[{"name":"Furosemide","dose":"40mg","frequency":"once daily"},{"name":"Bisoprolol","dose":"2.5mg","frequency":"once daily"},{"name":"Sertraline","dose":"50mg","frequency":"once daily"}]', 'Oxygen concentrator in situ. Must check O2 levels.', 'James (son) — 07700 900002'),
+        ('c3', 'Aisha Khan', 67, '8 Maple Lane, Birmingham B1 1CC', '["Parkinson''s disease", "Osteoporosis"]', '[{"name":"Levodopa","dose":"100mg","frequency":"three times daily"},{"name":"Calcium + D3","dose":"-","frequency":"once daily"},{"name":"Rivastigmine","dose":"4.6mg patch","frequency":"daily"}]', 'Levodopa timing critical — within 30 min of scheduled time.', 'Ahmed (husband) — 07700 900003'),
+        ('c4', 'Grace Mensah', 79, '3 Birch Close, Glasgow G1 1DD', '["Stroke (right-sided weakness)", "Dysphagia", "AF"]', '[{"name":"Apixaban","dose":"5mg","frequency":"twice daily"},{"name":"Lansoprazole","dose":"15mg","frequency":"once daily"}]', 'Thickened fluids only (Stage 2). Aspiration risk. Left-handed.', 'Kwame (son) — 07700 900004')
+        ON CONFLICT (id) DO NOTHING
+      `
+    } catch {}
   }
 
   // Seed scheduled visits if empty for today
   const visitCount = await sql`SELECT COUNT(*) FROM scheduled_visits WHERE visit_date = CURRENT_DATE` as any[]
   if (visitCount[0]?.count === '0') {
-    await sql`
-      INSERT INTO scheduled_visits (id, client_id, client_name, time, duration, status, tasks, flags, visit_date) VALUES
-      ('v1', 'c1', 'Mary Johnson', '09:00', '1 hr', 'pending', '["Personal care", "Medication", "Breakfast"]', '["Dementia - use simple language", "Prefers female carers"]', CURRENT_DATE),
-      ('v2', 'c2', 'Tom Adams', '10:30', '45 min', 'pending', '["Vitals", "Medication", "Wound check"]', '["O2 sat below target yesterday"]', CURRENT_DATE),
-      ('v3', 'c3', 'Aisha Khan', '12:00', '45 min', 'pending', '["Medication", "Meal prep", "Mobility"]', '[]', CURRENT_DATE),
-      ('v4', 'c4', 'Grace Mensah', '14:00', '1 hr', 'pending', '["Personal care", "Thickened fluids", "Medication"]', '["Thickened fluids only"]', CURRENT_DATE),
-      ('v5', 'c1', 'Mary Johnson', '16:30', '30 min', 'pending', '["Evening check", "Medication"]', '["Sundowning risk after 4pm"]', CURRENT_DATE)
-    `
+    try {
+      await sql`
+        INSERT INTO scheduled_visits (id, client_id, client_name, time, duration, status, tasks, flags, visit_date) VALUES
+        ('v1', 'c1', 'Mary Johnson', '09:00', '1 hr', 'pending', '["Personal care", "Medication", "Breakfast"]', '["Dementia - use simple language", "Prefers female carers"]', CURRENT_DATE),
+        ('v2', 'c2', 'Tom Adams', '10:30', '45 min', 'pending', '["Vitals", "Medication", "Wound check"]', '["O2 sat below target yesterday"]', CURRENT_DATE),
+        ('v3', 'c3', 'Aisha Khan', '12:00', '45 min', 'pending', '["Medication", "Meal prep", "Mobility"]', '[]', CURRENT_DATE),
+        ('v4', 'c4', 'Grace Mensah', '14:00', '1 hr', 'pending', '["Personal care", "Thickened fluids", "Medication"]', '["Thickened fluids only"]', CURRENT_DATE),
+        ('v5', 'c1', 'Mary Johnson', '16:30', '30 min', 'pending', '["Evening check", "Medication"]', '["Sundowning risk after 4pm"]', CURRENT_DATE)
+        ON CONFLICT (id) DO NOTHING
+      `
+    } catch {}
   }
 }
 
