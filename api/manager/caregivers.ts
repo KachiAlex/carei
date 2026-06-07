@@ -47,20 +47,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const id = generateId()
     const caregiverToken = generateToken()
 
-    await sql`
+    const result = await sql`
       INSERT INTO users (id, name, email, phone, region, pin, role, token)
       VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role}, ${caregiverToken})
-    `
+      ON CONFLICT (email) DO NOTHING
+      RETURNING id
+    ` as any[]
+
+    if (result.length === 0) {
+      res.status(409).json({ error: 'Email already registered' })
+      return
+    }
 
     res.status(201).json({
       status: 'created',
       caregiver: { id, name, email: email.toLowerCase(), phone, region, role },
     })
   } catch (err: any) {
-    if (err.message?.includes('unique constraint') || err.message?.includes('duplicate')) {
-      res.status(409).json({ error: 'Email already registered' })
-      return
-    }
     res.status(500).json({ error: err.message })
   }
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { loginUser, getBiometricsStatus, updateBiometrics } from '../api/client'
+import { loginUser, updateBiometrics, biometricLogin } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -25,14 +25,19 @@ export default function LoginScreen() {
   const [showBioSetup, setShowBioSetup] = useState(false)
 
   useEffect(() => {
-    // Check if WebAuthn is available
     if (window.PublicKeyCredential) {
       setBioAvailable(true)
-      getBiometricsStatus()
-        .then((res) => setBioEnabled(res.enabled && res.hasCredential))
-        .catch(() => {})
     }
   }, [])
+
+  useEffect(() => {
+    const stored = localStorage.getItem('carei_bio_email')
+    if (stored && stored === email.trim().toLowerCase()) {
+      setBioEnabled(true)
+    } else {
+      setBioEnabled(false)
+    }
+  }, [email])
 
   const handleSubmit = async () => {
     setError('')
@@ -50,8 +55,8 @@ export default function LoginScreen() {
     try {
       await loginUser({ email: email.trim().toLowerCase(), pin })
       setLoading(false)
-      // Offer to enable biometrics if available and not already enabled
-      if (bioAvailable && !bioEnabled) {
+      const stored = localStorage.getItem('carei_bio_email')
+      if (bioAvailable && stored !== email.trim().toLowerCase()) {
         setShowBioSetup(true)
       } else {
         setLocation('/dashboard')
@@ -86,6 +91,7 @@ export default function LoginScreen() {
       const credential = await navigator.credentials.create({ publicKey: publicKeyCredentialCreationOptions })
       if (credential) {
         await updateBiometrics({ credential: { id: credential.id, rawId: Array.from(new Uint8Array((credential as any).rawId)), type: credential.type }, enabled: true })
+        localStorage.setItem('carei_bio_email', email.trim().toLowerCase())
         setShowBioSetup(false)
         setLocation('/dashboard')
       }
@@ -97,6 +103,10 @@ export default function LoginScreen() {
 
   const handleBiometricLogin = async () => {
     setError('')
+    if (!validateEmail(email)) {
+      setError('Enter your email first')
+      return
+    }
     setLoading(true)
     try {
       const challenge = new Uint8Array(32)
@@ -110,8 +120,7 @@ export default function LoginScreen() {
 
       const assertion = await navigator.credentials.get({ publicKey: publicKeyCredentialRequestOptions })
       if (assertion) {
-        // Verify with backend
-        await updateBiometrics({ enabled: true })
+        await biometricLogin({ email: email.trim().toLowerCase(), credentialId: assertion.id })
         setLoading(false)
         setLocation('/dashboard')
       }

@@ -206,6 +206,10 @@ export async function updateBiometrics(data: { credential?: unknown; enabled: bo
   return post('/auth/biometrics', data)
 }
 
+export async function biometricLogin(data: { email: string; credentialId: string }) {
+  return post('/auth/biometric-login', data)
+}
+
 export async function createCaregiver(data: {
   name: string
   email: string
