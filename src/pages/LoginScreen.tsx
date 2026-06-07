@@ -53,8 +53,13 @@ export default function LoginScreen() {
 
     setLoading(true)
     try {
-      await loginUser({ email: email.trim().toLowerCase(), pin })
+      const res = await loginUser({ email: email.trim().toLowerCase(), pin }) as any
       setLoading(false)
+      const role = res?.user?.role
+      if (role === 'manager') {
+        setLocation('/manager')
+        return
+      }
       const stored = localStorage.getItem('carei_bio_email')
       if (bioAvailable && stored !== email.trim().toLowerCase()) {
         setShowBioSetup(true)
@@ -120,9 +125,13 @@ export default function LoginScreen() {
 
       const assertion = await navigator.credentials.get({ publicKey: publicKeyCredentialRequestOptions })
       if (assertion) {
-        await biometricLogin({ email: email.trim().toLowerCase(), credentialId: assertion.id })
+        const res = await biometricLogin({ email: email.trim().toLowerCase(), credentialId: assertion.id }) as any
         setLoading(false)
-        setLocation('/dashboard')
+        if (res?.user?.role === 'manager') {
+          setLocation('/manager')
+        } else {
+          setLocation('/dashboard')
+        }
       }
     } catch (err: any) {
       setLoading(false)
