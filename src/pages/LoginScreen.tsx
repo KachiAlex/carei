@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { loginUser } from '../api/client'
+import { loginUser, getBiometricsStatus, updateBiometrics } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -20,6 +20,19 @@ export default function LoginScreen() {
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [bioAvailable, setBioAvailable] = useState(false)
+  const [bioEnabled, setBioEnabled] = useState(false)
+  const [showBioSetup, setShowBioSetup] = useState(false)
+
+  useEffect(() => {
+    // Check if WebAuthn is available
+    if (window.PublicKeyCredential) {
+      setBioAvailable(true)
+      getBiometricsStatus()
+        .then((res) => setBioEnabled(res.enabled && res.hasCredential))
+        .catch(() => {})
+    }
+  }, [])
 
   const handleSubmit = async () => {
     setError('')
@@ -37,10 +50,74 @@ export default function LoginScreen() {
     try {
       await loginUser({ email: email.trim().toLowerCase(), pin })
       setLoading(false)
-      setLocation('/dashboard')
+      // Offer to enable biometrics if available and not already enabled
+      if (bioAvailable && !bioEnabled) {
+        setShowBioSetup(true)
+      } else {
+        setLocation('/dashboard')
+      }
     } catch (err: any) {
       setLoading(false)
       setError(err.message || 'Invalid email or PIN')
+    }
+  }
+
+  const handleEnableBiometrics = async () => {
+    try {
+      const challenge = new Uint8Array(32)
+      window.crypto.getRandomValues(challenge)
+
+      const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
+        challenge,
+        rp: { name: 'CAREi', id: window.location.hostname },
+        user: {
+          id: new TextEncoder().encode(email.trim().toLowerCase()),
+          name: email.trim().toLowerCase(),
+          displayName: email.trim().toLowerCase(),
+        },
+        pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          userVerification: 'required',
+        },
+        attestation: 'none',
+      }
+
+      const credential = await navigator.credentials.create({ publicKey: publicKeyCredentialCreationOptions })
+      if (credential) {
+        await updateBiometrics({ credential: { id: credential.id, rawId: Array.from(new Uint8Array((credential as any).rawId)), type: credential.type }, enabled: true })
+        setShowBioSetup(false)
+        setLocation('/dashboard')
+      }
+    } catch {
+      setShowBioSetup(false)
+      setLocation('/dashboard')
+    }
+  }
+
+  const handleBiometricLogin = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      const challenge = new Uint8Array(32)
+      window.crypto.getRandomValues(challenge)
+
+      const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
+        challenge,
+        rpId: window.location.hostname,
+        userVerification: 'required',
+      }
+
+      const assertion = await navigator.credentials.get({ publicKey: publicKeyCredentialRequestOptions })
+      if (assertion) {
+        // Verify with backend
+        await updateBiometrics({ enabled: true })
+        setLoading(false)
+        setLocation('/dashboard')
+      }
+    } catch (err: any) {
+      setLoading(false)
+      setError(err.message || 'Biometric authentication failed')
     }
   }
 
@@ -101,19 +178,60 @@ export default function LoginScreen() {
           {loading ? 'Signing in…' : 'Sign In'}
         </button>
 
-        <button
-          onClick={() => setLocation('/register')}
-          className="w-full mt-4 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
-        >
-          Create Account →
-        </button>
+        {bioAvailable && bioEnabled && (
+          <button
+            onClick={handleBiometricLogin}
+            disabled={loading}
+            className="w-full mt-3 py-3 rounded-full font-bold text-sm cursor-pointer border flex items-center justify-center gap-2 disabled:opacity-50"
+            style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'white', background: 'transparent' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2Z"/>
+              <path d="M12 6v6l4 2"/>
+            </svg>
+            Sign in with Biometrics
+          </button>
+        )}
+
         <button
           onClick={() => setLocation('/manager/login')}
-          className="w-full mt-2 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
+          className="w-full mt-4 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
         >
           Manager Login →
         </button>
       </div>
+
+      {/* Biometric Setup Modal */}
+      {showBioSetup && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(79,209,197,0.1)' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2Z"/>
+                <path d="M12 6v6l4 2"/>
+              </svg>
+            </div>
+            <h3 className="font-bold text-slate-800 mb-2">Enable Biometric Login?</h3>
+            <p className="text-sm text-slate-500 mb-6">Sign in faster with fingerprint or Face ID next time.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setShowBioSetup(false); setLocation('/dashboard') }}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold border cursor-pointer"
+                style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+              >
+                Skip
+              </button>
+              <button
+                onClick={handleEnableBiometrics}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+                style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+              >
+                Enable
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

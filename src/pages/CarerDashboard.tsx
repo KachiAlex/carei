@@ -2,7 +2,18 @@ import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation } from 'wouter'
 import type { Visit } from '../data/clients'
-import { getVisits, sendSOS, getMe, logoutUser } from '../api/client'
+import {
+  getVisits,
+  sendSOS,
+  getMe,
+  logoutUser,
+  getCaregiverClients,
+  getManagerTasks,
+  startTask,
+  completeTask,
+  addTaskLog,
+  getClientLogs,
+} from '../api/client'
 import { enqueue } from '../utils/offlineQueue'
 import { sendVisitStartReminder, requestNotificationPermission } from '../utils/notifications'
 
@@ -56,6 +67,15 @@ export default function CarerDashboard() {
   const [showProfile, setShowProfile] = useState(false)
   const [user, setUser] = useState<UserProfile | null>(null)
   const [visits, setVisits] = useState<Visit[]>([])
+  const [assignedClients, setAssignedClients] = useState<any[]>([])
+  const [clientTasks, setClientTasks] = useState<Record<string, any[]>>({})
+  const [activeTaskLog, setActiveTaskLog] = useState<{ logId: string; clientId: string; taskName: string; startTime: string } | null>(null)
+  const [taskNotes, setTaskNotes] = useState('')
+  const [selectedClient, setSelectedClient] = useState<string | null>(null)
+  const [clientLogs, setClientLogs] = useState<any[]>([])
+  const [showLogModal, setShowLogModal] = useState(false)
+  const [logTaskName, setLogTaskName] = useState('')
+  const [logNotes, setLogNotes] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -65,8 +85,8 @@ export default function CarerDashboard() {
   }, [])
 
   useEffect(() => {
-    getVisits()
-      .then((data) => {
+    Promise.all([
+      getVisits().then((data) => {
         setVisits(data.visits || [])
         requestNotificationPermission().then(() => {
           const pending = (data.visits || []).filter((v: Visit) => v.status === 'pending')
@@ -74,9 +94,20 @@ export default function CarerDashboard() {
             sendVisitStartReminder(pending[0].clientName, pending[0].time)
           }
         })
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+      }).catch(() => {}),
+      getCaregiverClients().then((data) => {
+        const clients = data.clients || []
+        setAssignedClients(clients)
+        // Load tasks for each client
+        clients.forEach((client: any) => {
+          getManagerTasks(client.id)
+            .then((res) => {
+              setClientTasks((prev) => ({ ...prev, [client.id]: res.tasks || [] }))
+            })
+            .catch(() => {})
+        })
+      }).catch(() => {}),
+    ]).finally(() => setLoading(false))
   }, [])
 
   const stats = useMemo(() => {
@@ -131,6 +162,53 @@ export default function CarerDashboard() {
     } catch {
       alert('SOS Alert queued. Will send when online.')
     }
+  }
+
+  const handleStartTask = async (clientId: string, taskName: string) => {
+    try {
+      const res = await startTask({ clientId, taskName })
+      setActiveTaskLog({ logId: res.id, clientId, taskName, startTime: res.startTime })
+    } catch (err: any) {
+      alert(err.message || 'Failed to start task')
+    }
+  }
+
+  const handleCompleteTask = async () => {
+    if (!activeTaskLog) return
+    try {
+      await completeTask({ logId: activeTaskLog.logId, notes: taskNotes })
+      setActiveTaskLog(null)
+      setTaskNotes('')
+      // Refresh logs
+      if (selectedClient) {
+        const res = await getClientLogs(selectedClient)
+        setClientLogs(res.logs || [])
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to complete task')
+    }
+  }
+
+  const handleAddLog = async () => {
+    if (!selectedClient || !logTaskName) return
+    try {
+      await addTaskLog({ clientId: selectedClient, taskName: logTaskName, notes: logNotes })
+      setShowLogModal(false)
+      setLogTaskName('')
+      setLogNotes('')
+      const res = await getClientLogs(selectedClient)
+      setClientLogs(res.logs || [])
+    } catch (err: any) {
+      alert(err.message || 'Failed to add log')
+    }
+  }
+
+  const handleSelectClient = async (clientId: string) => {
+    setSelectedClient(clientId)
+    try {
+      const res = await getClientLogs(clientId)
+      setClientLogs(res.logs || [])
+    } catch { setClientLogs([]) }
   }
 
   return (
@@ -428,6 +506,173 @@ export default function CarerDashboard() {
           ))}
         </motion.div>
       </div>
+
+      {/* My Clients Section */}
+      <div className="flex-1 px-4 py-5 overflow-auto border-t border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-slate-800">My Clients</h2>
+            <p className="text-[11px] text-slate-400">{assignedClients.length} assigned clients</p>
+          </div>
+        </div>
+
+        {assignedClients.length === 0 && !loading && (
+          <div className="text-center py-8">
+            <div className="text-slate-400 text-sm">No clients assigned yet.</div>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3 mb-4">
+          {assignedClients.map((client) => (
+            <motion.div
+              key={client.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-2xl p-4 border border-slate-200"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.teal}20, ${COLORS.teal2}15)`, color: COLORS.teal }}>
+                    {client.name.split(' ').map((n: string) => n[0]).join('')}
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-800">{client.name}</div>
+                    <div className="text-[11px] text-slate-400">{client.age ? `${client.age} yrs · ` : ''}{client.address}</div>
+                  </div>
+                </div>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleSelectClient(client.id)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg border cursor-pointer"
+                  style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+                >
+                  {selectedClient === client.id ? 'Hide' : 'Tasks'}
+                </motion.button>
+              </div>
+
+              {selectedClient === client.id && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-3 pt-3 border-t border-slate-100">
+                  {/* Tasks */}
+                  <div className="flex flex-col gap-2 mb-3">
+                    {(clientTasks[client.id] || []).map((task: any) => (
+                      <div key={task.id} className="flex items-center justify-between py-2 px-2 rounded-xl bg-slate-50">
+                        <div className="text-sm text-slate-700">{task.name}</div>
+                        {activeTaskLog && activeTaskLog.clientId === client.id && activeTaskLog.taskName === task.name ? (
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => setActiveTaskLog(null)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white border-none cursor-pointer"
+                            style={{ background: COLORS.amber }}
+                          >
+                            In Progress
+                          </motion.button>
+                        ) : (
+                          <motion.button
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => handleStartTask(client.id, task.name)}
+                            disabled={!!activeTaskLog}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white border-none cursor-pointer disabled:opacity-40"
+                            style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+                          >
+                            Start
+                          </motion.button>
+                        )}
+                      </div>
+                    ))}
+                    {(clientTasks[client.id] || []).length === 0 && (
+                      <div className="text-xs text-slate-400 py-2">No tasks assigned.</div>
+                    )}
+                  </div>
+
+                  {/* Active task completion */}
+                  {activeTaskLog && activeTaskLog.clientId === client.id && (
+                    <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="bg-teal-50 rounded-xl p-3 border border-teal-100 mb-3">
+                      <div className="text-xs font-semibold text-teal-700 mb-1">Active: {activeTaskLog.taskName}</div>
+                      <div className="text-[10px] text-teal-500 mb-2">Started {new Date(activeTaskLog.startTime).toLocaleTimeString()}</div>
+                      <textarea
+                        value={taskNotes}
+                        onChange={(e) => setTaskNotes(e.target.value)}
+                        placeholder="Add notes before completing..."
+                        className="w-full bg-white rounded-lg px-2 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none resize-none border border-teal-100 mb-2"
+                        rows={2}
+                      />
+                      <motion.button
+                        whileTap={{ scale: 0.97 }}
+                        onClick={handleCompleteTask}
+                        className="w-full py-2 rounded-lg text-xs font-semibold text-white border-none cursor-pointer"
+                        style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+                      >
+                        Complete Task
+                      </motion.button>
+                    </motion.div>
+                  )}
+
+                  {/* Add log button */}
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => { setShowLogModal(true); setLogTaskName(''); setLogNotes('') }}
+                    className="w-full py-2 rounded-xl text-xs font-semibold border cursor-pointer mb-3"
+                    style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+                  >
+                    + Add Log Note
+                  </motion.button>
+
+                  {/* Recent logs */}
+                  {clientLogs.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Recent Logs</div>
+                      {clientLogs.slice(0, 5).map((log) => (
+                        <div key={log.id} className="bg-slate-50 rounded-lg p-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-slate-700">{log.taskName}</span>
+                            {log.durationMinutes !== null && log.durationMinutes !== undefined && (
+                              <span className="text-[10px] text-teal-600 font-medium">{log.durationMinutes}m</span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            {log.startTime && log.completeTime ? (
+                              <span>{new Date(log.startTime).toLocaleTimeString()} — {new Date(log.completeTime).toLocaleTimeString()}</span>
+                            ) : (
+                              <span>{new Date(log.createdAt).toLocaleString()}</span>
+                            )}
+                          </div>
+                          {log.notes && <div className="text-[10px] text-slate-500 mt-1">{log.notes}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {/* Log Note Modal */}
+      {showLogModal && selectedClient && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-5 max-w-sm w-full">
+            <h3 className="font-bold text-slate-800 mb-3">Add Log Note</h3>
+            <input
+              value={logTaskName}
+              onChange={(e) => setLogTaskName(e.target.value)}
+              placeholder="Task name"
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal mb-3"
+            />
+            <textarea
+              value={logNotes}
+              onChange={(e) => setLogNotes(e.target.value)}
+              placeholder="Notes..."
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal resize-none mb-4"
+              rows={3}
+            />
+            <div className="flex gap-2">
+              <motion.button whileTap={{ scale: 0.97 }} onClick={() => setShowLogModal(false)} className="flex-1 py-2.5 rounded-xl text-xs font-semibold border cursor-pointer" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>Cancel</motion.button>
+              <motion.button whileTap={{ scale: 0.97 }} onClick={handleAddLog} className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Save Log</motion.button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* SOS Floating Button */}
       <button

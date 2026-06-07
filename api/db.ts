@@ -98,6 +98,8 @@ async function runInit() {
       pin TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'carer',
       token TEXT,
+      biometrics_enabled BOOLEAN DEFAULT FALSE,
+      webauthn_credential JSONB,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `
@@ -138,6 +140,41 @@ async function runInit() {
       status TEXT DEFAULT 'pending',
       reason TEXT,
       timestamp TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS caregiver_client_assignments (
+      id TEXT PRIMARY KEY,
+      caregiver_id TEXT NOT NULL,
+      client_id TEXT NOT NULL,
+      assigned_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(caregiver_id, client_id)
+    )
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      frequency TEXT DEFAULT 'daily',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS task_logs (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL,
+      caregiver_id TEXT NOT NULL,
+      task_name TEXT NOT NULL,
+      start_time TIMESTAMPTZ,
+      complete_time TIMESTAMPTZ,
+      notes TEXT,
+      duration_minutes INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `
 

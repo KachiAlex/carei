@@ -1,7 +1,19 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation } from 'wouter'
-import { getManagerData } from '../api/client'
+import {
+  getManagerData,
+  createCaregiver,
+  getClients,
+  createClient,
+  getAssignments,
+  createAssignment,
+  deleteAssignment,
+  getManagerTasks,
+  createManagerTask,
+  deleteManagerTask,
+  getClientLogs,
+} from '../api/client'
 import { sendSOSAlert, sendSOSResolved, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
@@ -16,7 +28,7 @@ const COLORS = {
 
 export default function ManagerDashboard() {
   const [, setLocation] = useLocation()
-  const [tab, setTab] = useState<'overview' | 'carers' | 'mar' | 'incidents'>('overview')
+  const [tab, setTab] = useState<'overview' | 'carers' | 'mar' | 'incidents' | 'staff' | 'clients' | 'assignments' | 'logs'>('overview')
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null)
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set())
   const [liveIncidents, setLiveIncidents] = useState<any[]>([])
@@ -26,7 +38,12 @@ export default function ManagerDashboard() {
   const [dbAlerts, setDbAlerts] = useState<any[]>([])
   const [dbIncidents, setDbIncidents] = useState<any[]>([])
   const [dbMedications, setDbMedications] = useState<any[]>([])
+  const [dbClients, setDbClients] = useState<any[]>([])
+  const [dbAssignments, setDbAssignments] = useState<any[]>([])
+  const [dbTasks, setDbTasks] = useState<any[]>([])
+  const [dbLogs, setDbLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [logClientId, setLogClientId] = useState<string>('')
 
   useEffect(() => {
     getManagerData()
@@ -549,6 +566,247 @@ export default function ManagerDashboard() {
     </motion.div>
   )
 
+  function renderStaff() {
+    const [name, setName] = useState('')
+    const [email, setEmail] = useState('')
+    const [phone, setPhone] = useState('')
+    const [region, setRegion] = useState('')
+    const [pin, setPin] = useState('')
+    const [role, setRole] = useState('carer')
+    const [msg, setMsg] = useState('')
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault()
+      try {
+        await createCaregiver({ name, email, phone, region, pin, role })
+        setMsg('Caregiver created successfully')
+        setName(''); setEmail(''); setPhone(''); setRegion(''); setPin('')
+      } catch (err: any) {
+        setMsg(err.message || 'Failed to create caregiver')
+      }
+    }
+
+    return (
+      <div className="flex flex-col gap-4">
+        <h2 className="font-bold text-slate-800">Create Caregiver</h2>
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+          <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Region" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+          <input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="PIN (4-6 digits)" type="password" maxLength={6} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+          <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
+            <option value="carer">Carer</option>
+            <option value="manager">Manager</option>
+          </select>
+          <motion.button whileTap={{ scale: 0.97 }} type="submit" className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Create Caregiver</motion.button>
+          {msg && <div className="text-xs text-slate-500">{msg}</div>}
+        </form>
+      </div>
+    )
+  }
+
+  function renderClients() {
+    const [name, setName] = useState('')
+    const [age, setAge] = useState('')
+    const [address, setAddress] = useState('')
+    const [conditions, setConditions] = useState('')
+    const [medications, setMedications] = useState('')
+    const [preferences, setPreferences] = useState('')
+    const [emergencyContact, setEmergencyContact] = useState('')
+    const [msg, setMsg] = useState('')
+    const [clientsList, setClientsList] = useState<any[]>([])
+
+    useEffect(() => {
+      getClients().then((rows) => setClientsList(rows)).catch(() => {})
+    }, [msg])
+
+    const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault()
+      try {
+        const id = 'cl-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
+        await createClient({
+          id,
+          name,
+          age: age ? parseInt(age) : undefined,
+          address: address || undefined,
+          conditions: conditions.split(',').map((s) => s.trim()).filter(Boolean),
+          medications: medications.split(',').map((s) => {
+            const parts = s.trim().split('—')
+            return { name: parts[0] || s.trim(), dose: parts[1] || '-', frequency: parts[2] || 'daily' }
+          }).filter((m) => m.name),
+          preferences: preferences || undefined,
+          emergencyContact: emergencyContact || undefined,
+        })
+        setMsg('Client created successfully')
+        setName(''); setAge(''); setAddress(''); setConditions(''); setMedications(''); setPreferences(''); setEmergencyContact('')
+      } catch (err: any) {
+        setMsg(err.message || 'Failed to create client')
+      }
+    }
+
+    return (
+      <div className="flex flex-col gap-4">
+        <h2 className="font-bold text-slate-800">Create Client</h2>
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+          <input value={age} onChange={(e) => setAge(e.target.value)} placeholder="Age" type="number" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+          <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+          <input value={conditions} onChange={(e) => setConditions(e.target.value)} placeholder="Conditions (comma separated)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+          <input value={medications} onChange={(e) => setMedications(e.target.value)} placeholder="Medications: Name—Dose—Frequency (comma separated)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+          <input value={preferences} onChange={(e) => setPreferences(e.target.value)} placeholder="Care preferences" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+          <input value={emergencyContact} onChange={(e) => setEmergencyContact(e.target.value)} placeholder="Emergency contact" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+          <motion.button whileTap={{ scale: 0.97 }} type="submit" className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Create Client</motion.button>
+          {msg && <div className="text-xs text-slate-500">{msg}</div>}
+        </form>
+        <h3 className="font-bold text-slate-800 mt-2">Existing Clients</h3>
+        <div className="flex flex-col gap-2">
+          {clientsList.map((c) => (
+            <div key={c.id} className="bg-white rounded-xl p-3 border border-slate-200 text-sm">
+              <div className="font-semibold text-slate-700">{c.name}</div>
+              <div className="text-xs text-slate-400">{c.age ? `${c.age} yrs · ` : ''}{c.address}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  function renderAssignments() {
+    const [caregiverId, setCaregiverId] = useState('')
+    const [clientId, setClientId] = useState('')
+    const [msg, setMsg] = useState('')
+    const [assignmentsList, setAssignmentsList] = useState<any[]>([])
+    const [users, setUsers] = useState<any[]>([])
+    const [clients, setClients] = useState<any[]>([])
+
+    useEffect(() => {
+      getAssignments().then((res) => setAssignmentsList(res.assignments || [])).catch(() => {})
+      getClients().then((rows) => setClients(rows)).catch(() => {})
+    }, [msg])
+
+    useEffect(() => {
+      // Load users (caregivers) from dbCarers or fetch separately
+      fetch('/api/carers', { credentials: 'include' })
+        .then((r) => r.json())
+        .then((data) => setUsers(data.carers || []))
+        .catch(() => {})
+    }, [])
+
+    const handleAssign = async () => {
+      if (!caregiverId || !clientId) { setMsg('Select both caregiver and client'); return }
+      try {
+        await createAssignment({ caregiverId, clientId })
+        setMsg('Assigned successfully')
+        setCaregiverId(''); setClientId('')
+        const res = await getAssignments()
+        setAssignmentsList(res.assignments || [])
+      } catch (err: any) {
+        setMsg(err.message || 'Failed to assign')
+      }
+    }
+
+    const handleUnassign = async (cgId: string, clId: string) => {
+      try {
+        await deleteAssignment(cgId, clId)
+        setMsg('Unassigned successfully')
+        const res = await getAssignments()
+        setAssignmentsList(res.assignments || [])
+      } catch (err: any) {
+        setMsg(err.message || 'Failed to unassign')
+      }
+    }
+
+    return (
+      <div className="flex flex-col gap-4">
+        <h2 className="font-bold text-slate-800">Assign Client to Caregiver</h2>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
+          <select value={caregiverId} onChange={(e) => setCaregiverId(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
+            <option value="">Select caregiver</option>
+            {users.map((u: any) => (
+              <option key={u.id} value={u.id}>{u.name}</option>
+            ))}
+          </select>
+          <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
+            <option value="">Select client</option>
+            {clients.map((c: any) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <motion.button whileTap={{ scale: 0.97 }} onClick={handleAssign} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Assign</motion.button>
+          {msg && <div className="text-xs text-slate-500">{msg}</div>}
+        </div>
+        <h3 className="font-bold text-slate-800 mt-2">Current Assignments</h3>
+        <div className="flex flex-col gap-2">
+          {assignmentsList.map((a) => (
+            <div key={a.id} className="bg-white rounded-xl p-3 border border-slate-200 text-sm flex items-center justify-between">
+              <div>
+                <div className="font-semibold text-slate-700">{a.clientName}</div>
+                <div className="text-xs text-slate-400">Caregiver: {a.caregiverName}</div>
+              </div>
+              <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleUnassign(a.caregiverId, a.clientId)} className="px-3 py-1 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>Unassign</motion.button>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  function renderLogs() {
+    const [clients, setClients] = useState<any[]>([])
+    const [logs, setLogs] = useState<any[]>([])
+    const [selectedClient, setSelectedClient] = useState('')
+
+    useEffect(() => {
+      getClients().then((rows) => setClients(rows)).catch(() => {})
+    }, [])
+
+    const handleFetchLogs = async (clientId: string) => {
+      setSelectedClient(clientId)
+      try {
+        const res = await getClientLogs(clientId)
+        setLogs(res.logs || [])
+      } catch { setLogs([]) }
+    }
+
+    return (
+      <div className="flex flex-col gap-4">
+        <h2 className="font-bold text-slate-800">Client Care Logs</h2>
+        <select
+          value={selectedClient}
+          onChange={(e) => handleFetchLogs(e.target.value)}
+          className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white"
+        >
+          <option value="">Select a client to view logs</option>
+          {clients.map((c: any) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        {selectedClient && (
+          <div className="flex flex-col gap-2">
+            {logs.length === 0 && <div className="text-sm text-slate-400">No logs found for this client.</div>}
+            {logs.map((log) => (
+              <motion.div key={log.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-xl p-3 border border-slate-200 text-sm">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-slate-700">{log.taskName}</div>
+                  {log.durationMinutes !== null && log.durationMinutes !== undefined && (
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-teal-50 text-teal-600">{log.durationMinutes} min</span>
+                  )}
+                </div>
+                <div className="text-xs text-slate-400 mt-1">
+                  {log.startTime && <span>Started: {new Date(log.startTime).toLocaleString()} · </span>}
+                  {log.completeTime && <span>Completed: {new Date(log.completeTime).toLocaleString()}</span>}
+                  {!log.startTime && <span>Logged: {new Date(log.createdAt).toLocaleString()}</span>}
+                </div>
+                {log.notes && <div className="text-xs text-slate-500 mt-1 bg-slate-50 rounded-lg p-2">{log.notes}</div>}
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans items-center">
       <div className="w-full max-w-3xl flex flex-col min-h-screen">
@@ -619,6 +877,10 @@ export default function ManagerDashboard() {
             { key: 'carers' as const, label: 'Carers' },
             { key: 'mar' as const, label: 'MAR' },
             { key: 'incidents' as const, label: 'Alerts' },
+            { key: 'staff' as const, label: 'Staff' },
+            { key: 'clients' as const, label: 'Clients' },
+            { key: 'assignments' as const, label: 'Assign' },
+            { key: 'logs' as const, label: 'Logs' },
           ].map((t) => (
             <motion.button
               key={t.key}
@@ -653,6 +915,10 @@ export default function ManagerDashboard() {
         {!loading && tab === 'carers' && renderCarers()}
         {!loading && tab === 'mar' && renderMAR()}
         {!loading && tab === 'incidents' && renderIncidents()}
+        {!loading && tab === 'staff' && renderStaff()}
+        {!loading && tab === 'clients' && renderClients()}
+        {!loading && tab === 'assignments' && renderAssignments()}
+        {!loading && tab === 'logs' && renderLogs()}
       </motion.div>
       </div>
     </div>

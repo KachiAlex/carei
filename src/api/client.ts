@@ -198,6 +198,91 @@ export async function getMe() {
   return get('/auth/me')
 }
 
+export async function getBiometricsStatus() {
+  return get('/auth/biometrics')
+}
+
+export async function updateBiometrics(data: { credential?: unknown; enabled: boolean }) {
+  return post('/auth/biometrics', data)
+}
+
+export async function createCaregiver(data: {
+  name: string
+  email: string
+  phone: string
+  region: string
+  pin: string
+  role?: string
+}) {
+  return post('/manager/caregivers', data)
+}
+
+export async function getAssignments() {
+  return get('/manager/assignments')
+}
+
+export async function createAssignment(data: { caregiverId: string; clientId: string }) {
+  return post('/manager/assignments', data)
+}
+
+export async function deleteAssignment(caregiverId: string, clientId: string) {
+  const res = await fetch(`${API_BASE}/manager/assignments?caregiverId=${caregiverId}&clientId=${clientId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function getManagerTasks(clientId?: string) {
+  const qs = clientId ? `?clientId=${clientId}` : ''
+  return get(`/manager/tasks${qs}`)
+}
+
+export async function createManagerTask(data: {
+  clientId: string
+  name: string
+  description?: string
+  frequency?: string
+}) {
+  return post('/manager/tasks', data)
+}
+
+export async function deleteManagerTask(taskId: string) {
+  const res = await fetch(`${API_BASE}/manager/tasks?id=${taskId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function getCaregiverClients() {
+  return get('/caregiver/clients')
+}
+
+export async function startTask(data: { clientId: string; taskName: string }) {
+  return post('/tasks/start', data)
+}
+
+export async function completeTask(data: { logId: string; notes?: string }) {
+  return post('/tasks/complete', data)
+}
+
+export async function addTaskLog(data: { clientId: string; taskName: string; notes?: string }) {
+  return post('/tasks/log', data)
+}
+
+export async function getClientLogs(clientId: string) {
+  return get(`/tasks/log?clientId=${clientId}`)
+}
+
 export async function saveVisitDraft(visitId: string, data: unknown) {
   return post(`/visit/${visitId}/draft`, data)
 }
