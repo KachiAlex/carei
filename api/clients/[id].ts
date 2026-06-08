@@ -22,7 +22,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(404).json({ error: 'Client not found' })
         return
       }
-      res.status(200).json(rows[0])
+      const r = rows[0] as any
+      res.status(200).json({
+        ...r,
+        conditions: typeof r.conditions === 'string' ? JSON.parse(r.conditions) : (r.conditions || []),
+        medications: typeof r.medications === 'string' ? JSON.parse(r.medications) : (r.medications || []),
+      })
       return
     }
 

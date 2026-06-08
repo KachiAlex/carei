@@ -9,7 +9,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await ensureTables()
       const sql = getSql()
       const rows = await sql`SELECT * FROM clients ORDER BY name`
-      res.status(200).json(rows)
+      const parsed = (rows as any[]).map((r) => ({
+        ...r,
+        conditions: typeof r.conditions === 'string' ? JSON.parse(r.conditions) : (r.conditions || []),
+        medications: typeof r.medications === 'string' ? JSON.parse(r.medications) : (r.medications || []),
+      }))
+      res.status(200).json(parsed)
     } catch (err: any) {
       res.status(500).json({ error: err.message })
     }

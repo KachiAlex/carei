@@ -43,7 +43,6 @@ export default function ManagerDashboard() {
   const [dbAlerts, setDbAlerts] = useState<any[]>([])
   const [dbIncidents, setDbIncidents] = useState<any[]>([])
   const [dbMedications, setDbMedications] = useState<any[]>([])
-  const [dbClients, setDbClients] = useState<any[]>([])
   const [dbAssignments, setDbAssignments] = useState<any[]>([])
   const [dbTasks, setDbTasks] = useState<any[]>([])
   const [dbLogs, setDbLogs] = useState<any[]>([])
@@ -300,7 +299,7 @@ export default function ManagerDashboard() {
         {[
           { label: 'Visits Today', value: stats.total, sub: `${stats.completed} done · ${stats.inProgress} active`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg> },
           { label: 'Medications', value: `${stats.medConfirmed}/${Math.max(dbMedications.length, 1)}`, sub: `${stats.medSkipped} skipped`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg> },
-          { label: 'Carers On Duty', value: dbCarers.length, sub: `${dbCarers.filter((c: any) => c.status === 'in-visit').length} in visit · ${dbCarers.filter((c: any) => c.status === 'traveling').length} traveling`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+          { label: 'Carers On Duty', value: dbCarers.length, sub: `${dbCarers.filter((c: any) => c.status === 'active').length} active · ${dbCarers.filter((c: any) => c.status === 'suspended').length} suspended`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
           { label: 'Alerts', value: `${allIncidents.length}`, sub: `${highSeverityCount} high · ${allIncidents.length - highSeverityCount} medium`, alert: true, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> },
         ].map((s, i) => (
           <motion.div
@@ -349,12 +348,12 @@ export default function ManagerDashboard() {
                   <span
                     className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
                     style={{
-                      background: carer.status === 'in-visit' ? 'rgba(79,209,197,0.1)' : carer.status === 'traveling' ? 'rgba(246,183,60,0.1)' : '#f1f5f9',
-                      color: carer.status === 'in-visit' ? COLORS.teal : carer.status === 'traveling' ? COLORS.amber : '#94a3b8',
-                      border: `1px solid ${carer.status === 'in-visit' ? 'rgba(79,209,197,0.15)' : carer.status === 'traveling' ? 'rgba(246,183,60,0.15)' : 'transparent'}`,
+                      background: carer.status === 'active' ? 'rgba(79,209,197,0.1)' : carer.status === 'suspended' ? 'rgba(255,90,95,0.1)' : '#f1f5f9',
+                      color: carer.status === 'active' ? COLORS.teal : carer.status === 'suspended' ? COLORS.red : '#94a3b8',
+                      border: `1px solid ${carer.status === 'active' ? 'rgba(79,209,197,0.15)' : carer.status === 'suspended' ? 'rgba(255,90,95,0.15)' : 'transparent'}`,
                     }}
                   >
-                    {carer.status.replace('-', ' ')}
+                    {carer.status}
                   </span>
                 </div>
                 <div className="text-xs text-slate-400 truncate">
