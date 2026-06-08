@@ -150,10 +150,16 @@ async function runInit() {
       id TEXT PRIMARY KEY,
       caregiver_id TEXT NOT NULL,
       client_id TEXT NOT NULL,
+      visit_date DATE,
+      visit_time TEXT,
+      instructions TEXT,
       assigned_at TIMESTAMPTZ DEFAULT NOW(),
       UNIQUE(caregiver_id, client_id)
     )
   `
+  await sql`ALTER TABLE caregiver_client_assignments ADD COLUMN IF NOT EXISTS visit_date DATE`
+  await sql`ALTER TABLE caregiver_client_assignments ADD COLUMN IF NOT EXISTS visit_time TEXT`
+  await sql`ALTER TABLE caregiver_client_assignments ADD COLUMN IF NOT EXISTS instructions TEXT`
 
   await sql`
     CREATE TABLE IF NOT EXISTS tasks (

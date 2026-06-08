@@ -255,7 +255,13 @@ export async function getAssignments() {
   return get('/manager/assignments')
 }
 
-export async function createAssignment(data: { caregiverId: string; clientId: string }) {
+export async function createAssignment(data: {
+  caregiverId: string
+  clientId: string
+  visitDate?: string
+  visitTime?: string
+  instructions?: string
+}) {
   return post('/manager/assignments', data)
 }
 

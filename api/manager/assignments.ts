@@ -39,6 +39,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           c.name AS "caregiverName",
           a.client_id AS "clientId",
           cl.name AS "clientName",
+          a.visit_date AS "visitDate",
+          a.visit_time AS "visitTime",
+          a.instructions,
           a.assigned_at AS "assignedAt"
         FROM caregiver_client_assignments a
         JOIN users c ON a.caregiver_id = c.id
@@ -54,16 +57,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(403).json({ error: 'Only managers can create assignments' })
         return
       }
-      const { caregiverId, clientId } = req.body || {}
+      const { caregiverId, clientId, visitDate, visitTime, instructions } = req.body || {}
       if (!caregiverId || !clientId) {
         res.status(400).json({ error: 'caregiverId and clientId required' })
         return
       }
 
       await sql`
-        INSERT INTO caregiver_client_assignments (id, caregiver_id, client_id)
-        VALUES (${generateId()}, ${caregiverId}, ${clientId})
-        ON CONFLICT (caregiver_id, client_id) DO NOTHING
+        INSERT INTO caregiver_client_assignments (id, caregiver_id, client_id, visit_date, visit_time, instructions)
+        VALUES (${generateId()}, ${caregiverId}, ${clientId}, ${visitDate || null}, ${visitTime || null}, ${instructions || null})
+        ON CONFLICT (caregiver_id, client_id) DO UPDATE SET
+          visit_date = EXCLUDED.visit_date,
+          visit_time = EXCLUDED.visit_time,
+          instructions = EXCLUDED.instructions
       `
       res.status(201).json({ status: 'assigned' })
       return
