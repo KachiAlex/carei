@@ -514,6 +514,7 @@ export default function ManagerDashboard() {
         setClientMsg('Client created')
         setClientName(''); setClientAge(''); setClientAddress(''); setClientConditions(''); setClientMedications(''); setClientPreferences(''); setClientEmergency('')
         setClientShowAdd(false)
+        getClients().then((rows) => setClientsList(rows)).catch(() => {})
       } catch (err: any) { setClientMsg(err.message || 'Failed') }
     }
 
