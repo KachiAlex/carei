@@ -187,38 +187,48 @@ export default function ManagerDashboard() {
       {/* Weekly Visit Chart */}
       <motion.div custom={1} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
         <h3 className="font-bold text-sm text-slate-800 mb-3">Weekly Visits</h3>
-        <div className="flex items-end gap-2 h-24">
-          {[
-            { day: 'Mon', value: 8 },
-            { day: 'Tue', value: 12 },
-            { day: 'Wed', value: 10 },
-            { day: 'Thu', value: 14 },
-            { day: 'Fri', value: stats.total || 6 },
-            { day: 'Sat', value: 4 },
-            { day: 'Sun', value: 3 },
-          ].map((d, idx) => (
-            <motion.div
-              key={d.day}
-              initial={{ scaleY: 0 }}
-              animate={{ scaleY: 1 }}
-              transition={{ delay: 0.3 + idx * 0.05, duration: 0.5, ease: 'easeOut' }}
-              className="flex-1 flex flex-col items-center gap-1.5 group cursor-pointer origin-bottom"
-            >
-              <div className="w-full relative rounded-lg overflow-hidden transition-all duration-300 group-hover:brightness-110" style={{ height: `${(d.value / 16) * 100}%`, minHeight: 8 }}>
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: '100%' }}
-                  transition={{ delay: 0.3 + idx * 0.05, duration: 0.6, ease: 'easeOut' }}
-                  className="absolute bottom-0 left-0 right-0 rounded-lg"
-                  style={{
-                    background: d.day === 'Fri' ? `linear-gradient(180deg, ${COLORS.teal}, ${COLORS.teal2})` : 'linear-gradient(180deg, #e2e8f0, #cbd5e1)',
-                  }}
-                />
-              </div>
-              <span className="text-[10px] text-slate-400 font-medium group-hover:text-slate-600 transition-colors">{d.day}</span>
-            </motion.div>
-          ))}
-        </div>
+        {(() => {
+          const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+          const counts = days.map((day, i) => {
+            const targetDay = (i + 1) % 7 || 7
+            return dbVisits.filter((v: any) => {
+              const d = v.submitted_at ? new Date(v.submitted_at) : null
+              return d && d.getDay() === targetDay
+            }).length
+          })
+          const maxCount = Math.max(...counts, 1)
+          if (dbVisits.length === 0) {
+            return <div className="text-center py-6 text-slate-400 text-sm">No visits recorded yet</div>
+          }
+          return (
+            <div className="flex items-end gap-2 h-24">
+              {days.map((day, idx) => {
+                const value = counts[idx]
+                const isToday = idx === (new Date().getDay() + 6) % 7
+                return (
+                  <motion.div
+                    key={day}
+                    initial={{ scaleY: 0 }}
+                    animate={{ scaleY: 1 }}
+                    transition={{ delay: 0.3 + idx * 0.05, duration: 0.5, ease: 'easeOut' }}
+                    className="flex-1 flex flex-col items-center gap-1.5 origin-bottom"
+                  >
+                    <div className="w-full relative rounded-lg overflow-hidden" style={{ height: `${(value / maxCount) * 100}%`, minHeight: value > 0 ? 8 : 4 }}>
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: '100%' }}
+                        transition={{ delay: 0.3 + idx * 0.05, duration: 0.6, ease: 'easeOut' }}
+                        className="absolute bottom-0 left-0 right-0 rounded-lg"
+                        style={{ background: isToday ? `linear-gradient(180deg, ${COLORS.teal}, ${COLORS.teal2})` : 'linear-gradient(180deg, #e2e8f0, #cbd5e1)' }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-medium">{day}</span>
+                  </motion.div>
+                )
+              })}
+            </div>
+          )
+        })()}
       </motion.div>
 
       {/* Stats */}
@@ -431,7 +441,7 @@ export default function ManagerDashboard() {
               </div>
               <div className="flex items-center gap-1.5 text-slate-500">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-                <span className="text-slate-700">3 visits</span>
+                <span className="text-slate-700">{dbVisits.filter((v: any) => v.carer_id === carer.id).length} visits</span>
               </div>
             </div>
           </motion.div>
@@ -439,172 +449,6 @@ export default function ManagerDashboard() {
       </motion.div>
     )
   }
-
-  const renderMAR = () => {
-    const confirmed = dbMedications.filter((m: any) => m.status === 'confirmed').length
-    const skipped = dbMedications.filter((m: any) => m.status === 'skipped').length
-    const pending = dbMedications.filter((m: any) => m.status === 'pending').length
-    const medCount = dbMedications.length
-    return (
-      <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
-        {/* MAR Summary */}
-        <motion.div custom={0} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-sm text-slate-800">MAR Summary</h3>
-            <span className="text-xs text-slate-400 font-mono">{new Date().toLocaleDateString('en-GB')}</span>
-          </div>
-          {medCount > 0 ? (
-            <div className="flex items-center justify-center mb-3 relative">
-              <svg width="100" height="100" viewBox="0 0 100 100" className="transform -rotate-90">
-                <circle cx="50" cy="50" r="38" fill="none" stroke="#f1f5f9" strokeWidth="10" />
-                <circle
-                  cx="50" cy="50" r="38" fill="none"
-                  stroke={COLORS.teal}
-                  strokeWidth="10"
-                  strokeDasharray={`${(confirmed / medCount) * 239} 239`}
-                  strokeLinecap="round"
-                />
-                <circle
-                  cx="50" cy="50" r="38" fill="none"
-                  stroke={COLORS.red}
-                  strokeWidth="10"
-                  strokeDasharray={`${(skipped / medCount) * 239} 239`}
-                  strokeDashoffset={`-${(confirmed / medCount) * 239}`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-xl font-bold text-slate-800">{confirmed}</div>
-                <div className="text-[10px] text-slate-400">of {medCount}</div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-6 text-slate-400 text-sm">No medications logged today</div>
-          )}
-          <div className="flex justify-center gap-4 mt-1">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ background: COLORS.teal }} />
-              <span className="text-[10px] text-slate-500">{confirmed} Confirmed</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ background: COLORS.red }} />
-              <span className="text-[10px] text-slate-500">{skipped} Skipped</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#cbd5e1' }} />
-              <span className="text-[10px] text-slate-500">{pending} Pending</span>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Medication List */}
-        <motion.div custom={1} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-          <h3 className="font-bold text-sm text-slate-800 mb-3">Medication Log</h3>
-          {dbMedications.length === 0 && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-6 text-slate-400 text-sm">No medication records</motion.div>
-          )}
-          <div className="flex flex-col gap-2">
-            {dbMedications.map((med: any, i: number) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 + i * 0.04, duration: 0.3 }}
-                whileHover={{ scale: 1.01, backgroundColor: med.status === 'skipped' ? 'rgba(255,90,95,0.05)' : 'rgba(248,250,252,1)' }}
-                className="flex items-center justify-between p-3 rounded-xl border border-slate-50 cursor-default"
-                style={{ background: med.status === 'skipped' ? 'rgba(255,90,95,0.03)' : 'white' }}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-slate-700">{med.medication_name}</span>
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                      style={{
-                        background: med.status === 'confirmed' ? 'rgba(79,209,197,0.1)' : med.status === 'skipped' ? 'rgba(255,90,95,0.08)' : '#f1f5f9',
-                        color: med.status === 'confirmed' ? COLORS.teal : med.status === 'skipped' ? COLORS.red : '#94a3b8',
-                        border: `1px solid ${med.status === 'confirmed' ? 'rgba(79,209,197,0.15)' : med.status === 'skipped' ? 'rgba(255,90,95,0.1)' : 'transparent'}`,
-                      }}
-                    >
-                      {med.status}
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-400 mt-0.5">{med.client_name} · {med.scheduled_time} · {med.carer_name}</div>
-                  {med.reason && <div className="text-[10px] mt-0.5" style={{ color: COLORS.red }}>Reason: {med.reason}</div>}
-                </div>
-                <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: med.status === 'confirmed' ? 'rgba(79,209,197,0.1)' : med.status === 'skipped' ? 'rgba(255,90,95,0.1)' : 'rgba(0,0,0,0.03)' }}>
-                  {med.status === 'confirmed' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                  )}
-                  {med.status === 'skipped' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.red} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  )}
-                  {med.status === 'pending' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </motion.div>
-    )
-  }
-
-  const renderIncidents = () => (
-    <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
-      {allIncidents.length === 0 && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">
-          <div className="text-slate-500 text-sm font-medium mb-1">No incidents reported</div>
-          <div className="text-slate-400 text-xs">Everything is running smoothly.</div>
-        </motion.div>
-      )}
-      {allIncidents.map((inc, idx) => (
-        <motion.div
-          key={inc.id}
-          custom={idx}
-          variants={cardVariants}
-          whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}
-          className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm cursor-default"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <div
-              className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-              style={{
-                background: inc.severity === 'high' ? 'rgba(255,90,95,0.1)' : 'rgba(246,183,60,0.1)',
-                color: inc.severity === 'high' ? COLORS.red : COLORS.amber,
-                border: `1px solid ${inc.severity === 'high' ? 'rgba(255,90,95,0.15)' : 'rgba(246,183,60,0.15)'}`,
-              }}
-            >
-              {inc.severity === 'high' ? (
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
-              ) : (
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
-              )}
-              {inc.severity.toUpperCase()}
-            </div>
-            <span className="text-xs text-slate-400 font-mono">{inc.time}</span>
-          </div>
-          <div className="font-bold text-sm text-slate-800 mb-1">{inc.type}</div>
-          <div className="text-xs text-slate-500 mb-3 flex flex-col gap-0.5">
-            <div className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> {inc.carer}</div>
-            <div className="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg> {inc.client}</div>
-          </div>
-          <div className="flex gap-2">
-            <motion.button whileTap={{ scale: 0.97 }} className="flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all hover:bg-slate-50" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>Review</motion.button>
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => {
-                setResolvedIds((prev) => new Set([...prev, inc.id]))
-                sendSOSResolved(inc.client)
-              }}
-              className="flex-1 py-2 rounded-xl text-xs font-semibold border-none cursor-pointer transition-all hover:opacity-90 text-white"
-              style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
-            >Resolve</motion.button>
-          </div>
-        </motion.div>
-      ))}
-    </motion.div>
-  )
 
   function renderClients() {
     const [showAdd, setShowAdd] = useState(false)
@@ -687,21 +531,12 @@ export default function ManagerDashboard() {
     const [clientId, setClientId] = useState('')
     const [msg, setMsg] = useState('')
     const [assignmentsList, setAssignmentsList] = useState<any[]>([])
-    const [users, setUsers] = useState<any[]>([])
     const [clients, setClients] = useState<any[]>([])
 
     useEffect(() => {
       getAssignments().then((res) => setAssignmentsList(res.assignments || [])).catch(() => {})
       getClients().then((rows) => setClients(rows)).catch(() => {})
     }, [msg])
-
-    useEffect(() => {
-      // Load users (caregivers) from dbCarers or fetch separately
-      fetch('/api/carers', { credentials: 'include' })
-        .then((r) => r.json())
-        .then((data) => setUsers(data.carers || []))
-        .catch(() => {})
-    }, [])
 
     const handleAssign = async () => {
       if (!caregiverId || !clientId) { setMsg('Select both caregiver and client'); return }
@@ -733,7 +568,7 @@ export default function ManagerDashboard() {
         <div className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
           <select value={caregiverId} onChange={(e) => setCaregiverId(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
             <option value="">Select caregiver</option>
-            {users.map((u: any) => (
+            {dbCarers.map((u: any) => (
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </select>
