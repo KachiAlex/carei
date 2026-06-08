@@ -75,6 +75,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
+    if (req.method === 'PATCH') {
+      if (user.role !== 'manager') {
+        res.status(403).json({ error: 'Only managers can update assignments' })
+        return
+      }
+      const { id } = req.query as { id?: string }
+      if (!id) {
+        res.status(400).json({ error: 'id required' })
+        return
+      }
+      const { visitDate, visitTime, instructions } = req.body || {}
+      await sql`
+        UPDATE caregiver_client_assignments SET
+          visit_date = COALESCE(${visitDate || null}, visit_date),
+          visit_time = COALESCE(${visitTime || null}, visit_time),
+          instructions = COALESCE(${instructions || null}, instructions)
+        WHERE id = ${id}
+      `
+      res.status(200).json({ status: 'updated' })
+      return
+    }
+
     if (req.method === 'DELETE') {
       if (user.role !== 'manager') {
         res.status(403).json({ error: 'Only managers can delete assignments' })

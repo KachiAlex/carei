@@ -265,6 +265,24 @@ export async function createAssignment(data: {
   return post('/manager/assignments', data)
 }
 
+export async function updateAssignment(assignmentId: string, data: {
+  visitDate?: string
+  visitTime?: string
+  instructions?: string
+}) {
+  const res = await fetch(`${API_BASE}/manager/assignments?id=${assignmentId}`, {
+    method: 'PATCH',
+    headers: jsonHeaders,
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 export async function deleteAssignment(caregiverId: string, clientId: string) {
   const res = await fetch(`${API_BASE}/manager/assignments?caregiverId=${caregiverId}&clientId=${clientId}`, {
     method: 'DELETE',

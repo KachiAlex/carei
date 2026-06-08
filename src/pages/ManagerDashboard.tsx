@@ -11,6 +11,7 @@ import {
   fetchClient,
   getAssignments,
   createAssignment,
+  updateAssignment,
   deleteAssignment,
   getManagerTasks,
   createManagerTask,
@@ -80,6 +81,10 @@ export default function ManagerDashboard() {
   const [scheduleMsg, setScheduleMsg] = useState('')
   const [assignmentsList, setAssignmentsList] = useState<any[]>([])
   const [scheduleClients, setScheduleClients] = useState<any[]>([])
+  const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null)
+  const [editAssignDate, setEditAssignDate] = useState('')
+  const [editAssignTime, setEditAssignTime] = useState('')
+  const [editAssignInstructions, setEditAssignInstructions] = useState('')
 
   // Logs tab state
   const [logsClients, setLogsClients] = useState<any[]>([])
@@ -821,6 +826,36 @@ export default function ManagerDashboard() {
       }
     }
 
+    const startEdit = (a: any) => {
+      setEditingAssignmentId(a.id)
+      setEditAssignDate(a.visitDate || '')
+      setEditAssignTime(a.visitTime || '')
+      setEditAssignInstructions(a.instructions || '')
+    }
+
+    const cancelEdit = () => {
+      setEditingAssignmentId(null)
+      setEditAssignDate('')
+      setEditAssignTime('')
+      setEditAssignInstructions('')
+    }
+
+    const handleUpdate = async (id: string) => {
+      try {
+        await updateAssignment(id, {
+          visitDate: editAssignDate || undefined,
+          visitTime: editAssignTime || undefined,
+          instructions: editAssignInstructions || undefined,
+        })
+        setScheduleMsg('Updated successfully')
+        cancelEdit()
+        const res = await getAssignments()
+        setAssignmentsList(res.assignments || [])
+      } catch (err: any) {
+        setScheduleMsg(err.message || 'Failed to update')
+      }
+    }
+
     return (
       <div className="flex flex-col gap-4">
         <h2 className="font-bold text-slate-800">Assign Client to Caregiver</h2>
@@ -863,30 +898,71 @@ export default function ManagerDashboard() {
         </div>
         <h3 className="font-bold text-slate-800 mt-2">Current Assignments</h3>
         <div className="flex flex-col gap-2">
-          {assignmentsList.map((a) => (
-            <div key={a.id} className="bg-white rounded-xl p-3 border border-slate-200 text-sm">
-              <div className="flex items-center justify-between mb-1">
-                <div>
-                  <div className="font-semibold text-slate-700">{a.clientName}</div>
-                  <div className="text-xs text-slate-400">Caregiver: {a.caregiverName}</div>
+          {assignmentsList.map((a) => {
+            const isEditing = editingAssignmentId === a.id
+            return (
+              <div key={a.id} className="bg-white rounded-xl p-3 border border-slate-200 text-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <div>
+                    <div className="font-semibold text-slate-700">{a.clientName}</div>
+                    <div className="text-xs text-slate-400">Caregiver: {a.caregiverName}</div>
+                  </div>
+                  {isEditing ? (
+                    <div className="flex items-center gap-1">
+                      <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleUpdate(a.id)} className="px-3 py-1 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: 'rgba(79,209,197,0.3)', color: COLORS.teal }}>Save</motion.button>
+                      <motion.button whileTap={{ scale: 0.95 }} onClick={cancelEdit} className="px-3 py-1 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>Cancel</motion.button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <motion.button whileTap={{ scale: 0.95 }} onClick={() => startEdit(a)} className="px-3 py-1 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>Edit</motion.button>
+                      <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleUnassign(a.caregiverId, a.clientId)} className="px-3 py-1 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>Unassign</motion.button>
+                    </div>
+                  )}
                 </div>
-                <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleUnassign(a.caregiverId, a.clientId)} className="px-3 py-1 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>Unassign</motion.button>
+                {isEditing ? (
+                  <div className="flex flex-col gap-2 mt-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="date"
+                        value={editAssignDate}
+                        onChange={(e) => setEditAssignDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white"
+                      />
+                      <input
+                        type="time"
+                        value={editAssignTime}
+                        onChange={(e) => setEditAssignTime(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white"
+                      />
+                    </div>
+                    <textarea
+                      value={editAssignInstructions}
+                      onChange={(e) => setEditAssignInstructions(e.target.value)}
+                      placeholder="Instructions"
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white resize-none"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {(a.visitDate || a.visitTime) && (
+                      <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-1">
+                        <span className="flex items-center gap-1">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                          {a.visitDate && new Date(a.visitDate).toLocaleDateString('en-GB')}
+                          {a.visitDate && a.visitTime && ' · '}
+                          {a.visitTime}
+                        </span>
+                      </div>
+                    )}
+                    {a.instructions && (
+                      <div className="text-[11px] text-slate-500 bg-slate-50 rounded-lg p-2 mt-1">{a.instructions}</div>
+                    )}
+                  </>
+                )}
               </div>
-              {(a.visitDate || a.visitTime) && (
-                <div className="flex items-center gap-2 text-[10px] text-slate-500 mb-1">
-                  <span className="flex items-center gap-1">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-                    {a.visitDate && new Date(a.visitDate).toLocaleDateString('en-GB')}
-                    {a.visitDate && a.visitTime && ' · '}
-                    {a.visitTime}
-                  </span>
-                </div>
-              )}
-              {a.instructions && (
-                <div className="text-[11px] text-slate-500 bg-slate-50 rounded-lg p-2 mt-1">{a.instructions}</div>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     )
