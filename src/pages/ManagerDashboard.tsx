@@ -45,6 +45,40 @@ export default function ManagerDashboard() {
   const [loading, setLoading] = useState(true)
   const [logClientId, setLogClientId] = useState<string>('')
 
+  // Team tab state
+  const [teamShowAdd, setTeamShowAdd] = useState(false)
+  const [teamName, setTeamName] = useState('')
+  const [teamEmail, setTeamEmail] = useState('')
+  const [teamPhone, setTeamPhone] = useState('')
+  const [teamRegion, setTeamRegion] = useState('')
+  const [teamPin, setTeamPin] = useState('')
+  const [teamRole, setTeamRole] = useState('carer')
+  const [teamMsg, setTeamMsg] = useState('')
+
+  // Clients tab state
+  const [clientShowAdd, setClientShowAdd] = useState(false)
+  const [clientName, setClientName] = useState('')
+  const [clientAge, setClientAge] = useState('')
+  const [clientAddress, setClientAddress] = useState('')
+  const [clientConditions, setClientConditions] = useState('')
+  const [clientMedications, setClientMedications] = useState('')
+  const [clientPreferences, setClientPreferences] = useState('')
+  const [clientEmergency, setClientEmergency] = useState('')
+  const [clientMsg, setClientMsg] = useState('')
+  const [clientsList, setClientsList] = useState<any[]>([])
+
+  // Schedule tab state
+  const [scheduleCaregiverId, setScheduleCaregiverId] = useState('')
+  const [scheduleClientId, setScheduleClientId] = useState('')
+  const [scheduleMsg, setScheduleMsg] = useState('')
+  const [assignmentsList, setAssignmentsList] = useState<any[]>([])
+  const [scheduleClients, setScheduleClients] = useState<any[]>([])
+
+  // Logs tab state
+  const [logsClients, setLogsClients] = useState<any[]>([])
+  const [logsList, setLogsList] = useState<any[]>([])
+  const [logsSelectedClient, setLogsSelectedClient] = useState('')
+
   useEffect(() => {
     getManagerData()
       .then((data) => {
@@ -84,6 +118,19 @@ export default function ManagerDashboard() {
     }
     eventSource.onerror = () => setSseConnected(false)
     return () => { eventSource.close() }
+  }, [])
+
+  useEffect(() => {
+    getClients().then((rows) => setClientsList(rows)).catch(() => {})
+  }, [clientMsg])
+
+  useEffect(() => {
+    getAssignments().then((res) => setAssignmentsList(res.assignments || [])).catch(() => {})
+    getClients().then((rows) => setScheduleClients(rows)).catch(() => {})
+  }, [scheduleMsg])
+
+  useEffect(() => {
+    getClients().then((rows) => setLogsClients(rows)).catch(() => {})
   }, [])
 
   const allIncidents = [
@@ -349,48 +396,39 @@ export default function ManagerDashboard() {
   )
 
   const renderTeam = () => {
-    const [showAdd, setShowAdd] = useState(false)
-    const [name, setName] = useState('')
-    const [email, setEmail] = useState('')
-    const [phone, setPhone] = useState('')
-    const [region, setRegion] = useState('')
-    const [pin, setPin] = useState('')
-    const [role, setRole] = useState('carer')
-    const [msg, setMsg] = useState('')
-
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault()
       try {
-        await createCaregiver({ name, email, phone, region, pin, role })
-        setMsg('Caregiver created')
-        setName(''); setEmail(''); setPhone(''); setRegion(''); setPin('')
-        setShowAdd(false)
-      } catch (err: any) { setMsg(err.message || 'Failed') }
+        await createCaregiver({ name: teamName, email: teamEmail, phone: teamPhone, region: teamRegion, pin: teamPin, role: teamRole })
+        setTeamMsg('Caregiver created')
+        setTeamName(''); setTeamEmail(''); setTeamPhone(''); setTeamRegion(''); setTeamPin('')
+        setTeamShowAdd(false)
+      } catch (err: any) { setTeamMsg(err.message || 'Failed') }
     }
 
     return (
       <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-sm text-slate-800">Caregivers</h2>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowAdd(!showAdd)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer flex items-center gap-1" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setTeamShowAdd(!teamShowAdd)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer flex items-center gap-1" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            {showAdd ? 'Close' : 'Add'}
+            {teamShowAdd ? 'Close' : 'Add'}
           </motion.button>
         </div>
 
-        {showAdd && (
+        {teamShowAdd && (
           <motion.form onSubmit={handleSubmit} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-            <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="Region" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-            <input value={pin} onChange={(e) => setPin(e.target.value)} placeholder="PIN (4-6 digits)" type="password" maxLength={6} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-            <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
+            <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <input value={teamEmail} onChange={(e) => setTeamEmail(e.target.value)} placeholder="Email" type="email" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <input value={teamPhone} onChange={(e) => setTeamPhone(e.target.value)} placeholder="Phone" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <input value={teamRegion} onChange={(e) => setTeamRegion(e.target.value)} placeholder="Region" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <input value={teamPin} onChange={(e) => setTeamPin(e.target.value)} placeholder="PIN (4-6 digits)" type="password" maxLength={6} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <select value={teamRole} onChange={(e) => setTeamRole(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
               <option value="carer">Carer</option>
               <option value="manager">Manager</option>
             </select>
             <motion.button whileTap={{ scale: 0.97 }} type="submit" className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Create Caregiver</motion.button>
-            {msg && <div className="text-xs text-slate-500">{msg}</div>}
+            {teamMsg && <div className="text-xs text-slate-500">{teamMsg}</div>}
           </motion.form>
         )}
 
@@ -451,65 +489,50 @@ export default function ManagerDashboard() {
   }
 
   function renderClients() {
-    const [showAdd, setShowAdd] = useState(false)
-    const [name, setName] = useState('')
-    const [age, setAge] = useState('')
-    const [address, setAddress] = useState('')
-    const [conditions, setConditions] = useState('')
-    const [medications, setMedications] = useState('')
-    const [preferences, setPreferences] = useState('')
-    const [emergencyContact, setEmergencyContact] = useState('')
-    const [msg, setMsg] = useState('')
-    const [clientsList, setClientsList] = useState<any[]>([])
-
-    useEffect(() => {
-      getClients().then((rows) => setClientsList(rows)).catch(() => {})
-    }, [msg])
-
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault()
       try {
         const id = 'cl-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
         await createClient({
           id,
-          name,
-          age: age ? parseInt(age) : undefined,
-          address: address || undefined,
-          conditions: conditions.split(',').map((s) => s.trim()).filter(Boolean),
-          medications: medications.split(',').map((s) => {
+          name: clientName,
+          age: clientAge ? parseInt(clientAge) : undefined,
+          address: clientAddress || undefined,
+          conditions: clientConditions.split(',').map((s) => s.trim()).filter(Boolean),
+          medications: clientMedications.split(',').map((s) => {
             const parts = s.trim().split('—')
             return { name: parts[0] || s.trim(), dose: parts[1] || '-', frequency: parts[2] || 'daily' }
           }).filter((m) => m.name),
-          preferences: preferences || undefined,
-          emergencyContact: emergencyContact || undefined,
+          preferences: clientPreferences || undefined,
+          emergencyContact: clientEmergency || undefined,
         })
-        setMsg('Client created')
-        setName(''); setAge(''); setAddress(''); setConditions(''); setMedications(''); setPreferences(''); setEmergencyContact('')
-        setShowAdd(false)
-      } catch (err: any) { setMsg(err.message || 'Failed') }
+        setClientMsg('Client created')
+        setClientName(''); setClientAge(''); setClientAddress(''); setClientConditions(''); setClientMedications(''); setClientPreferences(''); setClientEmergency('')
+        setClientShowAdd(false)
+      } catch (err: any) { setClientMsg(err.message || 'Failed') }
     }
 
     return (
       <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-sm text-slate-800">Clients</h2>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowAdd(!showAdd)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer flex items-center gap-1" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
+          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setClientShowAdd(!clientShowAdd)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer flex items-center gap-1" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            {showAdd ? 'Close' : 'Add'}
+            {clientShowAdd ? 'Close' : 'Add'}
           </motion.button>
         </div>
 
-        {showAdd && (
+        {clientShowAdd && (
           <motion.form onSubmit={handleSubmit} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
-            <input value={age} onChange={(e) => setAge(e.target.value)} placeholder="Age" type="number" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-            <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-            <input value={conditions} onChange={(e) => setConditions(e.target.value)} placeholder="Conditions (comma separated)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-            <input value={medications} onChange={(e) => setMedications(e.target.value)} placeholder="Medications: Name—Dose—Frequency (comma separated)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-            <input value={preferences} onChange={(e) => setPreferences(e.target.value)} placeholder="Care preferences" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
-            <input value={emergencyContact} onChange={(e) => setEmergencyContact(e.target.value)} placeholder="Emergency contact" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Full name" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" required />
+            <input value={clientAge} onChange={(e) => setClientAge(e.target.value)} placeholder="Age" type="number" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} placeholder="Address" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={clientConditions} onChange={(e) => setClientConditions(e.target.value)} placeholder="Conditions (comma separated)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={clientMedications} onChange={(e) => setClientMedications(e.target.value)} placeholder="Medications: Name—Dose—Frequency (comma separated)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={clientPreferences} onChange={(e) => setClientPreferences(e.target.value)} placeholder="Care preferences" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+            <input value={clientEmergency} onChange={(e) => setClientEmergency(e.target.value)} placeholder="Emergency contact" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
             <motion.button whileTap={{ scale: 0.97 }} type="submit" className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Create Client</motion.button>
-            {msg && <div className="text-xs text-slate-500">{msg}</div>}
+            {clientMsg && <div className="text-xs text-slate-500">{clientMsg}</div>}
           </motion.form>
         )}
 
@@ -527,38 +550,27 @@ export default function ManagerDashboard() {
   }
 
   function renderSchedule() {
-    const [caregiverId, setCaregiverId] = useState('')
-    const [clientId, setClientId] = useState('')
-    const [msg, setMsg] = useState('')
-    const [assignmentsList, setAssignmentsList] = useState<any[]>([])
-    const [clients, setClients] = useState<any[]>([])
-
-    useEffect(() => {
-      getAssignments().then((res) => setAssignmentsList(res.assignments || [])).catch(() => {})
-      getClients().then((rows) => setClients(rows)).catch(() => {})
-    }, [msg])
-
     const handleAssign = async () => {
-      if (!caregiverId || !clientId) { setMsg('Select both caregiver and client'); return }
+      if (!scheduleCaregiverId || !scheduleClientId) { setScheduleMsg('Select both caregiver and client'); return }
       try {
-        await createAssignment({ caregiverId, clientId })
-        setMsg('Assigned successfully')
-        setCaregiverId(''); setClientId('')
+        await createAssignment({ caregiverId: scheduleCaregiverId, clientId: scheduleClientId })
+        setScheduleMsg('Assigned successfully')
+        setScheduleCaregiverId(''); setScheduleClientId('')
         const res = await getAssignments()
         setAssignmentsList(res.assignments || [])
       } catch (err: any) {
-        setMsg(err.message || 'Failed to assign')
+        setScheduleMsg(err.message || 'Failed to assign')
       }
     }
 
     const handleUnassign = async (cgId: string, clId: string) => {
       try {
         await deleteAssignment(cgId, clId)
-        setMsg('Unassigned successfully')
+        setScheduleMsg('Unassigned successfully')
         const res = await getAssignments()
         setAssignmentsList(res.assignments || [])
       } catch (err: any) {
-        setMsg(err.message || 'Failed to unassign')
+        setScheduleMsg(err.message || 'Failed to unassign')
       }
     }
 
@@ -566,20 +578,20 @@ export default function ManagerDashboard() {
       <div className="flex flex-col gap-4">
         <h2 className="font-bold text-slate-800">Assign Client to Caregiver</h2>
         <div className="bg-white rounded-2xl p-4 border border-slate-200 flex flex-col gap-3">
-          <select value={caregiverId} onChange={(e) => setCaregiverId(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
+          <select value={scheduleCaregiverId} onChange={(e) => setScheduleCaregiverId(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
             <option value="">Select caregiver</option>
             {dbCarers.map((u: any) => (
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </select>
-          <select value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
+          <select value={scheduleClientId} onChange={(e) => setScheduleClientId(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
             <option value="">Select client</option>
-            {clients.map((c: any) => (
+            {scheduleClients.map((c: any) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
           <motion.button whileTap={{ scale: 0.97 }} onClick={handleAssign} className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Assign</motion.button>
-          {msg && <div className="text-xs text-slate-500">{msg}</div>}
+          {scheduleMsg && <div className="text-xs text-slate-500">{scheduleMsg}</div>}
         </div>
         <h3 className="font-bold text-slate-800 mt-2">Current Assignments</h3>
         <div className="flex flex-col gap-2">
@@ -598,39 +610,31 @@ export default function ManagerDashboard() {
   }
 
   function renderLogs() {
-    const [clients, setClients] = useState<any[]>([])
-    const [logs, setLogs] = useState<any[]>([])
-    const [selectedClient, setSelectedClient] = useState('')
-
-    useEffect(() => {
-      getClients().then((rows) => setClients(rows)).catch(() => {})
-    }, [])
-
     const handleFetchLogs = async (clientId: string) => {
-      setSelectedClient(clientId)
+      setLogsSelectedClient(clientId)
       try {
         const res = await getClientLogs(clientId)
-        setLogs(res.logs || [])
-      } catch { setLogs([]) }
+        setLogsList(res.logs || [])
+      } catch { setLogsList([]) }
     }
 
     return (
       <div className="flex flex-col gap-4">
         <h2 className="font-bold text-slate-800">Client Care Logs</h2>
         <select
-          value={selectedClient}
+          value={logsSelectedClient}
           onChange={(e) => handleFetchLogs(e.target.value)}
           className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white"
         >
           <option value="">Select a client to view logs</option>
-          {clients.map((c: any) => (
+          {logsClients.map((c: any) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
-        {selectedClient && (
+        {logsSelectedClient && (
           <div className="flex flex-col gap-2">
-            {logs.length === 0 && <div className="text-sm text-slate-400">No logs found for this client.</div>}
-            {logs.map((log) => (
+            {logsList.length === 0 && <div className="text-sm text-slate-400">No logs found for this client.</div>}
+            {logsList.map((log) => (
               <motion.div key={log.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-xl p-3 border border-slate-200 text-sm">
                 <div className="flex items-center justify-between">
                   <div className="font-semibold text-slate-700">{log.taskName}</div>
