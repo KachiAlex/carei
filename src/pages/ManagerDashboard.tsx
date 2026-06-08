@@ -79,7 +79,7 @@ export default function ManagerDashboard() {
   const [logsList, setLogsList] = useState<any[]>([])
   const [logsSelectedClient, setLogsSelectedClient] = useState('')
 
-  useEffect(() => {
+  const refreshManagerData = () => {
     getManagerData()
       .then((data) => {
         setDbCarers(data.carers || [])
@@ -90,6 +90,10 @@ export default function ManagerDashboard() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    refreshManagerData()
   }, [])
 
   useEffect(() => {
@@ -403,6 +407,7 @@ export default function ManagerDashboard() {
         setTeamMsg('Caregiver created')
         setTeamName(''); setTeamEmail(''); setTeamPhone(''); setTeamRegion(''); setTeamPin('')
         setTeamShowAdd(false)
+        refreshManagerData()
       } catch (err: any) { setTeamMsg(err.message || 'Failed') }
     }
 
