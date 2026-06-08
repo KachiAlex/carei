@@ -104,6 +104,8 @@ async function runInit() {
     )
   `
 
+  await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'`
+
   await sql`
     CREATE TABLE IF NOT EXISTS visit_drafts (
       visit_id TEXT PRIMARY KEY,

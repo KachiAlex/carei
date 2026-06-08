@@ -12,15 +12,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureTables()
     const sql = getSql()
-    const caregiverRows = await sql`SELECT id, name, email, phone, region, role FROM users WHERE role = 'carer' ORDER BY name` as any[]
+    const caregiverRows = await sql`SELECT id, name, email, phone, region, role, status, created_at FROM users WHERE role = 'carer' ORDER BY name` as any[]
     const carers = caregiverRows.map((u: any) => ({
       id: u.id,
       name: u.name,
+      email: u.email,
+      phone: u.phone,
       avatar: u.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase(),
-      status: 'available',
+      status: u.status || 'active',
       location: u.region || '—',
       client: '—',
-      since: '—',
+      since: u.created_at ? new Date(u.created_at).toLocaleDateString() : '—',
     }))
     res.status(200).json({ carers })
   } catch (err: any) {

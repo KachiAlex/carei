@@ -6,6 +6,9 @@ import {
   createCaregiver,
   getClients,
   createClient,
+  updateClient,
+  deleteClient,
+  fetchClient,
   getAssignments,
   createAssignment,
   deleteAssignment,
@@ -13,6 +16,8 @@ import {
   createManagerTask,
   deleteManagerTask,
   getClientLogs,
+  updateCaregiverStatus,
+  deleteCaregiver,
 } from '../api/client'
 import { sendSOSAlert, sendSOSResolved, requestNotificationPermission } from '../utils/notifications'
 
@@ -78,6 +83,14 @@ export default function ManagerDashboard() {
   const [logsClients, setLogsClients] = useState<any[]>([])
   const [logsList, setLogsList] = useState<any[]>([])
   const [logsSelectedClient, setLogsSelectedClient] = useState('')
+
+  // Modal state
+  const [selectedCarer, setSelectedCarer] = useState<any>(null)
+  const [showCarerModal, setShowCarerModal] = useState(false)
+  const [carerActionMsg, setCarerActionMsg] = useState('')
+  const [selectedClientDetail, setSelectedClientDetail] = useState<any>(null)
+  const [showClientModal, setShowClientModal] = useState(false)
+  const [clientActionMsg, setClientActionMsg] = useState('')
 
   const refreshManagerData = () => {
     getManagerData()
@@ -449,7 +462,8 @@ export default function ManagerDashboard() {
             custom={idx}
             variants={cardVariants}
             whileHover={{ y: -2, boxShadow: '0 8px 24px rgba(0,0,0,0.06)' }}
-            className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm cursor-default"
+            onClick={() => { setSelectedCarer(carer); setShowCarerModal(true); setCarerActionMsg('') }}
+            className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm cursor-pointer"
           >
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.darkNavy})` }}>
@@ -460,12 +474,12 @@ export default function ManagerDashboard() {
                 <span
                   className="text-[10px] px-2 py-0.5 rounded-full font-medium"
                   style={{
-                    background: carer.status === 'in-visit' ? 'rgba(79,209,197,0.1)' : carer.status === 'traveling' ? 'rgba(246,183,60,0.1)' : '#f1f5f9',
-                    color: carer.status === 'in-visit' ? COLORS.teal : carer.status === 'traveling' ? COLORS.amber : '#94a3b8',
-                    border: `1px solid ${carer.status === 'in-visit' ? 'rgba(79,209,197,0.15)' : carer.status === 'traveling' ? 'rgba(246,183,60,0.15)' : 'transparent'}`,
+                    background: carer.status === 'active' ? 'rgba(79,209,197,0.1)' : carer.status === 'suspended' ? 'rgba(255,90,95,0.1)' : '#f1f5f9',
+                    color: carer.status === 'active' ? COLORS.teal : carer.status === 'suspended' ? COLORS.red : '#94a3b8',
+                    border: `1px solid ${carer.status === 'active' ? 'rgba(79,209,197,0.15)' : carer.status === 'suspended' ? 'rgba(255,90,95,0.15)' : 'transparent'}`,
                   }}
                 >
-                  {carer.status.replace('-', ' ')}
+                  {carer.status}
                 </span>
               </div>
             </div>
@@ -489,6 +503,93 @@ export default function ManagerDashboard() {
             </div>
           </motion.div>
         ))}
+
+        {/* Carer Detail Modal */}
+        {showCarerModal && selectedCarer && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowCarerModal(false)}>
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.navy}, ${COLORS.darkNavy})` }}>
+                  {selectedCarer.avatar}
+                </div>
+                <div className="flex-1">
+                  <div className="font-bold text-slate-800">{selectedCarer.name}</div>
+                  <span
+                    className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{
+                      background: selectedCarer.status === 'active' ? 'rgba(79,209,197,0.1)' : 'rgba(255,90,95,0.1)',
+                      color: selectedCarer.status === 'active' ? COLORS.teal : COLORS.red,
+                      border: `1px solid ${selectedCarer.status === 'active' ? 'rgba(79,209,197,0.15)' : 'rgba(255,90,95,0.15)'}`,
+                    }}
+                  >
+                    {selectedCarer.status}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 text-sm mb-5">
+                <div className="flex justify-between"><span className="text-slate-400">Email</span><span className="text-slate-700">{selectedCarer.email || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Phone</span><span className="text-slate-700">{selectedCarer.phone || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Region</span><span className="text-slate-700">{selectedCarer.location || '—'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Visits</span><span className="text-slate-700">{dbVisits.filter((v: any) => v.carer_id === selectedCarer.id).length}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Joined</span><span className="text-slate-700">{selectedCarer.since || '—'}</span></div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={async () => {
+                    try {
+                      const newStatus = selectedCarer.status === 'active' ? 'suspended' : 'active'
+                      await updateCaregiverStatus(selectedCarer.id, newStatus)
+                      setCarerActionMsg(`Caregiver ${newStatus}`)
+                      refreshManagerData()
+                      setSelectedCarer({ ...selectedCarer, status: newStatus })
+                    } catch (err: any) { setCarerActionMsg(err.message || 'Failed') }
+                  }}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+                  style={{ background: selectedCarer.status === 'active' ? COLORS.amber : COLORS.teal }}
+                >
+                  {selectedCarer.status === 'active' ? 'Suspend' : 'Activate'}
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={async () => {
+                    if (!confirm('Are you sure you want to delete this caregiver?')) return
+                    try {
+                      await deleteCaregiver(selectedCarer.id)
+                      setCarerActionMsg('Caregiver deleted')
+                      setShowCarerModal(false)
+                      refreshManagerData()
+                    } catch (err: any) { setCarerActionMsg(err.message || 'Failed') }
+                  }}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+                  style={{ background: COLORS.red }}
+                >
+                  Delete
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    const email = selectedCarer.email
+                    if (email) window.location.href = `mailto:${email}`
+                    else setCarerActionMsg('No email available')
+                  }}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold border cursor-pointer"
+                  style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+                >
+                  Send Message
+                </motion.button>
+                {carerActionMsg && <div className="text-xs text-slate-500 text-center">{carerActionMsg}</div>}
+              </div>
+              <button onClick={() => setShowCarerModal(false)} className="w-full mt-3 py-2 text-xs text-slate-400 hover:text-slate-600 cursor-pointer bg-transparent border-none">Close</button>
+            </motion.div>
+          </div>
+        )}
       </motion.div>
     )
   }
@@ -518,6 +619,18 @@ export default function ManagerDashboard() {
       } catch (err: any) { setClientMsg(err.message || 'Failed') }
     }
 
+    const openClientModal = async (c: any) => {
+      setClientActionMsg('')
+      try {
+        const detail = await fetchClient(c.id)
+        setSelectedClientDetail(detail)
+        setShowClientModal(true)
+      } catch {
+        setSelectedClientDetail(c)
+        setShowClientModal(true)
+      }
+    }
+
     return (
       <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
         <div className="flex items-center justify-between">
@@ -545,12 +658,132 @@ export default function ManagerDashboard() {
         <div className="flex flex-col gap-2">
           {clientsList.length === 0 && <div className="text-center py-8 text-slate-400 text-sm">No clients yet</div>}
           {clientsList.map((c: any) => (
-            <motion.div key={c.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-xl p-3 border border-slate-200 text-sm">
-              <div className="font-semibold text-slate-700">{c.name}</div>
-              <div className="text-xs text-slate-400">{c.age ? `${c.age} yrs · ` : ''}{c.address}</div>
+            <motion.div
+              key={c.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={() => openClientModal(c)}
+              className="bg-white rounded-xl p-3 border border-slate-200 text-sm cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <div className="font-semibold text-slate-700">{c.name}</div>
+                {c.age && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{c.age} yrs</span>}
+              </div>
+              {c.address && <div className="text-xs text-slate-400 mt-0.5">{c.address}</div>}
+              {Array.isArray(c.conditions) && c.conditions.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {c.conditions.map((cond: string, i: number) => (
+                    <span key={i} className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-700">{cond}</span>
+                  ))}
+                </div>
+              )}
+              {Array.isArray(c.medications) && c.medications.length > 0 && (
+                <div className="text-[10px] text-slate-400 mt-1">{c.medications.length} medication{c.medications.length > 1 ? 's' : ''}</div>
+              )}
             </motion.div>
           ))}
         </div>
+
+        {/* Client Detail Modal */}
+        {showClientModal && selectedClientDetail && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowClientModal(false)}>
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              className="bg-white rounded-2xl p-5 w-full max-w-sm shadow-xl max-h-[85vh] overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold text-white shrink-0" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>
+                  {selectedClientDetail.name?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+                <div className="flex-1">
+                  <div className="font-bold text-slate-800">{selectedClientDetail.name}</div>
+                  {selectedClientDetail.age && <div className="text-xs text-slate-400">{selectedClientDetail.age} years old</div>}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 text-sm mb-5">
+                {selectedClientDetail.address && (
+                  <div>
+                    <div className="text-slate-400 text-xs mb-0.5">Address</div>
+                    <div className="text-slate-700">{selectedClientDetail.address}</div>
+                  </div>
+                )}
+                {Array.isArray(selectedClientDetail.conditions) && selectedClientDetail.conditions.length > 0 && (
+                  <div>
+                    <div className="text-slate-400 text-xs mb-1">Conditions</div>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedClientDetail.conditions.map((cond: string, i: number) => (
+                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 font-medium">{cond}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {Array.isArray(selectedClientDetail.medications) && selectedClientDetail.medications.length > 0 && (
+                  <div>
+                    <div className="text-slate-400 text-xs mb-1">Medications</div>
+                    <div className="flex flex-col gap-1">
+                      {selectedClientDetail.medications.map((med: any, i: number) => (
+                        <div key={i} className="text-xs text-slate-700 bg-slate-50 rounded-lg p-2">
+                          <span className="font-medium">{med.name}</span>
+                          {med.dose && <span className="text-slate-400"> · {med.dose}</span>}
+                          {med.frequency && <span className="text-slate-400"> · {med.frequency}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {selectedClientDetail.preferences && (
+                  <div>
+                    <div className="text-slate-400 text-xs mb-0.5">Care Preferences</div>
+                    <div className="text-slate-700 text-xs">{selectedClientDetail.preferences}</div>
+                  </div>
+                )}
+                {selectedClientDetail.emergency_contact && (
+                  <div>
+                    <div className="text-slate-400 text-xs mb-0.5">Emergency Contact</div>
+                    <div className="text-slate-700">{selectedClientDetail.emergency_contact}</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    const phone = selectedClientDetail.emergency_contact || ''
+                    if (phone) window.location.href = `tel:${phone}`
+                    else setClientActionMsg('No emergency contact available')
+                  }}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+                  style={{ background: COLORS.teal }}
+                >
+                  Call Emergency Contact
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={async () => {
+                    if (!confirm('Are you sure you want to delete this client?')) return
+                    try {
+                      await deleteClient(selectedClientDetail.id)
+                      setClientActionMsg('Client deleted')
+                      setShowClientModal(false)
+                      getClients().then((rows) => setClientsList(rows)).catch(() => {})
+                    } catch (err: any) { setClientActionMsg(err.message || 'Failed') }
+                  }}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+                  style={{ background: COLORS.red }}
+                >
+                  Delete Client
+                </motion.button>
+                {clientActionMsg && <div className="text-xs text-slate-500 text-center">{clientActionMsg}</div>}
+              </div>
+              <button onClick={() => setShowClientModal(false)} className="w-full mt-3 py-2 text-xs text-slate-400 hover:text-slate-600 cursor-pointer bg-transparent border-none">Close</button>
+            </motion.div>
+          </div>
+        )}
       </motion.div>
     )
   }

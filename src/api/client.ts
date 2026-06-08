@@ -221,6 +221,36 @@ export async function createCaregiver(data: {
   return post('/manager/caregivers', data)
 }
 
+export async function fetchCaregiver(caregiverId: string) {
+  return get(`/manager/caregiver?id=${caregiverId}`)
+}
+
+export async function updateCaregiverStatus(caregiverId: string, status: string) {
+  const res = await fetch(`${API_BASE}/manager/caregiver?id=${caregiverId}`, {
+    method: 'PATCH',
+    headers: jsonHeaders,
+    credentials: 'include',
+    body: JSON.stringify({ status }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function deleteCaregiver(caregiverId: string) {
+  const res = await fetch(`${API_BASE}/manager/caregiver?id=${caregiverId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 export async function getAssignments() {
   return get('/manager/assignments')
 }
