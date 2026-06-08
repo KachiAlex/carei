@@ -181,6 +181,11 @@ async function runInit() {
   `
 
   // No mock seed data — only real data is shown
+
+  // Cleanup previously seeded mock clients
+  try {
+    await sql`DELETE FROM clients WHERE name IN ('Aisha Khan', 'Grace Mensah', 'Mary Johnson', 'Tom Adams')`
+  } catch { /* ignore */ }
 }
 
 export function setCors(res: any) {
