@@ -96,6 +96,21 @@ async function generate() {
     <color name="ic_launcher_background">${bgColor}</color>
 </resources>`)
 
+  // PWA manifest icons
+  const publicDir = path.join(__dirname, '..', 'public')
+  for (const size of [192, 512]) {
+    const foregroundSize = Math.floor(size * 0.6)
+    const foregroundOpts = {
+      fitTo: { mode: 'width', value: foregroundSize },
+      background: 'transparent',
+    }
+    const foregroundResvg = new Resvg(svg, foregroundOpts)
+    const foregroundPng = foregroundResvg.render().asPng()
+    const png = await composite(null, foregroundPng, size)
+    fs.writeFileSync(path.join(publicDir, `icon-${size}.png`), png)
+    console.log(`Generated icon-${size}.png`)
+  }
+
   console.log('All icons generated successfully!')
 }
 

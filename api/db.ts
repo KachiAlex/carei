@@ -32,6 +32,14 @@ async function runInit() {
       medications JSONB,
       handover_note TEXT,
       clock_out_at TIMESTAMPTZ,
+      bp_systolic INTEGER,
+      bp_diastolic INTEGER,
+      pulse INTEGER,
+      o2_sat INTEGER,
+      fluid_glasses INTEGER,
+      meal_status TEXT,
+      mood TEXT,
+      wellbeing_note TEXT,
       submitted_at TIMESTAMPTZ DEFAULT NOW()
     )
   `
@@ -90,9 +98,23 @@ async function runInit() {
       support_framework TEXT,
       communication_guidance TEXT,
       mobility TEXT,
-      care_cues JSONB
+      care_cues JSONB,
+      bp_baseline_systolic INTEGER,
+      bp_baseline_diastolic INTEGER
     )
   `
+
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS bp_baseline_systolic INTEGER`
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS bp_baseline_diastolic INTEGER`
+
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS bp_systolic INTEGER`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS bp_diastolic INTEGER`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS pulse INTEGER`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS o2_sat INTEGER`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS fluid_glasses INTEGER`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS meal_status TEXT`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS mood TEXT`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS wellbeing_note TEXT`
 
   await sql`
     CREATE TABLE IF NOT EXISTS users (

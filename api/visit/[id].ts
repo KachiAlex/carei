@@ -81,15 +81,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const {
         clientName, clientAge, clientAddress, visitTime, visitDuration,
         elapsed, tasks, fluid, notes, medications, handoverNote, clockOutAt,
+        bpSystolic, bpDiastolic, pulse, o2Sat, fluidGlasses, mealStatus, mood, wellbeingNote,
       } = body
 
       await sql`
       INSERT INTO visits (
         id, client_name, client_age, client_address, visit_time, visit_duration,
-        elapsed, tasks, fluid, notes, medications, handover_note, clock_out_at
+        elapsed, tasks, fluid, notes, medications, handover_note, clock_out_at,
+        bp_systolic, bp_diastolic, pulse, o2_sat, fluid_glasses, meal_status, mood, wellbeing_note
       ) VALUES (
         ${visitId}, ${clientName}, ${clientAge}, ${clientAddress}, ${visitTime}, ${visitDuration},
-        ${elapsed}, ${JSON.stringify(tasks || [])}, ${fluid}, ${notes}, ${JSON.stringify(medications || [])}, ${handoverNote}, ${clockOutAt}
+        ${elapsed}, ${JSON.stringify(tasks || [])}, ${fluid}, ${notes}, ${JSON.stringify(medications || [])}, ${handoverNote}, ${clockOutAt},
+        ${bpSystolic}, ${bpDiastolic}, ${pulse}, ${o2Sat}, ${fluidGlasses}, ${mealStatus}, ${mood}, ${wellbeingNote}
       )
       ON CONFLICT (id) DO UPDATE SET
         client_name = EXCLUDED.client_name,
@@ -104,6 +107,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         medications = EXCLUDED.medications,
         handover_note = EXCLUDED.handover_note,
         clock_out_at = EXCLUDED.clock_out_at,
+        bp_systolic = EXCLUDED.bp_systolic,
+        bp_diastolic = EXCLUDED.bp_diastolic,
+        pulse = EXCLUDED.pulse,
+        o2_sat = EXCLUDED.o2_sat,
+        fluid_glasses = EXCLUDED.fluid_glasses,
+        meal_status = EXCLUDED.meal_status,
+        mood = EXCLUDED.mood,
+        wellbeing_note = EXCLUDED.wellbeing_note,
         submitted_at = NOW()
     `
       res.status(200).json({ status: 'saved', visitId })

@@ -69,6 +69,18 @@ export default function ActiveVisitScreen() {
   const [notGivenCarerSaid, setNotGivenCarerSaid] = useState('')
   const [notGivenFreeText, setNotGivenFreeText] = useState('')
   const [medsGivenToday, setMedsGivenToday] = useState<Set<string>>(new Set())
+
+  // Phase 5: Vitals & Care Notes
+  const [bpSystolic, setBpSystolic] = useState<string>('')
+  const [bpDiastolic, setBpDiastolic] = useState<string>('')
+  const [pulse, setPulse] = useState<string>('')
+  const [o2Sat, setO2Sat] = useState<string>('')
+  const [bpAdvisory, setBpAdvisory] = useState<string>('')
+  const [nutritionNote, setNutritionNote] = useState('')
+  const [selectedMood, setSelectedMood] = useState<string | null>(null)
+  const [wellbeingNote, setWellbeingNote] = useState('')
+  const [activeTab, setActiveTab] = useState<'tasks' | 'vitals' | 'notes'>('tasks')
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recognitionRef = useRef<any>(null)
   const dbSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -89,7 +101,7 @@ export default function ActiveVisitScreen() {
   const [showMealPrompt, setShowMealPrompt] = useState(false)
   const [mealStatus, setMealStatus] = useState<'full' | 'half' | 'refused' | null>(null)
 
-  useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn, mealStatus, loneWorkerElapsed }, 3000)
+  useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn, mealStatus, loneWorkerElapsed, bpSystolic, bpDiastolic, pulse, o2Sat, nutritionNote, selectedMood, wellbeingNote }, 3000)
 
   // Load visit + client from API, then DB data + draft
   useEffect(() => {
@@ -155,6 +167,14 @@ export default function ActiveVisitScreen() {
           if (v.notes) setNotes(v.notes)
           if (v.medications) setMeds(v.medications)
           if (v.clock_out_at) setClockedIn(false)
+          if (v.bp_systolic != null) setBpSystolic(String(v.bp_systolic))
+          if (v.bp_diastolic != null) setBpDiastolic(String(v.bp_diastolic))
+          if (v.pulse != null) setPulse(String(v.pulse))
+          if (v.o2_sat != null) setO2Sat(String(v.o2_sat))
+          if (v.fluid_glasses != null) setFluid(v.fluid_glasses)
+          if (v.meal_status) setMealStatus(v.meal_status)
+          if (v.mood) setSelectedMood(v.mood)
+          if (v.wellbeing_note) setWellbeingNote(v.wellbeing_note)
         }
 
         // Load draft
@@ -167,6 +187,13 @@ export default function ActiveVisitScreen() {
           if (draft.notes) setNotes(draft.notes)
           if (draft.meds) setMeds(draft.meds)
           if (draft.clockedIn != null) setClockedIn(draft.clockedIn)
+          if (draft.bpSystolic != null) setBpSystolic(draft.bpSystolic)
+          if (draft.bpDiastolic != null) setBpDiastolic(draft.bpDiastolic)
+          if (draft.pulse != null) setPulse(draft.pulse)
+          if (draft.o2Sat != null) setO2Sat(draft.o2Sat)
+          if (draft.nutritionNote) setNutritionNote(draft.nutritionNote)
+          if (draft.selectedMood) setSelectedMood(draft.selectedMood)
+          if (draft.wellbeingNote) setWellbeingNote(draft.wellbeingNote)
         } catch {}
       } catch {}
       if (mounted) setLoading(false)
@@ -287,6 +314,31 @@ export default function ActiveVisitScreen() {
   }
 
   const loneWorkerOverdue = loneWorkerElapsed > 25 * 60
+
+  // Phase 5: BP comparison against baseline
+  const computeBpAdvisory = (sys: string, dia: string) => {
+    const s = parseInt(sys, 10)
+    const d = parseInt(dia, 10)
+    if (isNaN(s) || isNaN(d)) return ''
+
+    const baseSys = client?.bp_baseline_systolic
+    const baseDia = client?.bp_baseline_diastolic
+    let advisory = ''
+
+    if (baseSys && baseDia) {
+      const diffSys = s - baseSys
+      const diffDia = d - baseDia
+      if (diffSys > 15 || diffDia > 10) {
+        advisory = `Elevated from baseline (${baseSys}/${baseDia})`
+      } else if (s < 90 || d < 60) {
+        advisory = 'Low BP — monitor client'
+      }
+    } else {
+      if (s < 90 || d < 60) advisory = 'Low BP — monitor client'
+    }
+
+    return advisory
+  }
 
   // Phase 4: Medication admin functions
   const openMedAdmin = (medName: string) => {
@@ -927,78 +979,274 @@ export default function ActiveVisitScreen() {
           </div>
         </div>
 
-        {/* Fluid Counter */}
-        <div
-          className="rounded-2xl p-4 border mb-3 flex items-center justify-between"
-          style={{
-            background: fluid >= 6 ? 'rgba(34,197,94,0.06)' : 'white',
-            borderColor: fluid >= 6 ? 'rgba(34,197,94,0.2)' : 'rgba(0,0,0,0.08)',
-          }}
-        >
-          <div>
-            <div className="text-xs text-slate-500">Fluid Intake</div>
-            <div className="font-bold text-lg" style={{ color: fluid >= 6 ? '#22c55e' : '#1e293b' }}>{fluid} / 12 glasses</div>
-          </div>
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={addFluid}
-            disabled={fluid >= 12}
-            className="w-11 h-11 rounded-full text-white text-xl font-bold flex items-center justify-center cursor-pointer border-none touch-target disabled:opacity-40"
-            style={{ background: fluid >= 6 ? '#22c55e' : `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
-            aria-label="Add 1 glass fluid"
-          >
-            +
-          </motion.button>
+        {/* Tab Navigation */}
+        <div className="flex gap-1 mb-3 p-1 rounded-xl" style={{ background: 'rgba(0,0,0,0.04)' }}>
+          {[
+            { key: 'tasks', label: 'Tasks' },
+            { key: 'vitals', label: 'Vitals' },
+            { key: 'notes', label: 'Care Notes' },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as any)}
+              className="flex-1 py-2 rounded-lg text-xs font-semibold cursor-pointer border-none transition-all"
+              style={{
+                background: activeTab === tab.key ? 'white' : 'transparent',
+                color: activeTab === tab.key ? '#1e293b' : '#94a3b8',
+                boxShadow: activeTab === tab.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Tasks */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
-          <h3 className="font-bold text-sm text-slate-800 mb-3">Tasks</h3>
-          <div className="flex flex-col gap-2">
-            {tasks.map((task, idx) => (
-              <motion.button
-                key={idx}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => toggleTask(idx)}
-                className="flex items-center gap-3 text-left py-3 px-2 rounded-xl cursor-pointer border-none bg-transparent hover:bg-slate-50 transition-colors min-h-[48px]"
-              >
-                <motion.div
-                  animate={{
-                    scale: task.done ? 1.1 : 1,
-                    backgroundColor: task.done ? COLORS.teal : 'transparent',
-                    borderColor: task.done ? COLORS.teal : '#cbd5e1',
-                  }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 15 }}
-                  className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 border"
-                >
-                  {task.done && (
-                    <motion.svg
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 15 }}
-                      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"
+        {/* Tab: Tasks */}
+        {activeTab === 'tasks' && (
+          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
+              <h3 className="font-bold text-sm text-slate-800 mb-3">Tasks</h3>
+              <div className="flex flex-col gap-2">
+                {tasks.map((task, idx) => (
+                  <motion.button
+                    key={idx}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => toggleTask(idx)}
+                    className="flex items-center gap-3 text-left py-3 px-2 rounded-xl cursor-pointer border-none bg-transparent hover:bg-slate-50 transition-colors min-h-[48px]"
+                  >
+                    <motion.div
+                      animate={{
+                        scale: task.done ? 1.1 : 1,
+                        backgroundColor: task.done ? COLORS.teal : 'transparent',
+                        borderColor: task.done ? COLORS.teal : '#cbd5e1',
+                      }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                      className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 border"
                     >
-                      <polyline points="20 6 9 17 4 12" />
-                    </motion.svg>
-                  )}
-                </motion.div>
-                <span className={`text-sm ${task.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{task.name}</span>
-              </motion.button>
-            ))}
-          </div>
-        </div>
+                      {task.done && (
+                        <motion.svg
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: 'spring', stiffness: 500, damping: 15 }}
+                          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </motion.svg>
+                      )}
+                    </motion.div>
+                    <span className={`text-sm ${task.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{task.name}</span>
+                    {task.completedAt && (
+                      <span className="text-[10px] text-slate-400 ml-auto">
+                        {new Date(task.completedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </motion.button>
+                ))}
+              </div>
+            </div>
 
-        {/* Notes */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
-          <h3 className="font-bold text-sm text-slate-800 mb-2">Notes</h3>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Add observations..."
-            className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
-            rows={3}
-          />
-        </div>
+            {/* Notes within Tasks tab */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3">
+              <h3 className="font-bold text-sm text-slate-800 mb-2">Notes</h3>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Add observations..."
+                className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
+                rows={3}
+              />
+            </div>
+          </motion.div>
+        )}
+
+        {/* Tab: Vitals */}
+        {activeTab === 'vitals' && (
+          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3 mb-3">
+            {/* BP Baseline header */}
+            {client?.bp_baseline_systolic && client?.bp_baseline_diastolic && (
+              <div className="bg-white rounded-2xl p-4 border border-slate-200">
+                <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Personal BP Baseline</div>
+                <div className="text-sm font-bold text-slate-800">{client.bp_baseline_systolic}/{client.bp_baseline_diastolic} mmHg</div>
+              </div>
+            )}
+
+            {/* Vital Signs form */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Vital Signs</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 mb-1 block">Systolic (mmHg)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={bpSystolic}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setBpSystolic(val)
+                      setBpAdvisory(computeBpAdvisory(val, bpDiastolic))
+                    }}
+                    placeholder="120"
+                    className="w-full bg-slate-50 rounded-xl px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-none border border-slate-100 focus:border-teal transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 mb-1 block">Diastolic (mmHg)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={bpDiastolic}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setBpDiastolic(val)
+                      setBpAdvisory(computeBpAdvisory(bpSystolic, val))
+                    }}
+                    placeholder="80"
+                    className="w-full bg-slate-50 rounded-xl px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-none border border-slate-100 focus:border-teal transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 mb-1 block">Pulse (bpm)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={pulse}
+                    onChange={(e) => setPulse(e.target.value)}
+                    placeholder="72"
+                    className="w-full bg-slate-50 rounded-xl px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-none border border-slate-100 focus:border-teal transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 mb-1 block">O₂ Sat (%)</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={o2Sat}
+                    onChange={(e) => setO2Sat(e.target.value)}
+                    placeholder="98"
+                    className="w-full bg-slate-50 rounded-xl px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-none border border-slate-100 focus:border-teal transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* BP advisory */}
+              {bpAdvisory && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-3 rounded-xl p-3 border"
+                  style={{ background: 'rgba(255,90,95,0.06)', borderColor: `${COLORS.red}25` }}
+                >
+                  <div className="text-xs font-bold" style={{ color: COLORS.red }}>⚠️ {bpAdvisory}</div>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Tab: Care Notes */}
+        {activeTab === 'notes' && (
+          <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3 mb-3">
+            {/* Fluid Counter (Care Notes) */}
+            <div
+              className="rounded-2xl p-4 border flex items-center justify-between"
+              style={{
+                background: fluid >= 6 ? 'rgba(34,197,94,0.06)' : 'white',
+                borderColor: fluid >= 6 ? 'rgba(34,197,94,0.2)' : 'rgba(0,0,0,0.08)',
+              }}
+            >
+              <div>
+                <div className="text-xs text-slate-500">Fluid Intake</div>
+                <div className="font-bold text-lg" style={{ color: fluid >= 6 ? '#22c55e' : '#1e293b' }}>{fluid} / 12 glasses</div>
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={addFluid}
+                disabled={fluid >= 12}
+                className="w-11 h-11 rounded-full text-white text-xl font-bold flex items-center justify-center cursor-pointer border-none touch-target disabled:opacity-40"
+                style={{ background: fluid >= 6 ? '#22c55e' : `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+                aria-label="Add 1 glass fluid"
+              >
+                +
+              </motion.button>
+            </div>
+
+            {/* Meal Status */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Meal Status</div>
+              <div className="flex gap-2">
+                {[
+                  { key: 'full', label: 'Full' },
+                  { key: 'half', label: 'Half' },
+                  { key: 'refused', label: 'Refused' },
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setMealStatus(opt.key as any)}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold cursor-pointer border-none transition-all"
+                    style={{
+                      background: mealStatus === opt.key ? `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` : '#f1f5f9',
+                      color: mealStatus === opt.key ? 'white' : '#64748b',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Nutrition Note */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Nutrition Notes</div>
+              <textarea
+                value={nutritionNote}
+                onChange={(e) => setNutritionNote(e.target.value)}
+                placeholder="Meal preferences, appetite, concerns..."
+                className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
+                rows={2}
+              />
+            </div>
+
+            {/* Mood Selector */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Mood</div>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'Happy', icon: '🙂' },
+                  { key: 'Calm', icon: '😌' },
+                  { key: 'Anxious', icon: '😰' },
+                  { key: 'Distressed', icon: '😢' },
+                  { key: 'Tired', icon: '😴' },
+                  { key: 'In Pain', icon: '😣' },
+                ].map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => setSelectedMood(m.key)}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer border-none transition-all flex items-center gap-1.5"
+                    style={{
+                      background: selectedMood === m.key ? `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` : '#f1f5f9',
+                      color: selectedMood === m.key ? 'white' : '#64748b',
+                    }}
+                  >
+                    <span>{m.icon}</span>
+                    {m.key}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Wellbeing Note */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-200">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Wellbeing Note</div>
+              <textarea
+                value={wellbeingNote}
+                onChange={(e) => setWellbeingNote(e.target.value)}
+                placeholder="General observations, mood, behaviour, concerns..."
+                className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
+                rows={3}
+              />
+            </div>
+          </motion.div>
+        )}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-2.5 mb-4">
@@ -1177,6 +1425,13 @@ export default function ActiveVisitScreen() {
                     })),
                     mealStatus,
                     loneWorkerElapsed,
+                    bpSystolic: bpSystolic ? parseInt(bpSystolic, 10) : null,
+                    bpDiastolic: bpDiastolic ? parseInt(bpDiastolic, 10) : null,
+                    pulse: pulse ? parseInt(pulse, 10) : null,
+                    o2Sat: o2Sat ? parseInt(o2Sat, 10) : null,
+                    nutritionNote,
+                    mood: selectedMood,
+                    wellbeingNote,
                     clockOutAt: new Date().toISOString(),
                   }
                   try { await saveVisitDraft(visit.id, { snapshot }) } catch {}
