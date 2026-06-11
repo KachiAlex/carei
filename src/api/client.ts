@@ -319,6 +319,11 @@ export async function getManagerTasks(clientId?: string) {
   return get(`/manager/tasks${qs}`)
 }
 
+export async function getCaregiverTasks(clientId?: string) {
+  const qs = clientId ? `?clientId=${clientId}` : ''
+  return get(`/caregiver/tasks${qs}`)
+}
+
 export async function createManagerTask(data: {
   clientId: string
   name: string

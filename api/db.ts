@@ -145,6 +145,7 @@ async function runInit() {
   await sql`
     CREATE TABLE IF NOT EXISTS incidents (
       id TEXT PRIMARY KEY,
+      visit_id TEXT,
       carer_id TEXT,
       carer_name TEXT,
       client_id TEXT,
@@ -154,6 +155,19 @@ async function runInit() {
       severity TEXT DEFAULT 'medium',
       timestamp TIMESTAMPTZ DEFAULT NOW(),
       resolved BOOLEAN DEFAULT FALSE
+    )
+  `
+  await sql`ALTER TABLE incidents ADD COLUMN IF NOT EXISTS visit_id TEXT`
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS voice_memos (
+      id TEXT PRIMARY KEY,
+      visit_id TEXT,
+      carer_id TEXT,
+      client_id TEXT,
+      audio_url TEXT,
+      duration INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `
 

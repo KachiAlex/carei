@@ -8,7 +8,7 @@ import {
   getMe,
   logoutUser,
   getCaregiverClients,
-  getManagerTasks,
+  getCaregiverTasks,
   startTask,
   completeTask,
   addTaskLog,
@@ -100,7 +100,7 @@ export default function CarerDashboard() {
         setAssignedClients(clients)
         // Load tasks for each client
         clients.forEach((client: any) => {
-          getManagerTasks(client.id)
+          getCaregiverTasks(client.id)
             .then((res) => {
               setClientTasks((prev) => ({ ...prev, [client.id]: res.tasks || [] }))
             })
