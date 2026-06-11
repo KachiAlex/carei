@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from '../db.js'
+import { getSql, setCors, ensureTables, getAuthToken } from '../db.js'
 
 async function getUserFromToken(sql: any, token: string) {
   const rows = await sql`SELECT id, name, role, biometrics_enabled, webauthn_credential FROM users WHERE token = ${token} LIMIT 1` as any[]
@@ -7,12 +7,10 @@ async function getUserFromToken(sql: any, token: string) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(res)
+  setCors(req, res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
 
-  const cookie = req.headers.cookie || ''
-  const match = cookie.match(/carei_token=([^;]+)/)
-  const token = match ? match[1] : ''
+  const token = getAuthToken(req)
   if (!token) {
     res.status(401).json({ error: 'Unauthorized' })
     return

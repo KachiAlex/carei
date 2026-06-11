@@ -18,7 +18,7 @@ function openDB(): Promise<IDBDatabase> {
 
 interface QueueItem {
   id?: number
-  type: 'visit' | 'sos' | 'medication' | 'handover'
+  type: 'visit' | 'sos' | 'medication' | 'handover' | 'medication-log'
   payload: unknown
   createdAt: string
   retries: number

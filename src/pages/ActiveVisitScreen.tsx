@@ -4,7 +4,7 @@ import { useLocation, useParams } from 'wouter'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
-import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft } from '../api/client'
+import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft, getDrugInteractions, logMedication, getMedicationLogs } from '../api/client'
 import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
@@ -27,8 +27,9 @@ export default function ActiveVisitScreen() {
   const [loading, setLoading] = useState(true)
 
   const [clockedIn, setClockedIn] = useState(false)
+  const [clockInAt, setClockInAt] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
-  const [tasks, setTasks] = useState<{ name: string; done: boolean }[]>([])
+  const [tasks, setTasks] = useState<{ name: string; done: boolean; completedAt?: number }[]>([])
   const [fluid, setFluid] = useState(0)
   const [notes, setNotes] = useState('')
   const [showBodyMap, setShowBodyMap] = useState(false)
@@ -37,15 +38,58 @@ export default function ActiveVisitScreen() {
   const [transcript, setTranscript] = useState('')
   const [showClockOut, setShowClockOut] = useState(false)
   const [showSOSConfirm, setShowSOSConfirm] = useState(false)
-  const [meds, setMeds] = useState<{ name: string; dose: string; status: 'pending' | 'confirmed' | 'skipped'; skipReason?: string }[]>([])
+  const [meds, setMeds] = useState<{
+    name: string
+    dose: string
+    status: 'pending' | 'confirmed' | 'skipped' | 'refused'
+    skipReason?: string
+    isControlled?: boolean
+    dueTime?: string
+    adminNote?: string
+    administeredAt?: string
+    witnessName?: string
+  }[]>([])
   const [showMedConfirm, setShowMedConfirm] = useState(false)
   const [selectedMed, setSelectedMed] = useState<string | null>(null)
   const [showSkipReason, setShowSkipReason] = useState(false)
+
+  // Phase 4: Medication Module
+  const [drugInteractions, setDrugInteractions] = useState<{ drug_a: string; drug_b: string; severity: string; description: string }[]>([])
+  const [showMedAdmin, setShowMedAdmin] = useState(false)
+  const [selectedMedForAdmin, setSelectedMedForAdmin] = useState<string | null>(null)
+  const [adminTime, setAdminTime] = useState(() => {
+    const now = new Date()
+    return `${String(now.getHours()).padStart(2, '0')}:${String(Math.round(now.getMinutes() / 5) * 5).padStart(2, '0')}`
+  })
+  const [adminNotes, setAdminNotes] = useState('')
+  const [witnessName, setWitnessName] = useState('')
+  const [showNotGivenForm, setShowNotGivenForm] = useState(false)
+  const [notGivenReason, setNotGivenReason] = useState('')
+  const [notGivenAction, setNotGivenAction] = useState('')
+  const [notGivenCarerSaid, setNotGivenCarerSaid] = useState('')
+  const [notGivenFreeText, setNotGivenFreeText] = useState('')
+  const [medsGivenToday, setMedsGivenToday] = useState<Set<string>>(new Set())
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recognitionRef = useRef<any>(null)
   const dbSyncRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn }, 3000)
+  // Phase 3: Lone Worker Safety
+  const [loneWorkerElapsed, setLoneWorkerElapsed] = useState(0)
+  const [loneWorkerPaused, setLoneWorkerPaused] = useState(false)
+  const loneWorkerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Phase 3: Online status
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
+
+  // Phase 3: Care Cue
+  const [showCareCue, setShowCareCue] = useState(false)
+  const [currentCareCue, setCurrentCareCue] = useState('')
+
+  // Phase 3: Meal prompt
+  const [showMealPrompt, setShowMealPrompt] = useState(false)
+  const [mealStatus, setMealStatus] = useState<'full' | 'half' | 'refused' | null>(null)
+
+  useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn, mealStatus, loneWorkerElapsed }, 3000)
 
   // Load visit + client from API, then DB data + draft
   useEffect(() => {
@@ -70,7 +114,37 @@ export default function ActiveVisitScreen() {
           setTasks(v.tasks.map((t: string) => ({ name: t, done: false })))
         }
         if (c?.medications && Array.isArray(c.medications)) {
-          setMeds(c.medications.map((m: any) => ({ name: m.name, dose: m.dose || '', status: 'pending' as const })))
+          setMeds(c.medications.map((m: any) => ({
+            name: m.name,
+            dose: m.dose || '',
+            status: 'pending' as const,
+            isControlled: m.isControlled || false,
+            dueTime: m.dueTime || null,
+          })))
+        }
+
+        // Phase 4: Fetch drug interactions
+        if (c?.medications && Array.isArray(c.medications) && c.medications.length >= 2) {
+          try {
+            const drugNames = c.medications.map((m: any) => m.name)
+            const interactionRes = await getDrugInteractions(drugNames)
+            if (mounted && interactionRes.interactions) {
+              setDrugInteractions(interactionRes.interactions)
+            }
+          } catch {}
+        }
+
+        // Phase 4: Fetch today's medication logs for overdose safeguard
+        if (c?.id) {
+          try {
+            const logsRes = await getMedicationLogs(c.id, true)
+            if (mounted && logsRes.logs) {
+              const given = new Set<string>(
+                logsRes.logs.filter((l: any) => l.status === 'given').map((l: any) => l.medication_name)
+              )
+              setMedsGivenToday(given)
+            }
+          } catch {}
         }
 
         // Load saved visit data from DB
@@ -130,11 +204,12 @@ export default function ActiveVisitScreen() {
         fluid,
         notes,
         medications: meds,
+        mealStatus,
       }
       saveVisit(visitId, payload).catch(() => {})
     }, 5000)
     return () => { if (dbSyncRef.current) clearTimeout(dbSyncRef.current) }
-  }, [visitId, elapsed, tasks, fluid, notes, meds, clockedIn, client, visit])
+  }, [visitId, elapsed, tasks, fluid, notes, meds, clockedIn, client, visit, mealStatus])
 
   useEffect(() => {
     if (clockedIn) {
@@ -143,6 +218,28 @@ export default function ActiveVisitScreen() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [clockedIn])
 
+  // Phase 3: Lone Worker Safety timer — 25 min check-in window
+  useEffect(() => {
+    if (clockedIn && !loneWorkerPaused) {
+      loneWorkerRef.current = setInterval(() => setLoneWorkerElapsed((e) => e + 1), 1000)
+    } else {
+      if (loneWorkerRef.current) clearInterval(loneWorkerRef.current)
+    }
+    return () => { if (loneWorkerRef.current) clearInterval(loneWorkerRef.current) }
+  }, [clockedIn, loneWorkerPaused])
+
+  // Phase 3: Online/offline detection
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
   const formatTime = (sec: number) => {
     const m = Math.floor(sec / 60)
     const s = sec % 60
@@ -150,13 +247,192 @@ export default function ActiveVisitScreen() {
   }
 
   const toggleTask = (idx: number) => {
-    setTasks((prev) => prev.map((t, i) => (i === idx ? { ...t, done: !t.done } : t)))
+    setTasks((prev) => {
+      const task = prev[idx]
+      if (!task) return prev
+      const now = Date.now()
+      // Clamp timestamp to clock-in time
+      const clampedAt = clockInAt ? Math.max(now, clockInAt) : now
+      const updated = prev.map((t, i) => (i === idx ? { ...t, done: !t.done, completedAt: !t.done ? clampedAt : undefined } : t))
+
+      // Show contextual care cue if task is being completed and client has care cues
+      if (!task.done && client?.careCues && Array.isArray(client.careCues)) {
+        const cue = client.careCues.find((c: string) => c.toLowerCase().includes(task.name.toLowerCase()))
+          || client.careCues[idx % client.careCues.length]
+        if (cue) {
+          setCurrentCareCue(cue)
+          setShowCareCue(true)
+        }
+      }
+
+      // Show meal prompt when breakfast-related task is ticked
+      if (!task.done && /breakfast|meal|food|prepare/i.test(task.name) && !mealStatus) {
+        setShowMealPrompt(true)
+      }
+
+      return updated
+    })
     triggerHaptic(HAPTIC_PATTERNS.tap)
   }
 
   const addFluid = () => {
-    setFluid((f) => f + 250)
+    setFluid((f) => Math.min(f + 1, 12))
     triggerHaptic(HAPTIC_PATTERNS.tap)
+  }
+
+  const formatLoneWorkerTime = (sec: number) => {
+    const m = Math.floor(sec / 60)
+    const s = sec % 60
+    return `${m}m ${String(s).padStart(2, '0')}s`
+  }
+
+  const loneWorkerOverdue = loneWorkerElapsed > 25 * 60
+
+  // Phase 4: Medication admin functions
+  const openMedAdmin = (medName: string) => {
+    setSelectedMedForAdmin(medName)
+    const now = new Date()
+    setAdminTime(`${String(now.getHours()).padStart(2, '0')}:${String(Math.round(now.getMinutes() / 5) * 5).padStart(2, '0')}`)
+    setAdminNotes('')
+    setWitnessName('')
+    setShowMedAdmin(true)
+  }
+
+  const confirmMedAdmin = async () => {
+    if (!selectedMedForAdmin || !client?.id) return
+
+    // Overdose safeguard: check if already given today
+    if (medsGivenToday.has(selectedMedForAdmin)) {
+      if (!window.confirm(`⚠️ ${selectedMedForAdmin} has already been logged as given today. Confirm you want to log it again?`)) {
+        setShowMedAdmin(false)
+        return
+      }
+    }
+
+    const [hours, minutes] = adminTime.split(':').map(Number)
+    const administeredAt = new Date()
+    administeredAt.setHours(hours, minutes, 0, 0)
+
+    // Two-person sign-off for controlled meds
+    const med = meds.find((m) => m.name === selectedMedForAdmin)
+    if (med?.isControlled && !witnessName.trim()) {
+      alert('Controlled medication requires a witness name. Please enter the witness name.')
+      return
+    }
+
+    try {
+      await logMedication({
+        clientId: client.id,
+        visitId,
+        medicationName: selectedMedForAdmin,
+        dose: med?.dose,
+        status: 'given',
+        witnessName: witnessName.trim() || undefined,
+        notes: adminNotes || undefined,
+        administeredAt: administeredAt.toISOString(),
+      })
+      setMedsGivenToday((prev) => new Set(prev).add(selectedMedForAdmin))
+    } catch (err: any) {
+      // If offline, queue it
+      if (!navigator.onLine) {
+        await enqueue({
+          type: 'medication-log',
+          payload: {
+            clientId: client.id,
+            visitId,
+            medicationName: selectedMedForAdmin,
+            dose: med?.dose,
+            status: 'given',
+            witnessName: witnessName.trim() || undefined,
+            notes: adminNotes || undefined,
+            administeredAt: administeredAt.toISOString(),
+          },
+        })
+        setMedsGivenToday((prev) => new Set(prev).add(selectedMedForAdmin))
+      }
+    }
+
+    setMeds((prev) =>
+      prev.map((m) =>
+        m.name === selectedMedForAdmin
+          ? {
+              ...m,
+              status: 'confirmed' as const,
+              administeredAt: administeredAt.toISOString(),
+              witnessName: witnessName.trim() || undefined,
+              adminNote: adminNotes || undefined,
+            }
+          : m
+      )
+    )
+    setShowMedAdmin(false)
+    triggerHaptic(HAPTIC_PATTERNS.confirm)
+  }
+
+  const openNotGivenForm = (medName: string) => {
+    setSelectedMedForAdmin(medName)
+    setNotGivenReason('')
+    setNotGivenAction('')
+    setNotGivenCarerSaid('')
+    setNotGivenFreeText('')
+    setShowNotGivenForm(true)
+  }
+
+  const submitNotGiven = async () => {
+    if (!selectedMedForAdmin || !client?.id) return
+
+    const med = meds.find((m) => m.name === selectedMedForAdmin)
+
+    try {
+      await logMedication({
+        clientId: client.id,
+        visitId,
+        medicationName: selectedMedForAdmin,
+        dose: med?.dose,
+        status: 'refused',
+        reason: notGivenReason,
+        notes: `Action: ${notGivenAction} | Carer said: ${notGivenCarerSaid} | Note: ${notGivenFreeText}`,
+      })
+    } catch {
+      if (!navigator.onLine) {
+        await enqueue({
+          type: 'medication-log',
+          payload: {
+            clientId: client.id,
+            visitId,
+            medicationName: selectedMedForAdmin,
+            dose: med?.dose,
+            status: 'refused',
+            reason: notGivenReason,
+            notes: `Action: ${notGivenAction} | Carer said: ${notGivenCarerSaid} | Note: ${notGivenFreeText}`,
+          },
+        })
+      }
+    }
+
+    setMeds((prev) =>
+      prev.map((m) =>
+        m.name === selectedMedForAdmin
+          ? { ...m, status: 'refused' as const, skipReason: notGivenReason }
+          : m
+      )
+    )
+    setShowNotGivenForm(false)
+    triggerHaptic(HAPTIC_PATTERNS.confirm)
+  }
+
+  const getDueTimeAlert = (dueTime?: string | null) => {
+    if (!dueTime) return null
+    const now = new Date()
+    const [h, m] = dueTime.split(':').map(Number)
+    const due = new Date()
+    due.setHours(h, m, 0, 0)
+    const diffMin = (now.getTime() - due.getTime()) / 60000
+    if (diffMin >= 60) return { type: 'red-locked', label: 'Over 1 hour late' }
+    if (diffMin >= 30) return { type: 'red', label: `${Math.round(diffMin)} min late` }
+    if (diffMin >= -15 && diffMin < 0) return { type: 'amber', label: 'Due soon' }
+    if (diffMin >= 0 && diffMin < 30) return { type: 'teal', label: 'Due now' }
+    return null
   }
 
   const startVoiceDoc = () => {
@@ -353,26 +629,45 @@ export default function ActiveVisitScreen() {
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>{client.medications.length} items</span>
             </div>
             <div className="flex flex-col gap-2">
-              {client.medications.map((med: any) => (
-                <div key={med.name} className="flex items-center justify-between text-xs py-2.5 border-b border-slate-50 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(79,209,197,0.08)' }}>
+              {client.medications.map((med: any, i: number) => (
+                <motion.div
+                  key={med.name}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  className="flex items-center justify-between text-xs py-2.5 border-b border-slate-50 last:border-0"
+                >
+                  <div className="flex items-center gap-2 flex-1">
+                    <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(79,209,197,0.08)' }}>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg>
                     </div>
-                    <div>
-                      <div className="font-semibold text-slate-700">{med.name}</div>
-                      <div className="text-slate-400">{med.dose} · {med.frequency}</div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-slate-700">{med.name}</span>
+                        {med.isControlled && (
+                          <span className="text-[8px] font-bold px-1 py-0.5 rounded-md uppercase tracking-wider" style={{ background: `${COLORS.red}10`, color: COLORS.red, border: `1px solid ${COLORS.red}20` }}>
+                            Controlled
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-slate-400">
+                        {med.dose}{med.dueTime ? ` · Due ${med.dueTime}` : ''}{med.frequency ? ` · ${med.frequency}` : ''}
+                      </div>
                     </div>
                   </div>
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: COLORS.teal }} />
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
 
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => setClockedIn(true)}
+            onClick={() => {
+              setClockedIn(true)
+              setClockInAt(Date.now())
+              setLoneWorkerElapsed(0)
+            }}
             className="w-full py-4 rounded-2xl font-bold text-base cursor-pointer border-none transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
             style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy, boxShadow: `0 8px 32px ${COLORS.teal}30` }}
           >
@@ -421,41 +716,236 @@ export default function ActiveVisitScreen() {
       </div>
 
       <div className="flex-1 px-4 py-4 overflow-auto">
-        {/* Medication Summary */}
-        <div
-          className="bg-white rounded-2xl p-4 border border-slate-200 mb-3 cursor-pointer"
-          onClick={() => setShowMedConfirm(true)}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs text-slate-500">Medications</div>
-              <div className="font-bold text-sm text-slate-800">
-                {meds.filter((m) => m.status === 'confirmed').length}/{meds.length} confirmed
+        {/* Phase 4: Drug Interaction Alert */}
+        {drugInteractions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-3 rounded-2xl p-4 border"
+            style={{
+              background: drugInteractions.some((i) => i.severity === 'major')
+                ? 'rgba(255,90,95,0.06)'
+                : 'rgba(246,183,60,0.06)',
+              borderColor: drugInteractions.some((i) => i.severity === 'major')
+                ? `${COLORS.red}30`
+                : `${COLORS.amber}30`,
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                style={{
+                  background: drugInteractions.some((i) => i.severity === 'major')
+                    ? 'rgba(255,90,95,0.12)'
+                    : 'rgba(246,183,60,0.12)',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={drugInteractions.some((i) => i.severity === 'major') ? COLORS.red : COLORS.amber} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold mb-1" style={{ color: drugInteractions.some((i) => i.severity === 'major') ? COLORS.red : COLORS.amber }}>
+                  Drug Interaction Alert
+                </div>
+                {drugInteractions.map((i, idx) => (
+                  <div key={idx} className="text-xs text-slate-600 leading-relaxed">
+                    <span className="font-medium">{i.drug_a} + {i.drug_b}:</span> {i.description}
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {pendingMedsCount > 0 && (
-                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-100">
-                  {pendingMedsCount} pending
-                </span>
-              )}
-              <span className="text-slate-400 text-sm">→</span>
+          </motion.div>
+        )}
+
+        {/* Phase 4: Per-Medication Cards */}
+        {meds.length > 0 && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Medications</div>
+              <div className="text-[10px] font-medium text-slate-500">
+                {meds.filter((m) => m.status === 'confirmed').length}/{meds.length} given
+              </div>
             </div>
+            <div className="flex flex-col gap-2">
+              {meds.map((med, i) => {
+                const alert = getDueTimeAlert(med.dueTime)
+                const isGiven = med.status === 'confirmed'
+                const isRefused = med.status === 'refused'
+                return (
+                  <motion.div
+                    key={med.name}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    className="rounded-2xl p-4 border"
+                    style={{
+                      background: isGiven
+                        ? 'rgba(34,197,94,0.04)'
+                        : isRefused
+                          ? 'rgba(255,90,95,0.04)'
+                          : alert?.type === 'red-locked'
+                            ? 'rgba(255,90,95,0.06)'
+                            : 'white',
+                      borderColor: isGiven
+                        ? 'rgba(34,197,94,0.2)'
+                        : isRefused
+                          ? 'rgba(255,90,95,0.2)'
+                          : alert?.type === 'red-locked'
+                            ? `${COLORS.red}30`
+                            : 'rgba(0,0,0,0.08)',
+                    }}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-bold text-slate-800">{med.name}</span>
+                        {med.isControlled && (
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider"
+                            style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}25` }}
+                          >
+                            Controlled
+                          </span>
+                        )}
+                        {alert && !isGiven && !isRefused && (
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider"
+                            style={{
+                              background: alert.type.startsWith('red') ? `${COLORS.red}10` : alert.type === 'amber' ? `${COLORS.amber}10` : `${COLORS.teal}10`,
+                              color: alert.type.startsWith('red') ? COLORS.red : alert.type === 'amber' ? COLORS.amber : COLORS.teal,
+                              border: `1px solid ${alert.type.startsWith('red') ? COLORS.red : alert.type === 'amber' ? COLORS.amber : COLORS.teal}20`,
+                            }}
+                          >
+                            {alert.label}
+                          </span>
+                        )}
+                      </div>
+                      {isGiven && med.witnessName && (
+                        <span className="text-[10px] font-medium flex items-center gap-1" style={{ color: COLORS.teal }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                          Witnessed by {med.witnessName}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-500 mb-2">{med.dose}{med.dueTime ? ` · Due ${med.dueTime}` : ''}</div>
+                    {med.adminNote && (
+                      <div className="text-[11px] text-slate-500 mb-2 italic">{med.adminNote}</div>
+                    )}
+                    {isGiven || isRefused ? (
+                      <span
+                        className="text-xs font-medium px-2 py-1 rounded-lg"
+                        style={{
+                          color: isGiven ? '#22c55e' : COLORS.red,
+                          background: isGiven ? 'rgba(34,197,94,0.1)' : 'rgba(255,90,95,0.08)',
+                        }}
+                      >
+                        {isGiven ? '✓ Given' : '⊘ Refused'}
+                      </span>
+                    ) : (
+                      <div className="flex gap-2">
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => openMedAdmin(med.name)}
+                          className="flex-1 py-2 rounded-xl text-xs font-semibold text-white border-none cursor-pointer"
+                          style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+                        >
+                          Give
+                        </motion.button>
+                        <motion.button
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => openNotGivenForm(med.name)}
+                          className="flex-1 py-2 rounded-xl text-xs font-semibold border cursor-pointer"
+                          style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+                        >
+                          Not Given
+                        </motion.button>
+                      </div>
+                    )}
+                  </motion.div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Phase 3: Offline Banner */}
+        {!isOnline && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-3 rounded-2xl p-3 border flex items-center gap-2"
+            style={{ background: 'rgba(246,183,60,0.06)', borderColor: `${COLORS.amber}30` }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.amber} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0" /><path d="M1.42 9a16 16 0 0 1 21.16 0" /><path d="M8.53 16.11a6 6 0 0 1 6.95 0" /><line x1="12" x2="12.01" y1="20" y2="20" />
+            </svg>
+            <span className="text-xs font-medium" style={{ color: COLORS.amber }}>Offline — data will sync when reconnected</span>
+          </motion.div>
+        )}
+
+        {/* Phase 3: Lone Worker Safety */}
+        <div
+          className="rounded-2xl p-4 border mb-3 flex items-center justify-between"
+          style={{
+            background: loneWorkerOverdue ? 'rgba(255,90,95,0.08)' : 'white',
+            borderColor: loneWorkerOverdue ? `${COLORS.red}30` : 'rgba(0,0,0,0.08)',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: loneWorkerOverdue ? 'rgba(255,90,95,0.12)' : 'rgba(79,209,197,0.08)' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={loneWorkerOverdue ? COLORS.red : COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500">Lone Worker Safety</div>
+              {loneWorkerOverdue ? (
+                <div className="text-sm font-bold" style={{ color: COLORS.red }}>Check-in overdue!</div>
+              ) : (
+                <div className="text-sm font-bold text-slate-800">{formatLoneWorkerTime(loneWorkerElapsed)}</div>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setLoneWorkerElapsed(0); triggerHaptic(HAPTIC_PATTERNS.tap) }}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white border-none cursor-pointer"
+              style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+            >
+              Check In
+            </button>
+            <button
+              onClick={() => setLoneWorkerPaused((p) => !p)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer"
+              style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b', background: loneWorkerPaused ? 'rgba(79,209,197,0.08)' : 'white' }}
+            >
+              {loneWorkerPaused ? 'Resume' : 'Pause'}
+            </button>
           </div>
         </div>
 
         {/* Fluid Counter */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 mb-3 flex items-center justify-between">
+        <div
+          className="rounded-2xl p-4 border mb-3 flex items-center justify-between"
+          style={{
+            background: fluid >= 6 ? 'rgba(34,197,94,0.06)' : 'white',
+            borderColor: fluid >= 6 ? 'rgba(34,197,94,0.2)' : 'rgba(0,0,0,0.08)',
+          }}
+        >
           <div>
             <div className="text-xs text-slate-500">Fluid Intake</div>
-            <div className="font-bold text-lg text-slate-800">{fluid} ml</div>
+            <div className="font-bold text-lg" style={{ color: fluid >= 6 ? '#22c55e' : '#1e293b' }}>{fluid} / 12 glasses</div>
           </div>
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={addFluid}
-            className="w-11 h-11 rounded-full text-white text-xl font-bold flex items-center justify-center cursor-pointer border-none touch-target"
-            style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
-            aria-label="Add 250ml fluid"
+            disabled={fluid >= 12}
+            className="w-11 h-11 rounded-full text-white text-xl font-bold flex items-center justify-center cursor-pointer border-none touch-target disabled:opacity-40"
+            style={{ background: fluid >= 6 ? '#22c55e' : `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+            aria-label="Add 1 glass fluid"
           >
             +
           </motion.button>
@@ -671,10 +1161,22 @@ export default function ActiveVisitScreen() {
                     visitTime: visit.time,
                     visitDuration: visit.duration,
                     elapsed,
-                    tasks: tasks.map((t) => ({ name: t.name, done: t.done })),
+                    tasks: tasks.map((t) => ({ name: t.name, done: t.done, completedAt: t.completedAt })),
                     fluid,
                     notes,
-                    medications: meds.map((m) => ({ name: m.name, dose: m.dose, status: m.status, skipReason: m.skipReason })),
+                    medications: meds.map((m) => ({
+                      name: m.name,
+                      dose: m.dose,
+                      status: m.status,
+                      skipReason: m.skipReason,
+                      isControlled: m.isControlled,
+                      administeredAt: m.administeredAt,
+                      witnessName: m.witnessName,
+                      adminNote: m.adminNote,
+                      dueTime: m.dueTime,
+                    })),
+                    mealStatus,
+                    loneWorkerElapsed,
                     clockOutAt: new Date().toISOString(),
                   }
                   try { await saveVisitDraft(visit.id, { snapshot }) } catch {}
@@ -803,6 +1305,259 @@ export default function ActiveVisitScreen() {
             </div>
             <p className="text-[10px] text-slate-400 mt-3">Auto-cancels in 15 seconds</p>
           </div>
+        </div>
+      )}
+
+      {/* Phase 3: Care Cue Modal */}
+      {showCareCue && currentCareCue && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-5 max-w-sm w-full"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(79,209,197,0.12)' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v4" /><path d="m16.2 7.8 2.9-2.9" /><path d="M18 12h4" /><path d="m16.2 16.2 2.9 2.9" /><path d="M12 18v4" /><path d="m4.9 19.1 2.9-2.9" /><path d="M2 12h4" /><path d="m4.9 4.9 2.9 2.9" />
+                </svg>
+              </div>
+              <h3 className="font-bold text-slate-800">Care Cue</h3>
+            </div>
+            <p className="text-sm text-slate-600 leading-relaxed mb-5">{currentCareCue}</p>
+            <button
+              onClick={() => setShowCareCue(false)}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+              style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+            >
+              Acknowledge
+            </button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Phase 3: Meal Prompt Modal */}
+      {showMealPrompt && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-5 max-w-sm w-full"
+          >
+            <h3 className="font-bold text-slate-800 mb-1">Meal Status</h3>
+            <p className="text-xs text-slate-500 mb-4">How much did the client eat?</p>
+            <div className="flex flex-col gap-2 mb-4">
+              {[
+                { key: 'full', label: 'Full Meal', color: '#22c55e' },
+                { key: 'half', label: 'Half Meal', color: COLORS.amber },
+                { key: 'refused', label: 'Refused', color: COLORS.red },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => {
+                    setMealStatus(opt.key as any)
+                    setShowMealPrompt(false)
+                    triggerHaptic(HAPTIC_PATTERNS.tap)
+                  }}
+                  className="w-full text-left px-4 py-3 rounded-xl text-sm border cursor-pointer hover:bg-slate-50 transition-colors"
+                  style={{
+                    borderColor: mealStatus === opt.key ? `${opt.color}40` : 'rgba(0,0,0,0.08)',
+                    background: mealStatus === opt.key ? `${opt.color}08` : 'white',
+                    color: mealStatus === opt.key ? opt.color : '#475569',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowMealPrompt(false)}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold border cursor-pointer"
+              style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+            >
+              Skip for now
+            </button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Phase 4: Medication Admin Modal */}
+      {showMedAdmin && selectedMedForAdmin && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center sm:items-center p-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-5 max-w-sm w-full max-h-[85vh] overflow-auto"
+          >
+            <h3 className="font-bold text-slate-800 mb-1">Give {selectedMedForAdmin}</h3>
+            <p className="text-xs text-slate-500 mb-4">{client?.name} · Confirm administration details</p>
+
+            <div className="flex flex-col gap-3 mb-4">
+              {/* Time picker */}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Time Given</label>
+                <input
+                  type="time"
+                  value={adminTime}
+                  onChange={(e) => setAdminTime(e.target.value)}
+                  className="w-full bg-slate-50 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none border border-slate-100 focus:border-teal transition-colors"
+                />
+              </div>
+
+              {/* Admin notes */}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Administration Note</label>
+                <textarea
+                  value={adminNotes}
+                  onChange={(e) => setAdminNotes(e.target.value)}
+                  placeholder="e.g. Taken with water, no issues..."
+                  className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
+                  rows={2}
+                />
+              </div>
+
+              {/* Controlled medication witness */}
+              {meds.find((m) => m.name === selectedMedForAdmin)?.isControlled && (
+                <div
+                  className="rounded-xl p-3 border"
+                  style={{ background: 'rgba(255,90,95,0.04)', borderColor: `${COLORS.red}20` }}
+                >
+                  <div className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+                    Two-Person Sign-Off Required
+                  </div>
+                  <input
+                    type="text"
+                    value={witnessName}
+                    onChange={(e) => setWitnessName(e.target.value)}
+                    placeholder="Witness name..."
+                    className="w-full bg-white rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none border border-slate-200 focus:border-red-300 transition-colors"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Overdue alert in modal */}
+            {(() => {
+              const med = meds.find((m) => m.name === selectedMedForAdmin)
+              const alert = getDueTimeAlert(med?.dueTime)
+              if (alert && alert.type.startsWith('red')) {
+                return (
+                  <div className="mb-4 rounded-xl p-3 border" style={{ background: 'rgba(255,90,95,0.06)', borderColor: `${COLORS.red}25` }}>
+                    <div className="text-xs font-bold" style={{ color: COLORS.red }}>⚠️ {alert.label}</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5">Document reason for delay in notes.</div>
+                  </div>
+                )
+              }
+              return null
+            })()}
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowMedAdmin(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border cursor-pointer"
+                style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmMedAdmin}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+                style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+              >
+                Confirm Given
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Phase 4: Not Given Structured Refusal Form */}
+      {showNotGivenForm && selectedMedForAdmin && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center sm:items-center p-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl p-5 max-w-sm w-full max-h-[85vh] overflow-auto"
+          >
+            <h3 className="font-bold text-slate-800 mb-1">Not Given: {selectedMedForAdmin}</h3>
+            <p className="text-xs text-slate-500 mb-4">{client?.name} · Complete structured refusal record</p>
+
+            <div className="flex flex-col gap-3 mb-4">
+              {/* Reason */}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Reason</label>
+                <select
+                  value={notGivenReason}
+                  onChange={(e) => setNotGivenReason(e.target.value)}
+                  className="w-full bg-slate-50 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none border border-slate-100 focus:border-teal transition-colors appearance-none"
+                >
+                  <option value="">Select reason...</option>
+                  <option value="Client refused">Client refused</option>
+                  <option value="Client asleep">Client asleep</option>
+                  <option value="Client unavailable">Client unavailable</option>
+                  <option value="Nausea / vomiting">Nausea / vomiting</option>
+                  <option value="Swallowing difficulty">Swallowing difficulty</option>
+                  <option value="Contraindicated today">Contraindicated today</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {/* What carer said */}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">What carer said</label>
+                <input
+                  type="text"
+                  value={notGivenCarerSaid}
+                  onChange={(e) => setNotGivenCarerSaid(e.target.value)}
+                  placeholder={'e.g. "I\'ll try again later"'}
+                  className="w-full bg-slate-50 rounded-xl px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-none border border-slate-100 focus:border-teal transition-colors"
+                />
+              </div>
+
+              {/* Action taken */}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Action taken</label>
+                <input
+                  type="text"
+                  value={notGivenAction}
+                  onChange={(e) => setNotGivenAction(e.target.value)}
+                  placeholder="e.g. Offered again in 30 minutes"
+                  className="w-full bg-slate-50 rounded-xl px-3 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-none border border-slate-100 focus:border-teal transition-colors"
+                />
+              </div>
+
+              {/* Free-text note */}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1 block">Additional note</label>
+                <textarea
+                  value={notGivenFreeText}
+                  onChange={(e) => setNotGivenFreeText(e.target.value)}
+                  placeholder="Any additional observations..."
+                  className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowNotGivenForm(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border cursor-pointer"
+                style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitNotGiven}
+                disabled={!notGivenReason}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-40"
+                style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+              >
+                Record Not Given
+              </button>
+            </div>
+          </motion.div>
         </div>
       )}
       </div>

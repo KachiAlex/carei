@@ -84,7 +84,13 @@ async function runInit() {
       conditions JSONB,
       medications JSONB,
       preferences TEXT,
-      emergency_contact TEXT
+      emergency_contact TEXT,
+      allergies TEXT,
+      dysphagia_protocol TEXT,
+      support_framework TEXT,
+      communication_guidance TEXT,
+      mobility TEXT,
+      care_cues JSONB
     )
   `
 
@@ -186,6 +192,50 @@ async function runInit() {
     )
   `
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS medication_logs (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL,
+      caregiver_id TEXT,
+      visit_id TEXT,
+      medication_name TEXT NOT NULL,
+      dose TEXT,
+      administered_at TIMESTAMPTZ DEFAULT NOW(),
+      status TEXT DEFAULT 'given',
+      witness_name TEXT,
+      reason TEXT,
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS drug_interactions (
+      id TEXT PRIMARY KEY,
+      drug_a TEXT NOT NULL,
+      drug_b TEXT NOT NULL,
+      severity TEXT DEFAULT 'moderate',
+      description TEXT
+    )
+  `
+
+  // Seed common drug interactions (idempotent)
+  try {
+    await sql`
+      INSERT INTO drug_interactions (id, drug_a, drug_b, severity, description)
+      VALUES
+        ('di1', 'warfarin', 'aspirin', 'major', 'Increased bleeding risk — monitor INR closely'),
+        ('di2', 'warfarin', 'ibuprofen', 'major', 'Increased bleeding risk — avoid or use acetaminophen'),
+        ('di3', 'metformin', 'furosemide', 'moderate', 'May reduce metformin effectiveness — monitor glucose'),
+        ('di4', 'lisinopril', 'spironolactone', 'major', 'Risk of hyperkalemia — monitor potassium levels'),
+        ('di5', 'digoxin', 'furosemide', 'moderate', 'Hypokalemia increases digoxin toxicity risk'),
+        ('di6', 'amiodarone', 'warfarin', 'major', 'Significantly potentiates anticoagulant effect'),
+        ('di7', 'simvastatin', 'clarithromycin', 'major', 'Increased risk of rhabdomyolysis — consider alternative antibiotic'),
+        ('di8', 'fluoxetine', 'tramadol', 'major', 'Serotonin syndrome risk — avoid combination if possible')
+      ON CONFLICT (id) DO NOTHING
+    `
+  } catch { /* ignore */ }
+
   // No mock seed data — only real data is shown
 
   // Cleanup previously seeded mock clients
@@ -194,9 +244,19 @@ async function runInit() {
   } catch { /* ignore */ }
 }
 
-export function setCors(res: any) {
+export function setCors(req: any, res: any) {
+  const origin = req.headers?.origin || '*'
   res.setHeader('Access-Control-Allow-Credentials', 'true')
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+}
+
+export function getAuthToken(req: any): string {
+  const authHeader = req.headers?.authorization || ''
+  const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/)
+  if (bearerMatch) return bearerMatch[1]
+  const cookie = req.headers?.cookie || ''
+  const match = cookie.match(/carei_token=([^;]+)/)
+  return match ? match[1] : ''
 }

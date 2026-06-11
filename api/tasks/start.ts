@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from '../db.js'
+import { getSql, setCors, ensureTables, getAuthToken } from '../db.js'
 
 function generateId(): string {
   return 'tl-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
@@ -11,16 +11,14 @@ async function getUserFromToken(sql: any, token: string) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(res)
+  setCors(req, res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' })
     return
   }
 
-  const cookie = req.headers.cookie || ''
-  const match = cookie.match(/carei_token=([^;]+)/)
-  const token = match ? match[1] : ''
+  const token = getAuthToken(req)
   if (!token) {
     res.status(401).json({ error: 'Unauthorized' })
     return

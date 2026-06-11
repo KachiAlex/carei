@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useLocation } from 'wouter'
+import { loginUser } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -10,25 +11,34 @@ const COLORS = {
 
 export default function ManagerLoginScreen() {
   const [, setLocation] = useLocation()
+  const [email, setEmail] = useState('')
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError('')
+    if (!email.trim() || !email.includes('@')) {
+      setError('Enter a valid email')
+      return
+    }
     if (pin.length !== 4) {
       setError('Enter 4-digit PIN')
       return
     }
     setLoading(true)
-    setTimeout(() => {
-      if (pin === '1234') {
+    try {
+      const res = await loginUser({ email: email.trim().toLowerCase(), pin }) as any
+      setLoading(false)
+      if (res?.user?.role === 'manager') {
         setLocation('/manager')
       } else {
-        setError('Invalid PIN')
-        setLoading(false)
+        setError('Not a manager account')
       }
-    }, 500)
+    } catch (err: any) {
+      setLoading(false)
+      setError(err.message || 'Invalid email or PIN')
+    }
   }
 
   const appendDigit = (d: string) => {
@@ -50,7 +60,15 @@ export default function ManagerLoginScreen() {
           </svg>
         </div>
         <h1 className="font-serif text-2xl text-center mb-1 text-slate-800">Manager Access</h1>
-        <p className="text-sm text-slate-400 text-center mb-8">Enter your 4-digit PIN</p>
+        <p className="text-sm text-slate-400 text-center mb-6">Enter your email and 4-digit PIN</p>
+
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Manager email"
+          className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white mb-4"
+        />
 
         {/* PIN Dots */}
         <div className="flex justify-center gap-3 mb-6">

@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from '../db.js'
+import { getSql, setCors, ensureTables, getAuthToken } from '../db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(res)
+  setCors(req, res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
 
   const { id } = req.query
@@ -13,9 +13,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const cookie = req.headers.cookie || ''
-  const match = cookie.match(/carei_token=([^;]+)/)
-  const token = match ? match[1] : ''
+  const token = getAuthToken(req)
   if (!token) {
     res.status(401).json({ error: 'Unauthorized' })
     return

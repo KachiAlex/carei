@@ -57,6 +57,26 @@ input, select, textarea {
   }
 }
 
+/* Mobile app-like behaviour */
+html {
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Disable text selection on UI chrome (keep it on inputs) */
+button, .no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Landscape safe areas */
+@media (orientation: landscape) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;

@@ -380,7 +380,7 @@ export default function CarerDashboard() {
               </div>
             </div>
             <button
-              onClick={() => setLocation(`/visit/${nextVisit.id}`)}
+              onClick={() => setLocation(`/client/${nextVisit.clientId}/overview`)}
               className="w-full py-2.5 rounded-xl text-xs font-semibold text-white border-none cursor-pointer transition-all hover:opacity-90 active:scale-[0.98]"
               style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
             >
@@ -497,7 +497,15 @@ export default function CarerDashboard() {
                 <button
                   className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-white border-none cursor-pointer transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
                   style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
-                  onClick={() => setLocation(`/visit/${visit.id}`)}
+                  onClick={() => {
+                    if (visit.status === 'pending') {
+                      setLocation(`/client/${visit.clientId}/overview`)
+                    } else if (visit.status === 'completed') {
+                      setLocation(`/summary/${visit.id}`)
+                    } else {
+                      setLocation(`/visit/${visit.id}`)
+                    }
+                  }}
                 >
                   {visit.status === 'in-progress' ? 'Continue Visit' : visit.status === 'completed' ? 'View Summary' : 'Start Visit'}
                 </button>

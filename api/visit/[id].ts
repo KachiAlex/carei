@@ -1,8 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from '../db.js'
+import { getSql, setCors, ensureTables, getAuthToken } from '../db.js'
+
+async function getUserFromToken(sql: any, token: string) {
+  const rows = await sql`SELECT id, name, role FROM users WHERE token = ${token} LIMIT 1` as any[]
+  return rows[0] || null
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCors(res)
+  setCors(req, res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
   const { id } = req.query
   const visitId = Array.isArray(id) ? id[0] : id
@@ -38,6 +43,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).json({ ...scheduled[0], status: 'pending' })
         return
       }
+
+      // Fallback: manager-created assignment
+      const token = getAuthToken(req)
+      const assignment = await sql`
+        SELECT
+          a.id,
+          c.id AS "clientId",
+          c.name AS "clientName",
+          c.age AS "clientAge",
+          c.address AS "clientAddress",
+          c.conditions,
+          c.medications,
+          c.preferences,
+          c.emergency_contact AS "emergencyContact",
+          a.visit_time AS time,
+          '60' AS duration,
+          'pending' AS status,
+          ARRAY[COALESCE(a.instructions, 'Follow care plan')] AS tasks,
+          COALESCE(c.conditions, '[]'::jsonb) AS flags
+        FROM caregiver_client_assignments a
+        JOIN clients c ON a.client_id = c.id
+        WHERE a.id = ${visitId}
+        LIMIT 1
+      ` as any[]
+      if (assignment[0]) {
+        res.status(200).json(assignment[0])
+        return
+      }
+
       res.status(200).json({ id: visitId, status: 'pending', data: null })
       return
     }
