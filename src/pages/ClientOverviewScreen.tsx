@@ -28,6 +28,8 @@ interface ClientDetail {
   communicationGuidance?: string
   mobility?: string
   careCues?: string[]
+  lastHandover?: string | null
+  lastHandoverAt?: string | null
 }
 
 export default function ClientOverviewScreen() {
@@ -256,6 +258,19 @@ export default function ClientOverviewScreen() {
             <div className="mb-4 rounded-2xl p-4 border border-slate-100 bg-white">
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Emergency Contact</div>
               <div className="text-sm text-slate-800">{client.emergencyContact}</div>
+            </div>
+          )}
+
+          {/* Last Handover */}
+          {client.lastHandover && (
+            <div className="mb-4 rounded-2xl p-4 border border-slate-100 bg-white">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Last Handover</div>
+              <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">{client.lastHandover}</div>
+              {client.lastHandoverAt && (
+                <div className="text-[10px] text-slate-400 mt-2">
+                  {new Date(client.lastHandoverAt).toLocaleDateString()} · {new Date(client.lastHandoverAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              )}
             </div>
           )}
 

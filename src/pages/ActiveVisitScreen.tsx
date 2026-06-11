@@ -4,7 +4,7 @@ import { useLocation, useParams } from 'wouter'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
-import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft, getDrugInteractions, logMedication, getMedicationLogs } from '../api/client'
+import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft, getDrugInteractions, logMedication, getMedicationLogs, reportIncident, saveVoiceMemo } from '../api/client'
 import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
@@ -34,7 +34,7 @@ export default function ActiveVisitScreen() {
   const [notes, setNotes] = useState('')
   const [showBodyMap, setShowBodyMap] = useState(false)
   const [showVoiceDoc, setShowVoiceDoc] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
+  const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [showClockOut, setShowClockOut] = useState(false)
   const [showSOSConfirm, setShowSOSConfirm] = useState(false)
@@ -80,6 +80,20 @@ export default function ActiveVisitScreen() {
   const [selectedMood, setSelectedMood] = useState<string | null>(null)
   const [wellbeingNote, setWellbeingNote] = useState('')
   const [activeTab, setActiveTab] = useState<'tasks' | 'vitals' | 'notes'>('tasks')
+
+  // Phase 6: Incident Reporting & Voice
+  const [incidents, setIncidents] = useState<{ id: string; type: string; severity: string; description: string; timestamp: string }[]>([])
+  const [showIncidentForm, setShowIncidentForm] = useState(false)
+  const [incidentType, setIncidentType] = useState('')
+  const [incidentSeverity, setIncidentSeverity] = useState<'low' | 'medium' | 'high'>('medium')
+  const [incidentNote, setIncidentNote] = useState('')
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordDuration, setRecordDuration] = useState(0)
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
+  const [voiceMemos, setVoiceMemos] = useState<{ id: string; audioUrl: string; duration: number; createdAt: string }[]>([])
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recognitionRef = useRef<any>(null)
@@ -221,6 +235,7 @@ export default function ActiveVisitScreen() {
     dbSyncRef.current = setTimeout(() => {
       const payload = {
         visitId,
+        clientId: client?.id,
         clientName: client?.name,
         clientAge: client?.age,
         clientAddress: client?.address,
@@ -473,6 +488,164 @@ export default function ActiveVisitScreen() {
     triggerHaptic(HAPTIC_PATTERNS.confirm)
   }
 
+  // Phase 6: Incident reporting
+  const submitIncident = async () => {
+    if (!incidentType.trim()) {
+      alert('Please select an incident type.')
+      return
+    }
+    try {
+      await reportIncident({
+        visitId,
+        clientId: client?.id,
+        clientName: client?.name,
+        type: incidentType,
+        description: incidentNote,
+        severity: incidentSeverity,
+      })
+      setIncidents((prev) => [
+        {
+          id: 'local-' + Date.now(),
+          type: incidentType,
+          severity: incidentSeverity,
+          description: incidentNote,
+          timestamp: new Date().toISOString(),
+        },
+        ...prev,
+      ])
+    } catch {
+      if (!navigator.onLine) {
+        await enqueue({
+          type: 'visit',
+          payload: {
+            type: 'incident',
+            visitId,
+            clientId: client?.id,
+            clientName: client?.name,
+            incidentType,
+            description: incidentNote,
+            severity: incidentSeverity,
+          },
+        })
+        setIncidents((prev) => [
+          {
+            id: 'local-' + Date.now(),
+            type: incidentType,
+            severity: incidentSeverity,
+            description: incidentNote,
+            timestamp: new Date().toISOString(),
+          },
+          ...prev,
+        ])
+      }
+    }
+    setIncidentType('')
+    setIncidentNote('')
+    setIncidentSeverity('medium')
+    setShowIncidentForm(false)
+    triggerHaptic(HAPTIC_PATTERNS.confirm)
+  }
+
+  // Phase 6: Voice memo recording
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      recordedChunksRef.current = []
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data)
+      }
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'audio/webm' })
+        setRecordedBlob(blob)
+        stream.getTracks().forEach((t) => t.stop())
+      }
+      mediaRecorder.start()
+      setIsRecording(true)
+      setRecordDuration(0)
+      recordTimerRef.current = setInterval(() => {
+        setRecordDuration((d) => d + 1)
+      }, 1000)
+    } catch {
+      alert('Could not access microphone. Please check permissions.')
+    }
+  }
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop()
+    if (recordTimerRef.current) clearInterval(recordTimerRef.current)
+    setIsRecording(false)
+  }
+
+  const discardRecording = () => {
+    setRecordedBlob(null)
+    setRecordDuration(0)
+  }
+
+  const saveRecording = async () => {
+    if (!recordedBlob) return
+    try {
+      const reader = new FileReader()
+      reader.readAsDataURL(recordedBlob)
+      reader.onloadend = async () => {
+        const base64 = reader.result as string
+        try {
+          await saveVoiceMemo({
+            visitId,
+            clientId: client?.id,
+            audioUrl: base64,
+            duration: recordDuration,
+          })
+        } catch {
+          if (!navigator.onLine) {
+            await enqueue({
+              type: 'visit',
+              payload: {
+                type: 'voice-memo',
+                visitId,
+                clientId: client?.id,
+                audioUrl: base64,
+                duration: recordDuration,
+              },
+            })
+          }
+        }
+      }
+      setVoiceMemos((prev) => [
+        {
+          id: 'local-' + Date.now(),
+          audioUrl: URL.createObjectURL(recordedBlob),
+          duration: recordDuration,
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ])
+      setRecordedBlob(null)
+      setRecordDuration(0)
+      triggerHaptic(HAPTIC_PATTERNS.confirm)
+    } catch {
+      // fallback: just add to local list
+      setVoiceMemos((prev) => [
+        {
+          id: 'local-' + Date.now(),
+          audioUrl: URL.createObjectURL(recordedBlob),
+          duration: recordDuration,
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ])
+      setRecordedBlob(null)
+      setRecordDuration(0)
+    }
+  }
+
+  const formatRecordTime = (sec: number) => {
+    const m = Math.floor(sec / 60)
+    const s = sec % 60
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  }
+
   const getDueTimeAlert = (dueTime?: string | null) => {
     if (!dueTime) return null
     const now = new Date()
@@ -503,15 +676,15 @@ export default function ActiveVisitScreen() {
       }
       setTranscript(txt)
     }
-    rec.onend = () => setIsRecording(false)
+    rec.onend = () => setIsTranscribing(false)
     rec.start()
     recognitionRef.current = rec
-    setIsRecording(true)
+    setIsTranscribing(true)
   }
 
   const stopVoiceDoc = () => {
     recognitionRef.current?.stop()
-    setIsRecording(false)
+    setIsTranscribing(false)
   }
 
   const saveVoiceDoc = () => {
@@ -1248,6 +1421,198 @@ export default function ActiveVisitScreen() {
           </motion.div>
         )}
 
+        {/* Phase 6: Incident Reporting */}
+        <div className="bg-white rounded-2xl border border-slate-200 mb-3 overflow-hidden">
+          <button
+            onClick={() => setShowIncidentForm((v) => !v)}
+            className="w-full flex items-center justify-between p-4 cursor-pointer border-none bg-transparent"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255,90,95,0.08)' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                </svg>
+              </div>
+              <span className="text-sm font-bold text-slate-800">Report Incident</span>
+            </div>
+            <span className="text-xs font-medium" style={{ color: COLORS.teal }}>{showIncidentForm ? 'Close' : 'Open'}</span>
+          </button>
+
+          {showIncidentForm && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              className="px-4 pb-4 flex flex-col gap-3"
+            >
+              {/* Severity */}
+              <div className="flex gap-2">
+                {[
+                  { key: 'low', label: 'Low', color: '#22c55e' },
+                  { key: 'medium', label: 'Medium', color: COLORS.amber },
+                  { key: 'high', label: 'High', color: COLORS.red },
+                ].map((s) => (
+                  <button
+                    key={s.key}
+                    onClick={() => setIncidentSeverity(s.key as any)}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold cursor-pointer border-none transition-all"
+                    style={{
+                      background: incidentSeverity === s.key ? s.color : '#f1f5f9',
+                      color: incidentSeverity === s.key ? 'white' : '#64748b',
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Type */}
+              <select
+                value={incidentType}
+                onChange={(e) => setIncidentType(e.target.value)}
+                className="w-full bg-slate-50 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none border border-slate-100 focus:border-teal transition-colors appearance-none"
+              >
+                <option value="">Select incident type...</option>
+                <option value="Fall">Fall</option>
+                <option value="Medication Error">Medication Error</option>
+                <option value="Injury">Injury</option>
+                <option value="Behavioral">Behavioral</option>
+                <option value="Environmental">Environmental</option>
+                <option value="Equipment">Equipment</option>
+                <option value="Other">Other</option>
+              </select>
+
+              {/* Note */}
+              <textarea
+                value={incidentNote}
+                onChange={(e) => setIncidentNote(e.target.value)}
+                placeholder="Describe what happened..."
+                className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
+                rows={3}
+              />
+
+              <button
+                onClick={submitIncident}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+                style={{ background: `linear-gradient(90deg, ${COLORS.red}, ${COLORS.amber})` }}
+              >
+                Submit Incident
+              </button>
+            </motion.div>
+          )}
+
+          {/* Incident list */}
+          {incidents.length > 0 && (
+            <div className="px-4 pb-3 flex flex-col gap-2">
+              {incidents.slice(0, 3).map((inc) => (
+                <div key={inc.id} className="flex items-center gap-2 rounded-xl p-2.5 bg-slate-50">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{
+                      background: inc.severity === 'high' ? COLORS.red : inc.severity === 'medium' ? COLORS.amber : '#22c55e',
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-slate-700 truncate">{inc.type}</div>
+                    {inc.description && <div className="text-[10px] text-slate-500 truncate">{inc.description}</div>}
+                  </div>
+                  <span className="text-[10px] text-slate-400 shrink-0">
+                    {new Date(inc.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Phase 6: Voice Memo Recorder */}
+        <div className="bg-white rounded-2xl border border-slate-200 mb-3 overflow-hidden">
+          <div className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(167,139,250,0.08)' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.lavender} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>
+                </svg>
+              </div>
+              <span className="text-sm font-bold text-slate-800">Voice Memo</span>
+            </div>
+            {isRecording && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs font-bold text-red-500">{formatRecordTime(recordDuration)}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="px-4 pb-4 flex flex-col gap-3">
+            {!isRecording && !recordedBlob && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={startRecording}
+                className="w-full py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer flex items-center justify-center gap-2"
+                style={{ background: `linear-gradient(90deg, ${COLORS.lavender}, ${COLORS.teal})` }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/>
+                </svg>
+                Tap to Record
+              </motion.button>
+            )}
+
+            {isRecording && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={stopRecording}
+                className="w-full py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer flex items-center justify-center gap-2"
+                style={{ background: COLORS.red }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="6" y="6" width="12" height="12" rx="2"/>
+                </svg>
+                Stop Recording
+              </motion.button>
+            )}
+
+            {recordedBlob && !isRecording && (
+              <div className="flex flex-col gap-2">
+                <audio src={URL.createObjectURL(recordedBlob)} controls className="w-full h-10" />
+                <div className="flex gap-2">
+                  <button
+                    onClick={discardRecording}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold cursor-pointer border-none transition-all"
+                    style={{ background: '#f1f5f9', color: '#64748b' }}
+                  >
+                    Discard
+                  </button>
+                  <button
+                    onClick={saveRecording}
+                    className="flex-1 py-2 rounded-xl text-xs font-semibold text-white border-none cursor-pointer transition-all"
+                    style={{ background: `linear-gradient(90deg, ${COLORS.lavender}, ${COLORS.teal})` }}
+                  >
+                    Save Memo
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Saved memos list */}
+          {voiceMemos.length > 0 && (
+            <div className="px-4 pb-3 flex flex-col gap-2">
+              {voiceMemos.slice(0, 3).map((memo) => (
+                <div key={memo.id} className="flex items-center gap-2 rounded-xl p-2.5 bg-slate-50">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.lavender} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-slate-700">Voice Memo</div>
+                  </div>
+                  <span className="text-[10px] text-slate-400 shrink-0">{formatRecordTime(memo.duration)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-2.5 mb-4">
           <motion.button
@@ -1308,10 +1673,10 @@ export default function ActiveVisitScreen() {
           <div className="bg-white rounded-2xl p-5 max-w-sm w-full">
             <h3 className="font-bold text-slate-800 mb-3">Voice Documentation</h3>
             <div className="bg-slate-50 rounded-xl p-3 mb-3 min-h-[60px] text-sm text-slate-600">
-              {transcript || (isRecording ? 'Listening...' : 'Tap record to start')}
+              {transcript || (isTranscribing ? 'Listening...' : 'Tap record to start')}
             </div>
             <div className="flex gap-2 mb-4">
-              {!isRecording ? (
+              {!isTranscribing ? (
                 <button
                   onClick={startVoiceDoc}
                   className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
@@ -1403,6 +1768,7 @@ export default function ActiveVisitScreen() {
                   triggerHaptic(HAPTIC_PATTERNS.clockOut)
                   const snapshot = {
                     visitId: visit.id,
+                    clientId: client.id,
                     clientName: client.name,
                     clientAge: client.age,
                     clientAddress: client.address,

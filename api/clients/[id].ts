@@ -23,11 +23,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
       const r = rows[0] as any
+
+      // Fetch most recent handover note for this client
+      const lastVisit = await sql`
+        SELECT handover_note, submitted_at
+        FROM visits
+        WHERE client_id = ${clientId} AND handover_note IS NOT NULL AND handover_note <> ''
+        ORDER BY submitted_at DESC
+        LIMIT 1
+      ` as any[]
+
       res.status(200).json({
         ...r,
         conditions: typeof r.conditions === 'string' ? JSON.parse(r.conditions) : (r.conditions || []),
         medications: typeof r.medications === 'string' ? JSON.parse(r.medications) : (r.medications || []),
         careCues: typeof r.care_cues === 'string' ? JSON.parse(r.care_cues) : (r.care_cues || []),
+        lastHandover: lastVisit[0]?.handover_note || null,
+        lastHandoverAt: lastVisit[0]?.submitted_at || null,
       })
       return
     }

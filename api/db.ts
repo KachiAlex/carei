@@ -115,6 +115,7 @@ async function runInit() {
   await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS meal_status TEXT`
   await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS mood TEXT`
   await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS wellbeing_note TEXT`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS client_id TEXT`
 
   await sql`
     CREATE TABLE IF NOT EXISTS users (

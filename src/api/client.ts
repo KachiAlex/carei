@@ -393,6 +393,36 @@ export async function getDrugInteractions(drugs: string[]) {
   return get(`/drug-interactions?drugs=${encodeURIComponent(drugs.join(','))}`)
 }
 
+export async function reportIncident(data: {
+  visitId?: string
+  clientId?: string
+  clientName?: string
+  type: string
+  description?: string
+  severity: 'low' | 'medium' | 'high'
+}) {
+  return post('/incidents', data)
+}
+
+export async function getIncidents(visitId?: string) {
+  const qs = visitId ? `?visitId=${visitId}` : ''
+  return get(`/incidents${qs}`)
+}
+
+export async function saveVoiceMemo(data: {
+  visitId?: string
+  clientId?: string
+  audioUrl: string
+  duration: number
+}) {
+  return post('/voice-memos', data)
+}
+
+export async function getVoiceMemos(visitId?: string) {
+  const qs = visitId ? `?visitId=${visitId}` : ''
+  return get(`/voice-memos${qs}`)
+}
+
 export async function saveVisitDraft(visitId: string, data: unknown) {
   return post(`/visit/${visitId}/draft`, data)
 }

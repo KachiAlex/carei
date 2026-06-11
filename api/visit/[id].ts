@@ -23,7 +23,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET') {
       const rows = await sql`SELECT * FROM visits WHERE id = ${visitId}`
       if (rows[0]) {
-        res.status(200).json(rows[0])
+        const r = rows[0] as any
+        res.status(200).json({
+          ...r,
+          clientId: r.client_id || r.clientId,
+        })
         return
       }
       const scheduled = await sql`
@@ -79,18 +83,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST' || req.method === 'PATCH') {
       const body = req.body || {}
       const {
-        clientName, clientAge, clientAddress, visitTime, visitDuration,
+        clientName, clientAge, clientAddress, clientId, visitTime, visitDuration,
         elapsed, tasks, fluid, notes, medications, handoverNote, clockOutAt,
         bpSystolic, bpDiastolic, pulse, o2Sat, fluidGlasses, mealStatus, mood, wellbeingNote,
       } = body
 
       await sql`
       INSERT INTO visits (
-        id, client_name, client_age, client_address, visit_time, visit_duration,
+        id, client_name, client_age, client_address, client_id, visit_time, visit_duration,
         elapsed, tasks, fluid, notes, medications, handover_note, clock_out_at,
         bp_systolic, bp_diastolic, pulse, o2_sat, fluid_glasses, meal_status, mood, wellbeing_note
       ) VALUES (
-        ${visitId}, ${clientName}, ${clientAge}, ${clientAddress}, ${visitTime}, ${visitDuration},
+        ${visitId}, ${clientName}, ${clientAge}, ${clientAddress}, ${clientId || null}, ${visitTime}, ${visitDuration},
         ${elapsed}, ${JSON.stringify(tasks || [])}, ${fluid}, ${notes}, ${JSON.stringify(medications || [])}, ${handoverNote}, ${clockOutAt},
         ${bpSystolic}, ${bpDiastolic}, ${pulse}, ${o2Sat}, ${fluidGlasses}, ${mealStatus}, ${mood}, ${wellbeingNote}
       )
@@ -98,6 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         client_name = EXCLUDED.client_name,
         client_age = EXCLUDED.client_age,
         client_address = EXCLUDED.client_address,
+        client_id = EXCLUDED.client_id,
         visit_time = EXCLUDED.visit_time,
         visit_duration = EXCLUDED.visit_duration,
         elapsed = EXCLUDED.elapsed,
