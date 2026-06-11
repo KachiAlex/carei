@@ -12,6 +12,7 @@ const COLORS = {
   teal2: '#40E0D0',
   red: '#FF5A5F',
   amber: '#F6B73C',
+  lavender: '#A78BFA',
 }
 
 interface VisitSnapshot {
@@ -22,11 +23,33 @@ interface VisitSnapshot {
   visitTime: string
   visitDuration: string
   elapsed: number
-  tasks: { name: string; done: boolean }[]
+  tasks: { name: string; done: boolean; completedAt?: number }[]
   fluid: number
   notes: string
-  medications: { name: string; dose: string; status: string; skipReason?: string }[]
+  medications: {
+    name: string
+    dose: string
+    status: string
+    skipReason?: string
+    isControlled?: boolean
+    administeredAt?: string
+    witnessName?: string
+    adminNote?: string
+    dueTime?: string
+  }[]
+  clockInAt?: string
   clockOutAt: string
+  bpSystolic?: number
+  bpDiastolic?: number
+  pulse?: number
+  o2Sat?: number
+  nutritionNote?: string
+  mood?: string
+  wellbeingNote?: string
+  mealStatus?: string
+  incidents?: { id: string; type: string; severity: string; description: string; timestamp: string }[]
+  voiceMemos?: { id: string; audioUrl: string; duration: number; createdAt: string }[]
+  status?: string
 }
 
 function formatTime(seconds: number) {
@@ -34,6 +57,17 @@ function formatTime(seconds: number) {
   const m = Math.floor((seconds % 3600) / 60)
   const s = seconds % 60
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+}
+
+function formatDateTime(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatRecordTime(sec: number) {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
 export default function VisitSummaryScreen() {
@@ -195,78 +229,210 @@ export default function VisitSummaryScreen() {
           ))}
         </div>
 
-        {/* Medications */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-sm text-slate-800">Medications</h3>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>{confirmedMeds}/{snapshot.medications.length} confirmed</span>
-          </div>
-          <div className="flex flex-col gap-2.5">
-            {snapshot.medications.map((med) => (
-              <div key={med.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: med.status === 'confirmed' ? 'rgba(79,209,197,0.08)' : med.status === 'skipped' ? 'rgba(255,90,95,0.06)' : 'rgba(148,163,184,0.08)' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={med.status === 'confirmed' ? COLORS.teal : med.status === 'skipped' ? COLORS.red : '#94a3b8'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg>
-                  </div>
-                  <div>
-                    <div className="font-semibold text-slate-700">{med.name}</div>
-                    <div className="text-slate-400">{med.dose}</div>
-                  </div>
-                </div>
-                <span
-                  className="text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0"
-                  style={{
-                    color: med.status === 'confirmed' ? COLORS.teal : med.status === 'skipped' ? COLORS.red : '#94a3b8',
-                    background: med.status === 'confirmed' ? 'rgba(79,209,197,0.08)' : med.status === 'skipped' ? 'rgba(255,90,95,0.06)' : '#f1f5f9',
-                    border: `1px solid ${med.status === 'confirmed' ? 'rgba(79,209,197,0.15)' : med.status === 'skipped' ? 'rgba(255,90,95,0.1)' : 'transparent'}`,
-                  }}
-                >
-                  {med.status === 'confirmed' ? 'Confirmed' : med.status === 'skipped' ? `${med.skipReason || 'Skipped'}` : 'Pending'}
-                </span>
-              </div>
-            ))}
-          </div>
-          {skippedMeds.length > 0 && (
-            <div className="mt-3 text-[10px] text-amber-700 rounded-lg px-3 py-2.5 flex items-center gap-1.5" style={{ background: 'rgba(246,183,60,0.08)', border: '1px solid rgba(246,183,60,0.12)' }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.amber} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
-              {skippedMeds.length} medication(s) skipped — flagged for review.
+        {/* Audit Trail Complete Badge */}
+        {snapshot.status === 'completed' && (
+          <div className="bg-white rounded-2xl p-3 border border-slate-100 mb-3 shadow-sm flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
-          )}
-        </div>
-
-        {/* Tasks */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-sm text-slate-800">Tasks</h3>
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>{doneTasks}/{snapshot.tasks.length}</span>
+            <div>
+              <div className="text-sm font-bold text-slate-800">Audit Trail Complete</div>
+              <div className="text-[10px] text-slate-500">All required fields present and visit submitted</div>
+            </div>
           </div>
-          <div className="flex flex-col gap-2">
-            {snapshot.tasks.map((task, i) => (
-              <div key={i} className="flex items-center gap-2.5 text-sm">
-                <div
-                  className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 transition-colors"
-                  style={{
-                    background: task.done ? COLORS.teal : 'transparent',
-                    border: `1.5px solid ${task.done ? COLORS.teal : '#cbd5e1'}`,
-                  }}
-                >
-                  {task.done && (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
+        )}
+
+        {/* Visit Timeline */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
+          <h3 className="font-bold text-sm text-slate-800 mb-3">Visit Timeline</h3>
+          <div className="flex flex-col gap-0 relative">
+            {/* Clock In */}
+            {snapshot.clockInAt && (
+              <div className="flex gap-3 py-2">
+                <div className="flex flex-col items-center">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(79,209,197,0.1)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  </div>
+                  <div className="w-px flex-1 bg-slate-200 my-1" />
                 </div>
-                <span className={task.done ? 'text-slate-400 line-through' : 'text-slate-700'}>{task.name}</span>
+                <div className="pb-3">
+                  <div className="text-xs font-semibold text-slate-700">Clocked In</div>
+                  <div className="text-[10px] text-slate-400">{formatDateTime(snapshot.clockInAt)}</div>
+                </div>
+              </div>
+            )}
+            {/* Tasks with timestamps */}
+            {snapshot.tasks.filter((t) => t.done && t.completedAt).map((task, i) => (
+              <div key={`task-${i}`} className="flex gap-3 py-2">
+                <div className="flex flex-col items-center">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(79,209,197,0.1)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                  </div>
+                  <div className="w-px flex-1 bg-slate-200 my-1" />
+                </div>
+                <div className="pb-3">
+                  <div className="text-xs font-semibold text-slate-700">Task: {task.name}</div>
+                  <div className="text-[10px] text-slate-400">{formatDateTime(new Date(task.completedAt!).toISOString())}</div>
+                </div>
               </div>
             ))}
+            {/* Vitals */}
+            {(snapshot.bpSystolic || snapshot.pulse || snapshot.o2Sat) && (
+              <div className="flex gap-3 py-2">
+                <div className="flex flex-col items-center">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(167,139,250,0.1)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.lavender} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                  </div>
+                  <div className="w-px flex-1 bg-slate-200 my-1" />
+                </div>
+                <div className="pb-3">
+                  <div className="text-xs font-semibold text-slate-700">Vitals Recorded</div>
+                  <div className="text-[10px] text-slate-400">
+                    {snapshot.bpSystolic && `${snapshot.bpSystolic}/${snapshot.bpDiastolic} mmHg`}
+                    {snapshot.pulse && ` · ${snapshot.pulse} bpm`}
+                    {snapshot.o2Sat && ` · ${snapshot.o2Sat}% O₂`}
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Medications */}
+            {snapshot.medications.filter((m) => m.status === 'confirmed' || m.status === 'refused').map((med, i) => (
+              <div key={`med-${i}`} className="flex gap-3 py-2">
+                <div className="flex flex-col items-center">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: med.status === 'confirmed' ? 'rgba(79,209,197,0.1)' : 'rgba(255,90,95,0.08)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={med.status === 'confirmed' ? COLORS.teal : COLORS.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg>
+                  </div>
+                  <div className="w-px flex-1 bg-slate-200 my-1" />
+                </div>
+                <div className="pb-3">
+                  <div className="text-xs font-semibold text-slate-700">
+                    {med.name} {med.status === 'confirmed' ? 'Given' : 'Not Given'}
+                    {med.isControlled && <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,90,95,0.1)', color: COLORS.red }}>CONTROLLED</span>}
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    {med.dose}
+                    {med.administeredAt && ` · ${formatDateTime(med.administeredAt)}`}
+                    {med.witnessName && ` · Witnessed by ${med.witnessName}`}
+                    {med.status === 'refused' && med.skipReason && ` · ${med.skipReason}`}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {/* Clock Out */}
+            {snapshot.clockOutAt && (
+              <div className="flex gap-3 py-2">
+                <div className="flex flex-col items-center">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold text-slate-700">Clocked Out</div>
+                  <div className="text-[10px] text-slate-400">{formatDateTime(snapshot.clockOutAt)} · {formatTime(snapshot.elapsed)}</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Notes */}
-        {snapshot.notes && (
+        {/* Vitals Summary */}
+        {(snapshot.bpSystolic || snapshot.pulse || snapshot.o2Sat) && (
           <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
-            <h3 className="font-bold text-sm text-slate-800 mb-2">Care Notes</h3>
-            <p className="text-sm text-slate-600 whitespace-pre-wrap">{snapshot.notes}</p>
+            <h3 className="font-bold text-sm text-slate-800 mb-3">Vitals</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {snapshot.bpSystolic && (
+                <div className="bg-slate-50 rounded-xl p-3">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider">Blood Pressure</div>
+                  <div className="text-sm font-bold text-slate-800">{snapshot.bpSystolic}/{snapshot.bpDiastolic} <span className="text-[10px] font-normal text-slate-500">mmHg</span></div>
+                </div>
+              )}
+              {snapshot.pulse && (
+                <div className="bg-slate-50 rounded-xl p-3">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider">Pulse</div>
+                  <div className="text-sm font-bold text-slate-800">{snapshot.pulse} <span className="text-[10px] font-normal text-slate-500">bpm</span></div>
+                </div>
+              )}
+              {snapshot.o2Sat && (
+                <div className="bg-slate-50 rounded-xl p-3">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wider">O₂ Saturation</div>
+                  <div className="text-sm font-bold text-slate-800">{snapshot.o2Sat}<span className="text-[10px] font-normal text-slate-500">%</span></div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Care Notes Summary */}
+        {(snapshot.notes || snapshot.nutritionNote || snapshot.mood || snapshot.wellbeingNote || snapshot.mealStatus) && (
+          <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
+            <h3 className="font-bold text-sm text-slate-800 mb-3">Care Notes</h3>
+            <div className="flex flex-col gap-2.5">
+              {snapshot.mealStatus && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500">Meal:</span>
+                  <span className="font-semibold text-slate-700 capitalize">{snapshot.mealStatus}</span>
+                </div>
+              )}
+              {snapshot.mood && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500">Mood:</span>
+                  <span className="font-semibold text-slate-700">{snapshot.mood}</span>
+                </div>
+              )}
+              {snapshot.nutritionNote && (
+                <div className="text-xs text-slate-600 bg-slate-50 rounded-xl p-2.5">{snapshot.nutritionNote}</div>
+              )}
+              {snapshot.wellbeingNote && (
+                <div className="text-xs text-slate-600 bg-slate-50 rounded-xl p-2.5">{snapshot.wellbeingNote}</div>
+              )}
+              {snapshot.notes && (
+                <div className="text-xs text-slate-600 bg-slate-50 rounded-xl p-2.5">{snapshot.notes}</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Incidents */}
+        {snapshot.incidents && snapshot.incidents.length > 0 && (
+          <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
+            <h3 className="font-bold text-sm text-slate-800 mb-3">Incidents</h3>
+            <div className="flex flex-col gap-2">
+              {snapshot.incidents.map((inc) => (
+                <div key={inc.id} className="flex items-center gap-2 rounded-xl p-2.5 bg-slate-50">
+                  <span
+                    className="w-2 h-2 rounded-full shrink-0"
+                    style={{
+                      background: inc.severity === 'high' ? COLORS.red : inc.severity === 'medium' ? COLORS.amber : '#22c55e',
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-slate-700">{inc.type}</div>
+                    {inc.description && <div className="text-[10px] text-slate-500">{inc.description}</div>}
+                  </div>
+                  <span className="text-[10px] text-slate-400 shrink-0">{formatDateTime(inc.timestamp)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Voice Memos */}
+        {snapshot.voiceMemos && snapshot.voiceMemos.length > 0 && (
+          <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
+            <h3 className="font-bold text-sm text-slate-800 mb-3">Voice Memos</h3>
+            <div className="flex flex-col gap-2">
+              {snapshot.voiceMemos.map((memo) => (
+                <div key={memo.id} className="flex items-center gap-2 rounded-xl p-2.5 bg-slate-50">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.lavender} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="5 3 19 12 5 21 5 3"/>
+                  </svg>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-semibold text-slate-700">Voice Memo</div>
+                  </div>
+                  <span className="text-[10px] text-slate-400 shrink-0">{formatRecordTime(memo.duration)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

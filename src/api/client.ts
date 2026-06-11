@@ -443,3 +443,71 @@ export async function deleteVisitDraft(visitId: string) {
   }
   return res.json()
 }
+
+export async function getSchedule() {
+  return get('/schedule')
+}
+
+export async function saveBodyMapMark(data: {
+  visitId: string
+  clientId?: string
+  x: number
+  y: number
+  side?: string
+  type?: string
+  note?: string
+}) {
+  return post('/body-map', data)
+}
+
+export async function getBodyMapMarks(visitId?: string, clientId?: string) {
+  const qs = visitId ? `?visitId=${visitId}` : clientId ? `?clientId=${clientId}` : ''
+  return get(`/body-map${qs}`)
+}
+
+export async function deleteBodyMapMark(markId: string) {
+  const res = await fetch(`${API_BASE}/body-map?markId=${markId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function getAgencies() {
+  return get('/agencies')
+}
+
+export async function getAgency(id: string) {
+  return get(`/agencies?id=${id}`)
+}
+
+export async function sendFamilyMessage(data: {
+  visitId?: string
+  clientId?: string
+  message: string
+}) {
+  return post('/family-messages', data)
+}
+
+export async function getFamilyMessages(visitId?: string, clientId?: string) {
+  const qs = visitId ? `?visitId=${visitId}` : clientId ? `?clientId=${clientId}` : ''
+  return get(`/family-messages${qs}`)
+}
+
+export async function getVisitApprovals(status?: string) {
+  const qs = status ? `?status=${status}` : ''
+  return get(`/visit-approvals${qs}`)
+}
+
+export async function updateVisitApproval(data: {
+  visitId: string
+  approvalStatus?: string
+  familyRead?: boolean
+}) {
+  return post('/visit-approvals', data)
+}

@@ -40,6 +40,8 @@ async function runInit() {
       meal_status TEXT,
       mood TEXT,
       wellbeing_note TEXT,
+      clock_in_at TIMESTAMPTZ,
+      status TEXT DEFAULT 'pending',
       submitted_at TIMESTAMPTZ DEFAULT NOW()
     )
   `
@@ -116,6 +118,8 @@ async function runInit() {
   await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS mood TEXT`
   await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS wellbeing_note TEXT`
   await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS client_id TEXT`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS clock_in_at TIMESTAMPTZ`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'`
 
   await sql`
     CREATE TABLE IF NOT EXISTS users (
@@ -242,6 +246,51 @@ async function runInit() {
       witness_name TEXT,
       reason TEXT,
       notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS body_map_marks (
+      id TEXT PRIMARY KEY,
+      visit_id TEXT NOT NULL,
+      client_id TEXT,
+      carer_id TEXT,
+      x INTEGER NOT NULL,
+      y INTEGER NOT NULL,
+      side TEXT DEFAULT 'anterior',
+      type TEXT DEFAULT 'skin_integrity',
+      note TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+
+  await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS pbs_framework JSONB`
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS agencies (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      phone TEXT,
+      logo TEXT,
+      settings JSONB,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS approval_status TEXT DEFAULT 'pending'`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS approved_by TEXT`
+  await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS family_read_at TIMESTAMPTZ`
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS family_messages (
+      id TEXT PRIMARY KEY,
+      visit_id TEXT,
+      client_id TEXT,
+      sender_name TEXT,
+      sender_role TEXT,
+      message TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `

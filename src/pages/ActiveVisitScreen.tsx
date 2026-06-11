@@ -1798,10 +1798,14 @@ export default function ActiveVisitScreen() {
                     nutritionNote,
                     mood: selectedMood,
                     wellbeingNote,
+                    clockInAt: clockInAt ? new Date(clockInAt).toISOString() : null,
                     clockOutAt: new Date().toISOString(),
+                    status: 'completed',
+                    incidents,
+                    voiceMemos,
                   }
                   try { await saveVisitDraft(visit.id, { snapshot }) } catch {}
-                  try { await saveVisit(visit.id, snapshot) } catch {}
+                  try { await saveVisit(visit.id, { ...snapshot, clientId: client.id }) } catch {}
                   setLocation(`/summary/${visit.id}`)
                 }}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"

@@ -14,6 +14,16 @@ const ClientManagement = lazy(() => import('./pages/ClientManagement'))
 const VisitScheduling = lazy(() => import('./pages/VisitScheduling'))
 const ClientOverviewScreen = lazy(() => import('./pages/ClientOverviewScreen'))
 const CreateAccountScreen = lazy(() => import('./pages/CreateAccountScreen'))
+const BodyMapScreen = lazy(() => import('./pages/BodyMapScreen'))
+const CarePlanScreen = lazy(() => import('./pages/CarePlanScreen'))
+const EmergencyScreen = lazy(() => import('./pages/EmergencyScreen'))
+const VisitHistoryScreen = lazy(() => import('./pages/VisitHistoryScreen'))
+const RotaScreen = lazy(() => import('./pages/RotaScreen'))
+const OperationsScreen = lazy(() => import('./pages/OperationsScreen'))
+const FamilyPortalScreen = lazy(() => import('./pages/FamilyPortalScreen'))
+const ManagerApprovalsScreen = lazy(() => import('./pages/ManagerApprovalsScreen'))
+const FamilySummaryScreen = lazy(() => import('./pages/FamilySummaryScreen'))
+const AdminTeaserScreen = lazy(() => import('./pages/AdminTeaserScreen'))
 
 function LoadingFallback() {
   return (
@@ -38,8 +48,18 @@ function App() {
         <Route path="/manager/login" component={ManagerLoginScreen} />
         <Route path="/manager" component={ManagerDashboard} />
         <Route path="/client/:id/overview" component={ClientOverviewScreen} />
+        <Route path="/client/:id/care-plan" component={CarePlanScreen} />
+        <Route path="/client/:id/history" component={VisitHistoryScreen} />
         <Route path="/manager/clients" component={ClientManagement} />
         <Route path="/manager/schedule" component={VisitScheduling} />
+        <Route path="/manager/approvals" component={ManagerApprovalsScreen} />
+        <Route path="/body-map/:visitId" component={BodyMapScreen} />
+        <Route path="/emergency" component={EmergencyScreen} />
+        <Route path="/rota" component={RotaScreen} />
+        <Route path="/operations" component={OperationsScreen} />
+        <Route path="/family/:id" component={FamilyPortalScreen} />
+        <Route path="/family-summary/:id" component={FamilySummaryScreen} />
+        <Route path="/admin" component={AdminTeaserScreen} />
       </Suspense>
     </Router>
   )

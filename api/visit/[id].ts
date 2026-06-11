@@ -84,18 +84,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const body = req.body || {}
       const {
         clientName, clientAge, clientAddress, clientId, visitTime, visitDuration,
-        elapsed, tasks, fluid, notes, medications, handoverNote, clockOutAt,
+        elapsed, tasks, fluid, notes, medications, handoverNote, clockOutAt, clockInAt, status,
         bpSystolic, bpDiastolic, pulse, o2Sat, fluidGlasses, mealStatus, mood, wellbeingNote,
       } = body
 
       await sql`
       INSERT INTO visits (
         id, client_name, client_age, client_address, client_id, visit_time, visit_duration,
-        elapsed, tasks, fluid, notes, medications, handover_note, clock_out_at,
+        elapsed, tasks, fluid, notes, medications, handover_note, clock_out_at, clock_in_at, status,
         bp_systolic, bp_diastolic, pulse, o2_sat, fluid_glasses, meal_status, mood, wellbeing_note
       ) VALUES (
         ${visitId}, ${clientName}, ${clientAge}, ${clientAddress}, ${clientId || null}, ${visitTime}, ${visitDuration},
-        ${elapsed}, ${JSON.stringify(tasks || [])}, ${fluid}, ${notes}, ${JSON.stringify(medications || [])}, ${handoverNote}, ${clockOutAt},
+        ${elapsed}, ${JSON.stringify(tasks || [])}, ${fluid}, ${notes}, ${JSON.stringify(medications || [])}, ${handoverNote}, ${clockOutAt}, ${clockInAt}, ${status || 'pending'},
         ${bpSystolic}, ${bpDiastolic}, ${pulse}, ${o2Sat}, ${fluidGlasses}, ${mealStatus}, ${mood}, ${wellbeingNote}
       )
       ON CONFLICT (id) DO UPDATE SET
@@ -112,6 +112,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         medications = EXCLUDED.medications,
         handover_note = EXCLUDED.handover_note,
         clock_out_at = EXCLUDED.clock_out_at,
+        clock_in_at = EXCLUDED.clock_in_at,
+        status = EXCLUDED.status,
         bp_systolic = EXCLUDED.bp_systolic,
         bp_diastolic = EXCLUDED.bp_diastolic,
         pulse = EXCLUDED.pulse,
