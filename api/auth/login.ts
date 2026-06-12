@@ -27,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const rows = await sql`
       SELECT id, name, email, phone, region, pin, role
       FROM users
-      WHERE email = ${email.toLowerCase()}
+      WHERE LOWER(email) = ${email.toLowerCase()}
       LIMIT 1
     ` as any[]
 

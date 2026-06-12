@@ -71,8 +71,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const { id, name, phone, region, pin, role } = userData
           const token = 'tok-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
 
-          // Check if user already exists
-          const existing = await sql`SELECT id FROM users WHERE email = ${email.toLowerCase()}` as any[]
+          // Check if user already exists (case-insensitive)
+          const existing = await sql`SELECT id FROM users WHERE LOWER(email) = ${email.toLowerCase()}` as any[]
           if (existing.length > 0) {
             res.status(409).json({ error: 'An account with this email already exists' })
             return
@@ -86,9 +86,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return
         }
 
-        // If this is a login, find the user and return token
+        // If this is a login, find the user and return token (case-insensitive)
         if (purpose === 'login') {
-          const users = await sql`SELECT id, name, email, phone, region, role FROM users WHERE email = ${email.toLowerCase()}` as any[]
+          const users = await sql`SELECT id, name, email, phone, region, role FROM users WHERE LOWER(email) = ${email.toLowerCase()}` as any[]
           if (users.length === 0) {
             res.status(404).json({ error: 'No account found with this email' })
             return
