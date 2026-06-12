@@ -76,6 +76,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
+      // Fallback: treat id as a clientId and build an initial visit object
+      const clientRows = await sql`
+        SELECT
+          id AS "clientId",
+          name AS "clientName",
+          age AS "clientAge",
+          address AS "clientAddress",
+          conditions,
+          medications,
+          preferences,
+          emergency_contact AS "emergencyContact"
+        FROM clients
+        WHERE id = ${visitId}
+        LIMIT 1
+      ` as any[]
+      if (clientRows[0]) {
+        res.status(200).json({ ...clientRows[0], id: visitId, status: 'pending' })
+        return
+      }
+
       res.status(200).json({ id: visitId, status: 'pending', data: null })
       return
     }
