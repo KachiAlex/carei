@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors } from './db.js'
+import { getSql, setCors, ensureTables } from './db.js'
 
 function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
@@ -17,6 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
 
   try {
+    await ensureTables()
     const sql = getSql()
 
     if (req.method === 'POST') {

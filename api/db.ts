@@ -177,22 +177,6 @@ async function runInit() {
   `
 
   await sql`
-    CREATE TABLE IF NOT EXISTS medication_logs (
-      id TEXT PRIMARY KEY,
-      client_id TEXT,
-      client_name TEXT,
-      carer_id TEXT,
-      carer_name TEXT,
-      medication_name TEXT NOT NULL,
-      dose TEXT,
-      scheduled_time TEXT,
-      status TEXT DEFAULT 'pending',
-      reason TEXT,
-      timestamp TIMESTAMPTZ DEFAULT NOW()
-    )
-  `
-
-  await sql`
     CREATE TABLE IF NOT EXISTS caregiver_client_assignments (
       id TEXT PRIMARY KEY,
       caregiver_id TEXT NOT NULL,
@@ -249,6 +233,16 @@ async function runInit() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `
+
+  // Migrate databases that had the old medication_logs schema
+  await sql`ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS caregiver_id TEXT`
+  await sql`ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS visit_id TEXT`
+  await sql`ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS administered_at TIMESTAMPTZ DEFAULT NOW()`
+  await sql`ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS witness_name TEXT`
+  await sql`ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS notes TEXT`
+  await sql`ALTER TABLE medication_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()`
+  try { await sql`ALTER TABLE medication_logs RENAME COLUMN carer_id TO caregiver_id` } catch {}
+  try { await sql`ALTER TABLE medication_logs RENAME COLUMN timestamp TO administered_at` } catch {}
 
   await sql`
     CREATE TABLE IF NOT EXISTS body_map_marks (
