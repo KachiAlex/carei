@@ -31,6 +31,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'POST') {
       const { visitId, clientId, audioUrl, duration } = req.body || {}
+      if (!audioUrl || typeof audioUrl !== 'string' || audioUrl.length < 10) {
+        res.status(400).json({ error: 'audioUrl required and must be a valid string' })
+        return
+      }
       const id = generateId()
       await sql`
         INSERT INTO voice_memos (id, visit_id, carer_id, client_id, audio_url, duration, created_at)

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from './db.js'
+import { getSql, setCors, ensureTables, checkRateLimit } from './db.js'
 
 function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
@@ -24,6 +24,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { action, email, code, purpose, userData } = req.body || {}
 
       if (action === 'send') {
+        const limit = checkRateLimit(req, 'otp-send', 3, 60000)
+        if (!limit.allowed) {
+          res.status(429).json({ error: 'Too many OTP requests', retryAfter: limit.retryAfter })
+          return
+        }
         if (!email) {
           res.status(400).json({ error: 'Email required' })
           return

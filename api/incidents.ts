@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, getAuthToken } from './db.js'
+import { getSql, setCors, ensureTables, getAuthToken, checkRateLimit } from './db.js'
 
 function generateId(): string {
   return 'inc-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
@@ -30,9 +30,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
+      const limit = checkRateLimit(req, 'incidents', 10, 60000)
+      if (!limit.allowed) {
+        res.status(429).json({ error: 'Too many incident reports', retryAfter: limit.retryAfter })
+        return
+      }
       const { visitId, clientId, clientName, type, description, severity } = req.body || {}
       if (!type) {
         res.status(400).json({ error: 'type required' })
+        return
+      }
+      const validSeverity = ['low', 'medium', 'high']
+      if (severity && !validSeverity.includes(severity)) {
+        res.status(400).json({ error: 'severity must be low, medium, or high' })
         return
       }
 

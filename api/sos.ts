@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from './db.js'
+import { getSql, setCors, ensureTables, checkRateLimit } from './db.js'
 import { broadcast } from './events.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -10,7 +10,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  const limit = checkRateLimit(req, 'sos', 5, 60000)
+  if (!limit.allowed) {
+    res.status(429).json({ error: 'Too many SOS alerts', retryAfter: limit.retryAfter })
+    return
+  }
+
   const { visitId, location, timestamp } = req.body || {}
+  if (!visitId) {
+    res.status(400).json({ error: 'visitId required' })
+    return
+  }
   const alertId = `SOS-${Date.now()}`
 
   try {

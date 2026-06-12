@@ -356,3 +356,26 @@ export function getAuthToken(req: any): string {
   const match = cookie.match(/carei_token=([^;]+)/)
   return match ? match[1] : ''
 }
+
+// Simple in-memory rate limiter (resets every 60s, not persisted across cold starts)
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>()
+
+export function checkRateLimit(req: any, key: string, maxRequests: number, windowMs = 60000): { allowed: boolean; retryAfter?: number } {
+  const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown'
+  const storeKey = `${clientIp}:${key}`
+  const now = Date.now()
+  const entry = rateLimitStore.get(storeKey)
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(storeKey, { count: 1, resetAt: now + windowMs })
+    return { allowed: true }
+  }
+
+  if (entry.count >= maxRequests) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000)
+    return { allowed: false, retryAfter }
+  }
+
+  entry.count++
+  return { allowed: true }
+}

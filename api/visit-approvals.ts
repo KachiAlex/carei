@@ -48,6 +48,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(400).json({ error: 'visitId required' })
         return
       }
+      const validStatuses = ['pending', 'approved', 'released', 'rejected']
+      if (approvalStatus && !validStatuses.includes(approvalStatus)) {
+        res.status(400).json({ error: 'approvalStatus must be pending, approved, released, or rejected' })
+        return
+      }
       if (approvalStatus) {
         await sql`
           UPDATE visits
