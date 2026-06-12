@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { getQueue, removeFromQueue, retryItem } from '../utils/offlineQueue'
-import { saveVisit, sendSOS } from '../api/client'
+import { saveVisit, sendSOS, logMedication, saveVoiceMemo } from '../api/client'
 
 export function useOnlineSync() {
   const sync = useCallback(async () => {
@@ -13,6 +13,10 @@ export function useOnlineSync() {
           await saveVisit((item.payload as any).visitId, item.payload)
         } else if (item.type === 'sos') {
           await sendSOS(item.payload as any)
+        } else if (item.type === 'medication-log') {
+          await logMedication(item.payload as any)
+        } else if (item.type === 'voice-memo') {
+          await saveVoiceMemo(item.payload as any)
         }
         await removeFromQueue(item.id!)
       } catch {

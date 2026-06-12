@@ -57,18 +57,6 @@ async function runInit() {
   `
 
   await sql`
-    CREATE TABLE IF NOT EXISTS carers (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      status TEXT DEFAULT 'available',
-      location TEXT,
-      client TEXT,
-      since TEXT,
-      avatar TEXT
-    )
-  `
-
-  await sql`
     CREATE TABLE IF NOT EXISTS scheduled_visits (
       id TEXT PRIMARY KEY,
       client_id TEXT,

@@ -600,9 +600,8 @@ export default function ActiveVisitScreen() {
         } catch {
           if (!navigator.onLine) {
             await enqueue({
-              type: 'visit',
+              type: 'voice-memo',
               payload: {
-                type: 'voice-memo',
                 visitId,
                 clientId: client?.id,
                 audioUrl: base64,
