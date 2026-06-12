@@ -21,6 +21,7 @@ import {
   deleteCaregiver,
 } from '../api/client'
 import { sendSOSAlert, sendSOSResolved, requestNotificationPermission } from '../utils/notifications'
+import { exportVisits, exportCarers, exportClients } from '../utils/exportCsv'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -324,6 +325,16 @@ export default function ManagerDashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* Export */}
+      <motion.div custom={6} variants={cardVariants} className="flex gap-2">
+        <button onClick={() => exportVisits(dbVisits)} className="flex-1 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-white border border-slate-200 cursor-pointer hover:border-teal transition-colors">
+          Export Visits
+        </button>
+        <button onClick={() => exportCarers(dbCarers)} className="flex-1 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-white border border-slate-200 cursor-pointer hover:border-teal transition-colors">
+          Export Carers
+        </button>
+      </motion.div>
 
       {/* Live Carer Status */}
       <motion.div custom={7} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
@@ -642,10 +653,15 @@ export default function ManagerDashboard() {
       <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-sm text-slate-800">Clients</h2>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setClientShowAdd(!clientShowAdd)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer flex items-center gap-1" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
+          <div className="flex gap-2">
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => exportClients(clientsList)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer flex items-center gap-1" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
+              Export
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setClientShowAdd(!clientShowAdd)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer flex items-center gap-1" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             {clientShowAdd ? 'Close' : 'Add'}
           </motion.button>
+          </div>
         </div>
 
         {clientShowAdd && (

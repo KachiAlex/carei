@@ -1,4 +1,5 @@
 import { useLocation } from 'wouter'
+import { exportVisits } from '../utils/exportCsv'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -77,6 +78,9 @@ export default function AdminTeaserScreen() {
             </button>
             <button onClick={() => setLocation('/manager/approvals')} className="text-left text-sm text-slate-600 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer bg-transparent border-none">
               Pending Approvals
+            </button>
+            <button onClick={() => { const saved = localStorage.getItem('carei_visits'); exportVisits(saved ? JSON.parse(saved) : []) }} className="text-left text-sm text-slate-600 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer bg-transparent border-none">
+              Export Visit Data
             </button>
           </div>
         </div>

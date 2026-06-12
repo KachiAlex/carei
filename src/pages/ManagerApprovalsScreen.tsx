@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
+import { exportVisits } from '../utils/exportCsv'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -65,8 +66,9 @@ export default function ManagerApprovalsScreen() {
         <h1 className="font-serif text-lg font-bold">Approvals</h1>
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-0 bg-white border-b border-slate-200 shrink-0">
+      {/* Filters + Export */}
+      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-200 shrink-0">
+        <div className="flex gap-0 flex-1">
         {[
           { key: 'pending' as const, label: 'Pending' },
           { key: 'approved' as const, label: 'Approved' },
@@ -84,6 +86,10 @@ export default function ManagerApprovalsScreen() {
             {f.label}
           </button>
         ))}
+        </div>
+        <button onClick={() => exportVisits(filtered)} className="ml-2 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
+          Export
+        </button>
       </div>
 
       <div className="flex-1 px-4 py-4 overflow-auto">
