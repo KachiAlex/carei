@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors } from './db'
+import { getSql, setCors } from './db.js'
 
 function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
