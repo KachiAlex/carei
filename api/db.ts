@@ -296,6 +296,18 @@ async function runInit() {
   `
 
   await sql`
+    CREATE TABLE IF NOT EXISTS otp_codes (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      code TEXT NOT NULL,
+      purpose TEXT DEFAULT 'login',
+      expires_at TIMESTAMPTZ NOT NULL,
+      used BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+
+  await sql`
     CREATE TABLE IF NOT EXISTS drug_interactions (
       id TEXT PRIMARY KEY,
       drug_a TEXT NOT NULL,

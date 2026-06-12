@@ -511,3 +511,11 @@ export async function updateVisitApproval(data: {
 }) {
   return post('/visit-approvals', data)
 }
+
+export async function sendOtp(data: { email: string; purpose?: string }) {
+  return post('/otp', { action: 'send', ...data })
+}
+
+export async function verifyOtp(data: { email: string; code: string; purpose?: string; userData?: any }) {
+  return post('/otp', { action: 'verify', ...data })
+}

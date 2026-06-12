@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation } from 'wouter'
-import { registerUser } from '../api/client'
+import { sendOtp, verifyOtp } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -21,15 +21,17 @@ function validateEmail(email: string): boolean {
 
 export default function CreateAccountScreen() {
   const [, setLocation] = useLocation()
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [region, setRegion] = useState('Manchester')
   const [pin, setPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
+  const [otp, setOtp] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [demoCode, setDemoCode] = useState('')
 
   const regions = ['Manchester', 'London', 'Birmingham', 'Leeds', 'Liverpool', 'Bristol', 'Sheffield']
 
@@ -41,28 +43,63 @@ export default function CreateAccountScreen() {
     setStep(2)
   }
 
-  const handleCreate = async () => {
+  const handleStep2 = () => {
     setError('')
     if (pin.length !== 4) { setError('PIN must be 4 digits'); return }
     if (pin !== confirmPin) { setError('PINs do not match'); return }
+    setStep(3)
+    // Auto-send OTP when entering step 3
+    handleSendOtp()
+  }
+
+  const handleSendOtp = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      const res = await sendOtp({ email: email.trim().toLowerCase(), purpose: 'register' }) as any
+      setLoading(false)
+      if (res?.demoCode) setDemoCode(res.demoCode)
+    } catch (err: any) {
+      setLoading(false)
+      setError(err.message || 'Failed to send code')
+    }
+  }
+
+  const handleVerify = async () => {
+    setError('')
+    if (otp.length !== 6) { setError('Enter the 6-digit code'); return }
 
     setLoading(true)
     try {
-      await registerUser({
+      const userData = {
         id: crypto.randomUUID ? crypto.randomUUID() : `u-${Date.now()}`,
         name: name.trim(),
-        email: email.trim().toLowerCase(),
         phone: phone.replace(/\s/g, ''),
         region,
         pin,
         role: 'carer',
-      })
+      }
+      const res = await verifyOtp({
+        email: email.trim().toLowerCase(),
+        code: otp,
+        purpose: 'register',
+        userData,
+      }) as any
       setLoading(false)
-      setLocation('/dashboard')
+      if (res?.token) {
+        localStorage.setItem('carei_token', res.token)
+        setLocation('/dashboard')
+      }
     } catch (err: any) {
       setLoading(false)
-      setError(err.message || 'Failed to create account')
+      setError(err.message || 'Invalid code or registration failed')
     }
+  }
+
+  const handleBack = () => {
+    if (step === 3) setStep(2)
+    else if (step === 2) setStep(1)
+    else setLocation('/')
   }
 
   return (
@@ -72,19 +109,25 @@ export default function CreateAccountScreen() {
     >
       <div className="flex-1 flex flex-col justify-center px-6 max-w-md mx-auto w-full">
         <button
-          onClick={() => step === 1 ? setLocation('/') : setStep(1)}
+          onClick={handleBack}
           className="self-start mb-8 text-white/60 hover:text-white transition-colors text-sm flex items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-1 -ml-1 rounded-lg"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           Back
         </button>
 
-        <h1 className="font-serif text-white text-3xl mb-2">{step === 1 ? 'Create Account' : 'Set Your PIN'}</h1>
+        <h1 className="font-serif text-white text-3xl mb-2">
+          {step === 1 ? 'Create Account' : step === 2 ? 'Set Your PIN' : 'Verify Your Email'}
+        </h1>
         <p className="text-white/50 mb-6">
-          {step === 1 ? 'Join CAREi to manage your care shifts digitally.' : 'Choose a 4-digit PIN for quick login.'}
+          {step === 1
+            ? 'Join CAREi to manage your care shifts digitally.'
+            : step === 2
+            ? 'Choose a 4-digit PIN for quick login.'
+            : 'Enter the 6-digit code sent to your email.'}
         </p>
 
-        {step === 1 ? (
+        {step === 1 && (
           <>
             <div className="mb-4">
               <label className="block text-white/70 text-sm mb-2">Full name</label>
@@ -97,7 +140,6 @@ export default function CreateAccountScreen() {
                 onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
               />
             </div>
-
             <div className="mb-4">
               <label className="block text-white/70 text-sm mb-2">Email address</label>
               <input
@@ -109,7 +151,6 @@ export default function CreateAccountScreen() {
                 onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
               />
             </div>
-
             <div className="mb-4">
               <label className="block text-white/70 text-sm mb-2">Mobile number</label>
               <input
@@ -121,7 +162,6 @@ export default function CreateAccountScreen() {
                 onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
               />
             </div>
-
             <div className="mb-6">
               <label className="block text-white/70 text-sm mb-2">Region</label>
               <select
@@ -135,9 +175,7 @@ export default function CreateAccountScreen() {
                 ))}
               </select>
             </div>
-
             {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
-
             <button
               onClick={handleStep1}
               className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none"
@@ -146,7 +184,9 @@ export default function CreateAccountScreen() {
               Continue
             </button>
           </>
-        ) : (
+        )}
+
+        {step === 2 && (
           <>
             <div className="mb-4">
               <label className="block text-white/70 text-sm mb-2">4-digit PIN</label>
@@ -158,10 +198,9 @@ export default function CreateAccountScreen() {
                 onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setPin(v) }}
                 placeholder="••••"
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors text-center text-2xl tracking-[0.5em]"
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                onKeyDown={(e) => e.key === 'Enter' && handleStep2()}
               />
             </div>
-
             <div className="mb-6">
               <label className="block text-white/70 text-sm mb-2">Confirm PIN</label>
               <input
@@ -172,19 +211,54 @@ export default function CreateAccountScreen() {
                 onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setConfirmPin(v) }}
                 placeholder="••••"
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors text-center text-2xl tracking-[0.5em]"
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                onKeyDown={(e) => e.key === 'Enter' && handleStep2()}
               />
             </div>
-
             {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
-
             <button
-              onClick={handleCreate}
+              onClick={handleStep2}
               disabled={loading}
               className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none disabled:opacity-50"
               style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
             >
-              {loading ? 'Creating account…' : 'Create Account'}
+              {loading ? 'Sending code…' : 'Continue'}
+            </button>
+          </>
+        )}
+
+        {step === 3 && (
+          <>
+            <div className="mb-6">
+              <label className="block text-white/70 text-sm mb-2">6-digit code</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={otp}
+                onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setOtp(v) }}
+                placeholder="••••••"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors text-center text-2xl tracking-[0.5em]"
+                onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+              />
+              {demoCode && (
+                <p className="text-teal text-xs mt-2 text-center">Demo code: {demoCode}</p>
+              )}
+            </div>
+            {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
+            <button
+              onClick={handleVerify}
+              disabled={loading}
+              className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none disabled:opacity-50"
+              style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
+            >
+              {loading ? 'Verifying…' : 'Verify & Create Account'}
+            </button>
+            <button
+              onClick={handleSendOtp}
+              disabled={loading}
+              className="w-full mt-3 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
+            >
+              Didn't receive it? Resend code
             </button>
           </>
         )}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { loginUser, updateBiometrics, biometricLogin } from '../api/client'
+import { sendOtp, verifyOtp, updateBiometrics, biometricLogin } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -17,9 +17,11 @@ function validateEmail(email: string): boolean {
 export default function LoginScreen() {
   const [, setLocation] = useLocation()
   const [email, setEmail] = useState('')
-  const [pin, setPin] = useState('')
+  const [otp, setOtp] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [demoCode, setDemoCode] = useState('')
   const [bioAvailable, setBioAvailable] = useState(false)
   const [bioEnabled, setBioEnabled] = useState(false)
   const [showBioSetup, setShowBioSetup] = useState(false)
@@ -39,36 +41,51 @@ export default function LoginScreen() {
     }
   }, [email])
 
-  const handleSubmit = async () => {
+  const handleSendOtp = async () => {
     setError('')
-
     if (!validateEmail(email)) {
       setError('Enter a valid email address')
       return
     }
-    if (pin.length !== 4) {
-      setError('Enter your 4-digit PIN')
-      return
-    }
-
     setLoading(true)
     try {
-      const res = await loginUser({ email: email.trim().toLowerCase(), pin }) as any
+      const res = await sendOtp({ email: email.trim().toLowerCase(), purpose: 'login' }) as any
       setLoading(false)
-      const role = res?.user?.role
-      if (role === 'manager') {
-        setLocation('/manager')
-        return
-      }
-      const stored = localStorage.getItem('carei_bio_email')
-      if (bioAvailable && stored !== email.trim().toLowerCase()) {
-        setShowBioSetup(true)
-      } else {
-        setLocation('/dashboard')
+      setOtpSent(true)
+      if (res?.demoCode) setDemoCode(res.demoCode)
+    } catch (err: any) {
+      setLoading(false)
+      setError(err.message || 'Failed to send code')
+    }
+  }
+
+  const handleVerify = async () => {
+    setError('')
+    if (otp.length !== 6) {
+      setError('Enter the 6-digit code')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await verifyOtp({ email: email.trim().toLowerCase(), code: otp, purpose: 'login' }) as any
+      setLoading(false)
+      if (res?.token) {
+        localStorage.setItem('carei_token', res.token)
+        const role = res?.user?.role
+        if (role === 'manager') {
+          setLocation('/manager')
+          return
+        }
+        const stored = localStorage.getItem('carei_bio_email')
+        if (bioAvailable && stored !== email.trim().toLowerCase()) {
+          setShowBioSetup(true)
+        } else {
+          setLocation('/dashboard')
+        }
       }
     } catch (err: any) {
       setLoading(false)
-      setError(err.message || 'Invalid email or PIN')
+      setError(err.message || 'Invalid code')
     }
   }
 
@@ -154,7 +171,9 @@ export default function LoginScreen() {
         </button>
 
         <h1 className="font-serif text-white text-3xl mb-2">Welcome back</h1>
-        <p className="text-white/50 mb-6">Sign in with your email and PIN.</p>
+        <p className="text-white/50 mb-6">
+          {otpSent ? 'Enter the 6-digit code sent to your email.' : 'Sign in with your email address.'}
+        </p>
 
         <div className="mb-4">
           <label className="block text-white/70 text-sm mb-2">Email address</label>
@@ -163,38 +182,68 @@ export default function LoginScreen() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="carer@agency.co.uk"
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
-            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            disabled={otpSent}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors disabled:opacity-50"
+            onKeyDown={(e) => e.key === 'Enter' && !otpSent && handleSendOtp()}
           />
         </div>
 
-        <div className="mb-6">
-          <label className="block text-white/70 text-sm mb-2">4-digit PIN</label>
-          <input
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            value={pin}
-            onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setPin(v) }}
-            placeholder="••••"
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors text-center text-2xl tracking-[0.5em]"
-            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          />
-        </div>
+        {otpSent && (
+          <div className="mb-6">
+            <label className="block text-white/70 text-sm mb-2">6-digit code</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setOtp(v) }}
+              placeholder="••••••"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors text-center text-2xl tracking-[0.5em]"
+              onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+            />
+            {demoCode && (
+              <p className="text-teal text-xs mt-2 text-center">Demo code: {demoCode}</p>
+            )}
+          </div>
+        )}
 
         {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
 
-        <button
-          onClick={handleSubmit}
-          disabled={loading}
-          className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none disabled:opacity-50"
-          style={{
-            background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
-            color: COLORS.darkNavy,
-          }}
-        >
-          {loading ? 'Signing in…' : 'Sign In'}
-        </button>
+        {!otpSent ? (
+          <button
+            onClick={handleSendOtp}
+            disabled={loading}
+            className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none disabled:opacity-50"
+            style={{
+              background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
+              color: COLORS.darkNavy,
+            }}
+          >
+            {loading ? 'Sending…' : 'Send Code'}
+          </button>
+        ) : (
+          <button
+            onClick={handleVerify}
+            disabled={loading}
+            className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none disabled:opacity-50"
+            style={{
+              background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
+              color: COLORS.darkNavy,
+            }}
+          >
+            {loading ? 'Verifying…' : 'Verify & Sign In'}
+          </button>
+        )}
+
+        {otpSent && (
+          <button
+            onClick={handleSendOtp}
+            disabled={loading}
+            className="w-full mt-3 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
+          >
+            Didn't receive it? Resend code
+          </button>
+        )}
 
         {bioAvailable && bioEnabled && (
           <button
