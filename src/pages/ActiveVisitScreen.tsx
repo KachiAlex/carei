@@ -793,7 +793,7 @@ export default function ActiveVisitScreen() {
 
         <div className="flex-1 px-4 py-4 overflow-auto">
           {/* Flags */}
-          {visit.flags.length > 0 && (
+          {visit.flags?.length > 0 && (
             <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
@@ -819,7 +819,7 @@ export default function ActiveVisitScreen() {
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-700">Key Observations</div>
-                  <div className="text-xs text-slate-500">{client.conditions.join(', ')}</div>
+                  <div className="text-xs text-slate-500">{client.conditions?.join(', ') || 'None recorded'}</div>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -828,7 +828,7 @@ export default function ActiveVisitScreen() {
                 </div>
                 <div>
                   <div className="text-xs font-bold text-slate-700">Open Tasks</div>
-                  <div className="text-xs text-slate-500">{visit.tasks.join(', ')}</div>
+                  <div className="text-xs text-slate-500">{visit.tasks?.join(', ') || 'None recorded'}</div>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -850,10 +850,10 @@ export default function ActiveVisitScreen() {
           <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold text-sm text-slate-800">Medications Due</h3>
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>{client.medications.length} items</span>
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>{client.medications?.length || 0} items</span>
             </div>
             <div className="flex flex-col gap-2">
-              {client.medications.map((med: any, i: number) => (
+              {client.medications?.map((med: any, i: number) => (
                 <motion.div
                   key={med.name}
                   initial={{ opacity: 0, y: 4 }}
