@@ -1,4 +1,14 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api'
+function getApiBase(): string {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
+  // Capacitor / native webview uses file:// or capacitor:// protocol;
+  // relative /api won't reach the backend, so use absolute production URL.
+  const isNative = typeof (window as any).Capacitor !== 'undefined' ||
+    !['http:', 'https:'].includes(window.location.protocol)
+  if (isNative) return 'https://carei-app.vercel.app/api'
+  return '/api'
+}
+
+const API_BASE = getApiBase()
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
 function authHeaders(): Record<string, string> {
