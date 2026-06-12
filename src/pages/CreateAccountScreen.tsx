@@ -228,6 +228,13 @@ export default function CreateAccountScreen() {
 
         {step === 3 && (
           <>
+            {demoCode && (
+              <div className="mb-4 rounded-xl border border-teal/30 bg-teal/10 p-4 text-center">
+                <p className="text-white/60 text-xs mb-1">Your verification code</p>
+                <p className="text-3xl font-mono font-bold tracking-[0.3em]" style={{ color: COLORS.teal }}>{demoCode}</p>
+                <p className="text-white/40 text-[10px] mt-1">This is shown on screen for testing. SMS will be sent once domain is verified.</p>
+              </div>
+            )}
             <div className="mb-6">
               <label className="block text-white/70 text-sm mb-2">6-digit code</label>
               <input
@@ -240,9 +247,6 @@ export default function CreateAccountScreen() {
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors text-center text-2xl tracking-[0.5em]"
                 onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
               />
-              {demoCode && (
-                <p className="text-teal text-xs mt-2 text-center">Demo code: {demoCode}</p>
-              )}
             </div>
             {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
             <button
