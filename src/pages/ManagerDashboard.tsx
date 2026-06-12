@@ -109,7 +109,7 @@ export default function ManagerDashboard() {
         setDbIncidents(data.incidents || [])
         setDbMedications(data.medications || [])
       })
-      .catch(() => {})
+      .catch((err: any) => { console.error(err.message) })
       .finally(() => setLoading(false))
   }
 
@@ -139,23 +139,23 @@ export default function ManagerDashboard() {
             sendSOSAlert(data.location || 'Unknown location')
           })
         }
-      } catch {}
+      } catch (err: any) { console.error('SSE parse error', err.message) }
     }
     eventSource.onerror = () => setSseConnected(false)
     return () => { eventSource.close() }
   }, [])
 
   useEffect(() => {
-    getClients().then((rows) => setClientsList(rows)).catch(() => {})
+    getClients().then((rows) => setClientsList(rows)).catch((err: any) => { console.error(err.message) })
   }, [clientMsg])
 
   useEffect(() => {
-    getAssignments().then((res) => setAssignmentsList(res.assignments || [])).catch(() => {})
-    getClients().then((rows) => setScheduleClients(rows)).catch(() => {})
+    getAssignments().then((res) => setAssignmentsList(res.assignments || [])).catch((err: any) => { console.error(err.message) })
+    getClients().then((rows) => setScheduleClients(rows)).catch((err: any) => { console.error(err.message) })
   }, [scheduleMsg])
 
   useEffect(() => {
-    getClients().then((rows) => setLogsClients(rows)).catch(() => {})
+    getClients().then((rows) => setLogsClients(rows)).catch((err: any) => { console.error(err.message) })
   }, [])
 
   const allIncidents = [
@@ -633,7 +633,7 @@ export default function ManagerDashboard() {
         setClientMsg('Client created')
         setClientName(''); setClientAge(''); setClientAddress(''); setClientConditions(''); setClientMedications(''); setClientPreferences(''); setClientEmergency('')
         setClientShowAdd(false)
-        getClients().then((rows) => setClientsList(rows)).catch(() => {})
+        getClients().then((rows) => setClientsList(rows)).catch((err: any) => { console.error(err.message) })
       } catch (err: any) { setClientMsg(err.message || 'Failed') }
     }
 
@@ -793,7 +793,7 @@ export default function ManagerDashboard() {
                       await deleteClient(selectedClientDetail.id)
                       setClientActionMsg('Client deleted')
                       setShowClientModal(false)
-                      getClients().then((rows) => setClientsList(rows)).catch(() => {})
+                      getClients().then((rows) => setClientsList(rows)).catch((err: any) => { console.error(err.message) })
                     } catch (err: any) { setClientActionMsg(err.message || 'Failed') }
                   }}
                   className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"

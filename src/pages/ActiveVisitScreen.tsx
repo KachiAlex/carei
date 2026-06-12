@@ -130,7 +130,7 @@ export default function ActiveVisitScreen() {
 
         let c = null
         if (v?.clientId) {
-          try { c = await fetchClient(v.clientId) } catch {}
+          try { c = await fetchClient(v.clientId) } catch (err: any) { console.error('fetchClient failed', err.message) }
         }
         if (!mounted) return
         if (c) setClient(c)
@@ -157,7 +157,7 @@ export default function ActiveVisitScreen() {
             if (mounted && interactionRes.interactions) {
               setDrugInteractions(interactionRes.interactions)
             }
-          } catch {}
+          } catch (err: any) { console.error('getDrugInteractions failed', err.message) }
         }
 
         // Phase 4: Fetch today's medication logs for overdose safeguard
@@ -170,7 +170,7 @@ export default function ActiveVisitScreen() {
               )
               setMedsGivenToday(given)
             }
-          } catch {}
+          } catch (err: any) { console.error('getMedicationLogs failed', err.message) }
         }
 
         // Load saved visit data from DB
@@ -208,8 +208,8 @@ export default function ActiveVisitScreen() {
           if (draft.nutritionNote) setNutritionNote(draft.nutritionNote)
           if (draft.selectedMood) setSelectedMood(draft.selectedMood)
           if (draft.wellbeingNote) setWellbeingNote(draft.wellbeingNote)
-        } catch {}
-      } catch {}
+        } catch (err: any) { console.error('getVisitDraft failed', err.message) }
+      } catch (err: any) { console.error('load visit failed', err.message) }
       if (mounted) setLoading(false)
     }
 
@@ -1803,8 +1803,8 @@ export default function ActiveVisitScreen() {
                     incidents,
                     voiceMemos,
                   }
-                  try { await saveVisitDraft(visit.id, { snapshot }) } catch {}
-                  try { await saveVisit(visit.id, { ...snapshot, clientId: client.id }) } catch {}
+                  try { await saveVisitDraft(visit.id, { snapshot }) } catch (err: any) { console.error('saveVisitDraft failed', err.message) }
+                  try { await saveVisit(visit.id, { ...snapshot, clientId: client.id }) } catch (err: any) { console.error('saveVisit failed', err.message) }
                   setLocation(`/summary/${visit.id}`)
                 }}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"

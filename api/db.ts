@@ -322,6 +322,24 @@ async function runInit() {
   try {
     await sql`DELETE FROM clients WHERE name IN ('Aisha Khan', 'Grace Mensah', 'Mary Johnson', 'Tom Adams')`
   } catch { /* ignore */ }
+
+  // Performance indexes
+  await sql`CREATE INDEX IF NOT EXISTS idx_visits_client_id ON visits(client_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_visits_status ON visits(status)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_sos_alerts_visit ON sos_alerts(visit_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_sos_alerts_timestamp ON sos_alerts(timestamp)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_scheduled_visits_carer ON scheduled_visits(carer_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_scheduled_visits_date ON scheduled_visits(visit_date)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_medication_logs_client ON medication_logs(client_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_medication_logs_visit ON medication_logs(visit_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_incidents_visit ON incidents(visit_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_incidents_client ON incidents(client_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_voice_memos_visit ON voice_memos(visit_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_body_map_marks_visit ON body_map_marks(visit_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_family_messages_visit ON family_messages(visit_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_task_logs_client ON task_logs(client_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_caregiver_assignments_caregiver ON caregiver_client_assignments(caregiver_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_caregiver_assignments_client ON caregiver_client_assignments(client_id)`
 }
 
 export function setCors(req: any, res: any) {

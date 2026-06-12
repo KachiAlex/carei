@@ -731,7 +731,7 @@ export default function CarerDashboard() {
               </button>
               <button
                 onClick={async () => {
-                  try { await logoutUser() } catch {}
+                  try { await logoutUser() } catch (err: any) { console.error('logout failed', err.message) }
                   setLocation('/')
                 }}
                 className="flex-1 py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"

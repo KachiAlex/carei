@@ -137,7 +137,7 @@ export default function VisitSummaryScreen() {
     setSubmitting(true)
     try {
       await saveVisit(visitId, payload)
-      try { await deleteVisitDraft(visitId) } catch {}
+      try { await deleteVisitDraft(visitId) } catch (err: any) { console.error('deleteVisitDraft failed', err.message) }
       triggerHaptic(HAPTIC_PATTERNS.success)
       setSubmitted(true)
       setTimeout(() => setLocation('/dashboard'), 1500)
