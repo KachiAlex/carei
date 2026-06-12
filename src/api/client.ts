@@ -20,7 +20,6 @@ async function post(path: string, body: unknown) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     headers: { ...jsonHeaders, ...authHeaders() },
-    credentials: 'include',
     body: JSON.stringify(body),
   })
   if (!res.ok) {
@@ -33,7 +32,6 @@ async function post(path: string, body: unknown) {
 async function get(path: string) {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: authHeaders(),
-    credentials: 'include',
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
@@ -111,7 +109,6 @@ export async function updateClient(clientId: string, data: Partial<{
   const res = await fetch(`${API_BASE}/clients/${clientId}`, {
     method: 'PATCH',
     headers: { ...jsonHeaders, ...authHeaders() },
-    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) {
@@ -125,7 +122,6 @@ export async function deleteClient(clientId: string) {
   const res = await fetch(`${API_BASE}/clients/${clientId}`, {
     method: 'DELETE',
     headers: authHeaders(),
-    credentials: 'include',
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
@@ -171,7 +167,6 @@ export async function updateScheduledVisit(visitId: string, data: Partial<{
   const res = await fetch(`${API_BASE}/schedule/${visitId}`, {
     method: 'PATCH',
     headers: { ...jsonHeaders, ...authHeaders() },
-    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) {
@@ -185,7 +180,6 @@ export async function deleteScheduledVisit(visitId: string) {
   const res = await fetch(`${API_BASE}/schedule/${visitId}`, {
     method: 'DELETE',
     headers: authHeaders(),
-    credentials: 'include',
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
@@ -256,7 +250,6 @@ export async function updateCaregiverStatus(caregiverId: string, status: string)
   const res = await fetch(`${API_BASE}/manager/caregiver?id=${caregiverId}`, {
     method: 'PATCH',
     headers: { ...jsonHeaders, ...authHeaders() },
-    credentials: 'include',
     body: JSON.stringify({ status }),
   })
   if (!res.ok) {
@@ -270,7 +263,6 @@ export async function deleteCaregiver(caregiverId: string) {
   const res = await fetch(`${API_BASE}/manager/caregiver?id=${caregiverId}`, {
     method: 'DELETE',
     headers: authHeaders(),
-    credentials: 'include',
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
@@ -301,7 +293,6 @@ export async function updateAssignment(assignmentId: string, data: {
   const res = await fetch(`${API_BASE}/manager/assignments?id=${assignmentId}`, {
     method: 'PATCH',
     headers: { ...jsonHeaders, ...authHeaders() },
-    credentials: 'include',
     body: JSON.stringify(data),
   })
   if (!res.ok) {
@@ -315,7 +306,6 @@ export async function deleteAssignment(caregiverId: string, clientId: string) {
   const res = await fetch(`${API_BASE}/manager/assignments?caregiverId=${caregiverId}&clientId=${clientId}`, {
     method: 'DELETE',
     headers: authHeaders(),
-    credentials: 'include',
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
@@ -347,7 +337,6 @@ export async function deleteManagerTask(taskId: string) {
   const res = await fetch(`${API_BASE}/manager/tasks?id=${taskId}`, {
     method: 'DELETE',
     headers: authHeaders(),
-    credentials: 'include',
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
@@ -445,7 +434,6 @@ export async function deleteVisitDraft(visitId: string) {
   const res = await fetch(`${API_BASE}/visit/${visitId}/draft`, {
     method: 'DELETE',
     headers: authHeaders(),
-    credentials: 'include',
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))
@@ -479,7 +467,6 @@ export async function deleteBodyMapMark(markId: string) {
   const res = await fetch(`${API_BASE}/body-map?markId=${markId}`, {
     method: 'DELETE',
     headers: authHeaders(),
-    credentials: 'include',
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Network error' }))

@@ -1,5 +1,5 @@
 import { useLocation } from 'wouter'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -9,9 +9,69 @@ const COLORS = {
   lavender: '#A78BFA',
 }
 
+function LoadingOverlay({ onDone }: { onDone: () => void }) {
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    const duration = 3000
+    const interval = 30
+    const step = 100 / (duration / interval)
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        const next = prev + step
+        if (next >= 100) {
+          clearInterval(timer)
+          setTimeout(onDone, 200)
+          return 100
+        }
+        return next
+      })
+    }, interval)
+    return () => clearInterval(timer)
+  }, [onDone])
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center"
+      style={{ background: COLORS.darkNavy }}
+    >
+      {/* Logo */}
+      <div className="mb-8 animate-bounce">
+        <svg width="72" height="72" viewBox="0 0 32 32" fill="none">
+          <path d="M16 28C16 28 6 21 6 13C6 9.5 8.5 7 11.5 7C13.6 7 15.3 8.1 16 9.8C16.7 8.1 18.4 7 20.5 7C23.5 7 26 9.5 26 13C26 21 16 28 16 28Z" fill="url(#tealGradLoad)" />
+          <rect x="14" y="4" width="4" height="10" rx="1" fill="#fff" />
+          <rect x="10" y="8" width="12" height="4" rx="1" fill="#fff" />
+          <defs>
+            <linearGradient id="tealGradLoad" x1="6" y1="7" x2="26" y2="28" gradientUnits="userSpaceOnUse">
+              <stop stopColor={COLORS.teal} />
+              <stop offset="1" stopColor={COLORS.teal2} />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <h1 className="font-serif text-2xl text-white font-bold tracking-wide mb-1">CAREi</h1>
+      <p className="text-white/40 text-xs mb-8">Loading your care environment…</p>
+
+      {/* Progress bar */}
+      <div className="w-56 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+        <div
+          className="h-full rounded-full transition-all duration-75 ease-linear"
+          style={{
+            width: `${progress}%`,
+            background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
+            boxShadow: `0 0 12px ${COLORS.teal}60`,
+          }}
+        />
+      </div>
+      <p className="text-white/30 text-[10px] mt-3 font-mono">{Math.round(progress)}%</p>
+    </div>
+  )
+}
+
 export default function SplashScreen() {
   const [, setLocation] = useLocation()
   const heroRef = useRef<HTMLDivElement>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const els = document.querySelectorAll('[data-animate]')
@@ -75,6 +135,10 @@ export default function SplashScreen() {
     { value: 'GDPR', label: 'Compliant' },
     { value: '<2s', label: 'Alert Latency' },
   ]
+
+  if (loading) {
+    return <LoadingOverlay onDone={() => setLoading(false)} />
+  }
 
   return (
     <div className="min-h-screen flex flex-col font-sans relative overflow-hidden" style={{ background: COLORS.darkNavy }}>
