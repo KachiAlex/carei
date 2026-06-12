@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation, useParams } from 'wouter'
-import { getClient } from '../api/client'
+import { getClient, startVisit } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -39,6 +39,7 @@ export default function ClientOverviewScreen() {
 
   const [client, setClient] = useState<ClientDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [startingVisit, setStartingVisit] = useState(false)
   const [dismissedAllergy, setDismissedAllergy] = useState(false)
   const [dismissedChoking, setDismissedChoking] = useState(false)
 
@@ -287,11 +288,22 @@ export default function ClientOverviewScreen() {
         <div className="shrink-0 px-4 pb-5 pt-2 bg-slate-50">
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => setLocation(`/visit/${client.id}`)}
-            className="w-full py-3.5 rounded-2xl text-sm font-bold text-white border-none cursor-pointer transition-all hover:opacity-90 active:scale-[0.98]"
+            disabled={startingVisit}
+            onClick={async () => {
+              if (!client?.id) return
+              setStartingVisit(true)
+              try {
+                const res = await startVisit(client.id)
+                setLocation(`/visit/${res.visitId}`)
+              } catch (err: any) {
+                alert(err.message || 'Failed to start visit')
+                setStartingVisit(false)
+              }
+            }}
+            className="w-full py-3.5 rounded-2xl text-sm font-bold text-white border-none cursor-pointer transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
           >
-            Start Active Visit
+            {startingVisit ? 'Starting Visit...' : 'Start Active Visit'}
           </motion.button>
         </div>
       </div>

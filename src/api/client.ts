@@ -56,6 +56,10 @@ export async function saveVisit(visitId: string, data: unknown) {
   return post(`/visit-detail?id=${encodeURIComponent(visitId)}`, data)
 }
 
+export async function startVisit(clientId: string) {
+  return post('/visit-start', { clientId })
+}
+
 export async function getManagerData() {
   return get('/manager/data')
 }
