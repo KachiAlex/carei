@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    // 1. Scheduled visits for this carer today
+    // 1. Scheduled visits for this carer (today and future)
     const scheduled = await sql`
       SELECT
         id,
@@ -39,30 +39,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         duration,
         status,
         tasks,
-        flags
+        flags,
+        visit_date AS "visitDate"
       FROM scheduled_visits
-      WHERE visit_date = CURRENT_DATE AND carer_id = ${user.id}
-      ORDER BY time
+      WHERE carer_id = ${user.id} AND visit_date >= CURRENT_DATE
+      ORDER BY visit_date, time
     ` as any[]
 
-    // 2. Manager-created assignments for this carer today
+    // 2. Manager-created assignments for this carer (all assignments, any date or no date)
     const assignments = await sql`
       SELECT
         a.id,
         c.id AS "clientId",
         c.name AS "clientName",
-        a.visit_time AS time,
+        COALESCE(a.visit_time, '09:00') AS time,
         '60' AS duration,
         'pending' AS status,
         ARRAY[
           COALESCE(a.instructions, 'Follow care plan'),
           'Assigned by manager'
         ] AS tasks,
-        COALESCE(c.conditions, '[]'::jsonb) AS flags
+        COALESCE(c.conditions, '[]'::jsonb) AS flags,
+        a.visit_date AS "visitDate"
       FROM caregiver_client_assignments a
       JOIN clients c ON a.client_id = c.id
-      WHERE a.caregiver_id = ${user.id} AND a.visit_date = CURRENT_DATE
-      ORDER BY a.visit_time
+      WHERE a.caregiver_id = ${user.id}
+      ORDER BY a.visit_date NULLS LAST, a.visit_time NULLS LAST
     ` as any[]
 
     // Merge: prefer scheduled visits if same client+time exists, otherwise add assignments
