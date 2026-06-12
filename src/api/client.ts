@@ -53,7 +53,7 @@ export async function sendSOS(payload: { visitId: string; location?: string; tim
 }
 
 export async function saveVisit(visitId: string, data: unknown) {
-  return post(`/visit/${visitId}`, data)
+  return post(`/visit-detail?id=${encodeURIComponent(visitId)}`, data)
 }
 
 export async function getManagerData() {
@@ -65,7 +65,7 @@ export async function getVisits() {
 }
 
 export async function fetchVisit(visitId: string) {
-  return get(`/visit/${visitId}`)
+  return get(`/visit-detail?id=${encodeURIComponent(visitId)}`)
 }
 
 export async function initDatabase() {
@@ -81,7 +81,7 @@ export async function getCarers() {
 }
 
 export async function fetchClient(clientId: string) {
-  return get(`/clients/${clientId}`)
+  return get(`/clients?id=${encodeURIComponent(clientId)}`)
 }
 
 export async function createClient(data: {
@@ -106,7 +106,7 @@ export async function updateClient(clientId: string, data: Partial<{
   preferences: string
   emergencyContact: string
 }>) {
-  const res = await fetch(`${API_BASE}/clients/${clientId}`, {
+  const res = await fetch(`${API_BASE}/clients?id=${encodeURIComponent(clientId)}`, {
     method: 'PATCH',
     headers: { ...jsonHeaders, ...authHeaders() },
     body: JSON.stringify(data),
@@ -119,7 +119,7 @@ export async function updateClient(clientId: string, data: Partial<{
 }
 
 export async function deleteClient(clientId: string) {
-  const res = await fetch(`${API_BASE}/clients/${clientId}`, {
+  const res = await fetch(`${API_BASE}/clients?id=${encodeURIComponent(clientId)}`, {
     method: 'DELETE',
     headers: authHeaders(),
   })
@@ -164,7 +164,7 @@ export async function updateScheduledVisit(visitId: string, data: Partial<{
   recurring: string
   visitDate: string
 }>) {
-  const res = await fetch(`${API_BASE}/schedule/${visitId}`, {
+  const res = await fetch(`${API_BASE}/schedule?id=${encodeURIComponent(visitId)}`, {
     method: 'PATCH',
     headers: { ...jsonHeaders, ...authHeaders() },
     body: JSON.stringify(data),
@@ -177,7 +177,7 @@ export async function updateScheduledVisit(visitId: string, data: Partial<{
 }
 
 export async function deleteScheduledVisit(visitId: string) {
-  const res = await fetch(`${API_BASE}/schedule/${visitId}`, {
+  const res = await fetch(`${API_BASE}/schedule?id=${encodeURIComponent(visitId)}`, {
     method: 'DELETE',
     headers: authHeaders(),
   })
@@ -350,7 +350,7 @@ export async function getCaregiverClients() {
 }
 
 export async function getClient(clientId: string) {
-  return get(`/clients/${clientId}`)
+  return get(`/clients?id=${encodeURIComponent(clientId)}`)
 }
 
 export async function startTask(data: { clientId: string; taskName: string }) {
@@ -423,15 +423,15 @@ export async function getVoiceMemos(visitId?: string) {
 }
 
 export async function saveVisitDraft(visitId: string, data: unknown) {
-  return post(`/visit/${visitId}/draft`, data)
+  return post(`/visit-draft?visitId=${encodeURIComponent(visitId)}`, data)
 }
 
 export async function getVisitDraft(visitId: string) {
-  return get(`/visit/${visitId}/draft`)
+  return get(`/visit-draft?visitId=${encodeURIComponent(visitId)}`)
 }
 
 export async function deleteVisitDraft(visitId: string) {
-  const res = await fetch(`${API_BASE}/visit/${visitId}/draft`, {
+  const res = await fetch(`${API_BASE}/visit-draft?visitId=${encodeURIComponent(visitId)}`, {
     method: 'DELETE',
     headers: authHeaders(),
   })

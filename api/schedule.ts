@@ -82,5 +82,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  const { id: queryId } = req.query as { id?: string }
+
+  if (req.method === 'PATCH' || req.method === 'PUT') {
+    if (!queryId) {
+      res.status(400).json({ error: 'id required' })
+      return
+    }
+    const body = req.body || {}
+    const { clientId, clientName, carerId, carerName, time, duration, status, tasks, flags, recurring, visitDate } = body
+    try {
+      await ensureTables()
+      const sql = getSql()
+      await sql`
+        UPDATE scheduled_visits SET
+          client_id = COALESCE(${clientId || null}, client_id),
+          client_name = COALESCE(${clientName || null}, client_name),
+          carer_id = COALESCE(${carerId || null}, carer_id),
+          carer_name = COALESCE(${carerName || null}, carer_name),
+          time = COALESCE(${time || null}, time),
+          duration = COALESCE(${duration || null}, duration),
+          status = COALESCE(${status || null}, status),
+          tasks = COALESCE(${JSON.stringify(tasks || null)}, tasks),
+          flags = COALESCE(${JSON.stringify(flags || null)}, flags),
+          recurring = COALESCE(${recurring || null}, recurring),
+          visit_date = COALESCE(${visitDate || null}, visit_date)
+        WHERE id = ${queryId}
+      `
+      res.status(200).json({ status: 'updated', id: queryId })
+    } catch (err: any) {
+      res.status(500).json({ error: err.message })
+    }
+    return
+  }
+
+  if (req.method === 'DELETE') {
+    if (!queryId) {
+      res.status(400).json({ error: 'id required' })
+      return
+    }
+    try {
+      await ensureTables()
+      const sql = getSql()
+      await sql`DELETE FROM scheduled_visits WHERE id = ${queryId}`
+      res.status(200).json({ status: 'deleted', id: queryId })
+    } catch (err: any) {
+      res.status(500).json({ error: err.message })
+    }
+    return
+  }
+
   res.status(405).json({ error: 'Method not allowed' })
 }
