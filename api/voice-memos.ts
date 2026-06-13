@@ -35,6 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(400).json({ error: 'audioUrl required and must be a valid string' })
         return
       }
+      // Reject if base64 payload exceeds ~2MB (≈1.5MB actual audio)
+      if (audioUrl.length > 2_000_000) {
+        res.status(413).json({ error: 'Audio file too large. Max ~2MB base64.' })
+        return
+      }
       const id = generateId()
       await sql`
         INSERT INTO voice_memos (id, visit_id, carer_id, client_id, audio_url, duration, created_at)

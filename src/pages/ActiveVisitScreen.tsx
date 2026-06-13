@@ -585,6 +585,11 @@ export default function ActiveVisitScreen() {
 
   const saveRecording = async () => {
     if (!recordedBlob) return
+    // Warn if recording is likely too large (>1.5MB blob ≈ >2MB base64)
+    if (recordedBlob.size > 1_500_000) {
+      alert('Recording too large. Please keep recordings under ~90 seconds.')
+      return
+    }
     try {
       const reader = new FileReader()
       reader.readAsDataURL(recordedBlob)
