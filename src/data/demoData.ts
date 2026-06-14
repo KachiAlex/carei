@@ -174,7 +174,8 @@ export const TOM_ADAMS: Client = {
       dosingGapHours: 24, 
       timeSensitive: true, 
       adminNote: 'Give with food. Monitor blood pressure. Report readings above baseline.', 
-      interactions: ['Aspirin may reduce Lisinopril\'s blood pressure-lowering effect — monitor BP closely after both are given'] 
+      interactions: ['Aspirin may reduce Lisinopril\'s blood pressure-lowering effect — monitor BP closely after both are given'],
+      possibleDuplicate: false
     },
   ],
   conditions: ['Post-Stroke', 'Hypertension', 'Dysphagia Risk'],

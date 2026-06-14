@@ -137,7 +137,7 @@ export default function VisitSummaryScreen() {
     }
 
     const lines: string[] = []
-    lines.push(`Handover for ${snapshot.clientName}:`)
+    lines.push(`Handover for ${snapshot?.clientName || 'Client'}:`)
     lines.push('')
     lines.push(`🧠 Mood: ${moodText[handoverMood]}`)
     lines.push('')

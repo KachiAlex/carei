@@ -481,8 +481,8 @@ export default function ActiveVisitScreen() {
     )
 
     // Start post-medication monitoring timer (30 min) for certain meds
-    const med = meds.find((m) => m.name === selectedMedForAdmin)
-    if (med && (med.name.toLowerCase().includes('metformin') || med.adminNote?.toLowerCase().includes('monitor'))) {
+    const medForMonitoring = meds.find((m) => m.name === selectedMedForAdmin)
+    if (medForMonitoring && (medForMonitoring.name.toLowerCase().includes('metformin') || medForMonitoring.adminNote?.toLowerCase().includes('monitor'))) {
       setActivePostMedMonitor(selectedMedForAdmin)
       setPostMedTimers((prev) => ({ ...prev, [selectedMedForAdmin]: 30 * 60 })) // 30 minutes
     }
@@ -503,14 +503,14 @@ export default function ActiveVisitScreen() {
   const submitNotGiven = async () => {
     if (!selectedMedForAdmin || !client?.id) return
 
-    const med = meds.find((m) => m.name === selectedMedForAdmin)
+    const medNotGiven = meds.find((m) => m.name === selectedMedForAdmin)
 
     try {
       await logMedication({
         clientId: client.id,
         visitId,
         medicationName: selectedMedForAdmin,
-        dose: med?.dose,
+        dose: medNotGiven?.dose,
         status: 'refused',
         reason: notGivenReason,
         notes: `Action: ${notGivenAction} | Carer said: ${notGivenCarerSaid} | Note: ${notGivenFreeText}`,
@@ -1164,7 +1164,7 @@ export default function ActiveVisitScreen() {
                             Controlled
                           </span>
                         )}
-                        {med.timeSensitive && !isGiven && !isRefused && (
+                        {(med as any).timeSensitive && !isGiven && !isRefused && (
                           <span
                             className="text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider"
                             style={{ background: `${COLORS.amber}10`, color: COLORS.amber, border: `1px solid ${COLORS.amber}20` }}
