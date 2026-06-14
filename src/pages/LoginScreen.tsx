@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react'
 import { useLocation } from 'wouter'
-import { DEMO_CARER, DEMO_MANAGER } from '../data/demoData'
-import type { UserRole } from '../types'
+import { loginUser } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -72,7 +71,6 @@ export default function LoginScreen() {
   const [pin, setPin] = useState(['', '', '', ''])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [demoLoading, setDemoLoading] = useState<UserRole | null>(null)
 
   const handlePinChange = (idx: number, val: string) => {
     const next = [...pin]
@@ -81,7 +79,7 @@ export default function LoginScreen() {
     setError('')
   }
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     const pinValue = pin.join('')
     if (!validateEmail(email)) {
       setError('Please enter your email address.')
@@ -95,43 +93,24 @@ export default function LoginScreen() {
     setError('')
     setLoading(true)
     
-    // Demo authentication - check stored user or default to demo
-    const storedUser = localStorage.getItem('carei_user')
-    let user = storedUser ? JSON.parse(storedUser) : null
-    
-    // For demo, accept any PIN if email matches demo accounts
-    if (email.toLowerCase().includes('sarah') || email.toLowerCase().includes('adjoy')) {
-      user = DEMO_CARER
-    } else if (email.toLowerCase().includes('alex') || email.toLowerCase().includes('manager')) {
-      user = DEMO_MANAGER
-    }
-    
-    if (user) {
-      localStorage.setItem('carei_user', JSON.stringify(user))
-      localStorage.setItem('carei_token', 'demo-token-' + Date.now())
-      
-      setTimeout(() => {
-        setLoading(false)
-        setLocation(user.role === 'manager' ? '/manager' : '/dashboard')
-      }, 800)
-    } else {
+    // Real authentication via API
+    try {
+      const res = await loginUser({ email: email.trim().toLowerCase(), pin: pinValue })
       setLoading(false)
-      setError('Invalid email or PIN.')
+      if (res.user) {
+        localStorage.setItem('carei_user', JSON.stringify(res.user))
+        setLocation(res.user.role === 'manager' ? '/manager' : '/dashboard')
+      } else {
+        setError('Invalid email or PIN.')
+        setPin(['', '', '', ''])
+      }
+    } catch (err: any) {
+      setLoading(false)
+      setError(err.message || 'Login failed. Please try again.')
       setPin(['', '', '', ''])
     }
   }
 
-  const handleDemoLogin = (role: UserRole) => {
-    setDemoLoading(role)
-    const isManager = role === 'manager'
-    const user = isManager ? DEMO_MANAGER : DEMO_CARER
-    
-    setTimeout(() => {
-      localStorage.setItem('carei_user', JSON.stringify(user))
-      localStorage.setItem('carei_token', 'demo-token-' + Date.now())
-      setLocation(isManager ? '/manager' : '/dashboard')
-    }, 800)
-  }
 
   const getInitials = (name: string) => {
     return name.trim().split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
@@ -149,50 +128,6 @@ export default function LoginScreen() {
           <h2 className="font-serif text-white text-xl">Welcome back</h2>
         </div>
 
-        {/* Demo Accounts */}
-        <div className="flex flex-col gap-3 mb-6">
-          <div className="text-center">
-            <span className="text-white/30 text-[10px] font-bold uppercase tracking-wider">Demo Accounts</span>
-          </div>
-          
-          {[
-            { role: 'carer' as UserRole, icon: '👩‍⚕️', label: 'Care Worker', sub: 'Adjoy Healthcare · Sarah O\'Brien' },
-            { role: 'manager' as UserRole, icon: '🏢', label: 'Agency Manager', sub: 'Adjoy Healthcare · Manager Portal' },
-          ].map((acc) => (
-            <button
-              key={acc.role}
-              onClick={() => handleDemoLogin(acc.role)}
-              disabled={demoLoading !== null}
-              className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all text-left disabled:opacity-50"
-              style={{
-                border: `1.5px solid ${acc.role === 'carer' ? 'rgba(79,209,197,0.4)' : 'rgba(255,255,255,0.12)'}`,
-                background: acc.role === 'carer' ? 'rgba(79,209,197,0.08)' : 'rgba(255,255,255,0.04)',
-              }}
-            >
-              <span className="text-2xl flex-shrink-0">{acc.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-white font-bold text-sm">{acc.label}</div>
-                <div className="text-white/50 text-xs truncate">{acc.sub}</div>
-              </div>
-              {demoLoading === acc.role ? (
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: COLORS.teal }} />
-                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: COLORS.teal, animationDelay: '0.2s' }} />
-                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: COLORS.teal, animationDelay: '0.4s' }} />
-                </div>
-              ) : (
-                <span style={{ color: acc.role === 'manager' ? COLORS.teal : COLORS.g2 }}>›</span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="flex-1 h-px bg-white/10" />
-          <span className="text-white/30 text-xs">or sign in with your account</span>
-          <div className="flex-1 h-px bg-white/10" />
-        </div>
 
         {/* Email Input */}
         <div className="space-y-4 mb-6">

@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useLocation } from 'wouter'
+import { registerUser } from '../api/client'
 import type { UserRole } from '../types'
 
 const COLORS = {
@@ -102,20 +103,23 @@ export default function CreateAccountScreen() {
     setError('')
     setLoading(true)
     
-    // Store user data for demo
-    const userData = {
-      id: crypto.randomUUID?.() || `u-${Date.now()}`,
-      name: fullName.trim(),
-      email: email.trim(),
-      agency: agency.trim(),
-      role: selectedRole || 'carer',
-      pin: pinValue,
-      initials: getInitials(fullName),
+    // Register via API
+    try {
+      await registerUser({
+        id: crypto.randomUUID?.() || `u-${Date.now()}`,
+        name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        phone: '',
+        region: agency.trim(),
+        role: selectedRole || 'carer',
+        pin: pinValue,
+      })
+      setStep('done')
+    } catch (err: any) {
+      setError(err.message || 'Registration failed. Please try again.')
+      setLoading(false)
+      return
     }
-    localStorage.setItem('carei_user', JSON.stringify(userData))
-    localStorage.setItem('carei_token', 'demo-token-' + Date.now())
-    
-    setStep('done')
     setLoading(false)
     
     setTimeout(() => {
