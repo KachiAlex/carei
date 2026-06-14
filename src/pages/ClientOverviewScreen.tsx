@@ -208,12 +208,18 @@ export default function ClientOverviewScreen() {
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pre-Visit Handover</div>
             </div>
             <div className="space-y-2.5">
-              {handoverBullets.map((bullet, idx) => (
-                <div key={idx} className="flex items-start gap-2.5">
-                  <span className="text-lg shrink-0">{bullet.split(' ')[0]}</span>
-                  <span className="text-xs text-slate-700 leading-relaxed">{bullet.substring(bullet.indexOf(' ') + 1)}</span>
+              {handoverBullets.length > 0 ? (
+                handoverBullets.map((bullet, idx) => (
+                  <div key={idx} className="flex items-start gap-2.5">
+                    <span className="text-lg shrink-0">{bullet.split(' ')[0]}</span>
+                    <span className="text-xs text-slate-700 leading-relaxed">{bullet.substring(bullet.indexOf(' ') + 1)}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-slate-400 italic py-2">
+                  No handover notes available. Previous visit notes will appear here after your first visit.
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
