@@ -117,7 +117,7 @@ export default function LoginScreen() {
     }
   }
 
-  // Request OTP for PIN reset
+  // Request OTP for PIN reset - uses backend only
   const handleRequestReset = async () => {
     if (!validateEmail(email)) {
       setError('Please enter a valid email address.')
@@ -127,44 +127,29 @@ export default function LoginScreen() {
     setError('')
     setLoading(true)
     
-    // Always generate OTP locally for now (backend not ready)
-    // This ensures the reset flow works reliably
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString()
-    
-    // Store in localStorage so it persists across sessions if needed
-    localStorage.setItem('carei_temp_otp', JSON.stringify({
-      email: email.trim().toLowerCase(),
-      otp: generatedOtp,
-      timestamp: Date.now(),
-      expiresAt: Date.now() + 10 * 60 * 1000 // 10 minutes
-    }))
-    
-    setDisplayOtp(generatedOtp)
-    setLoading(false)
-    setView('reset-verify')
-    
-    // Try backend in background (don't block user flow)
     try {
+      // Call backend API to generate and store OTP in database
       const res = await sendOtp({ email: email.trim().toLowerCase(), purpose: 'reset-pin' }) as any
-      if (res?.otp || res?.code) {
-        // Backend responded - update to use backend OTP
-        const backendOtp = res?.otp || res?.code
-        setDisplayOtp(backendOtp)
-        localStorage.setItem('carei_temp_otp', JSON.stringify({
-          email: email.trim().toLowerCase(),
-          otp: backendOtp,
-          timestamp: Date.now(),
-          expiresAt: Date.now() + 10 * 60 * 1000,
-          source: 'backend'
-        }))
+      
+      // Display OTP on screen since email isn't configured yet
+      // Backend generates and stores the OTP, we display it here
+      if (res?.demoCode || res?.otp || res?.code) {
+        setDisplayOtp(res.demoCode || res.otp || res.code)
+      } else {
+        setError('Failed to generate reset code. Please try again.')
+        setLoading(false)
+        return
       }
-    } catch (err) {
-      // Backend failed - local OTP already set, continue with flow
-      console.log('Backend OTP unavailable, using local:', err)
+      
+      setLoading(false)
+      setView('reset-verify')
+    } catch (err: any) {
+      setLoading(false)
+      setError(err.message || 'Failed to send reset code. Please check your connection.')
     }
   }
 
-  // Verify OTP - check localStorage first, then backend
+  // Verify OTP against backend only
   const handleVerifyOtp = async () => {
     const enteredOtp = otp.join('')
     if (enteredOtp.length !== 6) {
@@ -174,52 +159,8 @@ export default function LoginScreen() {
     
     setLoading(true)
     
-    // Get stored OTP details
-    const storedOtpData = localStorage.getItem('carei_temp_otp')
-    let validOtp = displayOtp
-    
-    if (storedOtpData) {
-      try {
-        const parsed = JSON.parse(storedOtpData)
-        if (parsed.email === email.trim().toLowerCase() && parsed.otp) {
-          validOtp = parsed.otp
-          
-          // Check if expired
-          if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
-            setError('Code has expired. Please request a new one.')
-            setLoading(false)
-            setOtp(['', '', '', '', '', ''])
-            localStorage.removeItem('carei_temp_otp')
-            return
-          }
-        }
-      } catch (e) {
-        console.log('Error parsing stored OTP:', e)
-      }
-    }
-    
-    // First check locally (most reliable)
-    if (enteredOtp === validOtp) {
-      setError('')
-      setView('reset-newpin')
-      setLoading(false)
-      
-      // Try backend verification in background
-      try {
-        await verifyOtp({ 
-          email: email.trim().toLowerCase(), 
-          code: enteredOtp, 
-          purpose: 'reset-pin' 
-        })
-      } catch (err) {
-        // Backend verification failed, but local worked - that's fine
-        console.log('Backend verify failed, local succeeded')
-      }
-      return
-    }
-    
-    // Local check failed - try backend as last resort
     try {
+      // Verify OTP against database via backend API
       const res = await verifyOtp({ 
         email: email.trim().toLowerCase(), 
         code: enteredOtp, 
@@ -233,8 +174,8 @@ export default function LoginScreen() {
         setError('Invalid code. Please try again.')
         setOtp(['', '', '', '', '', ''])
       }
-    } catch (err) {
-      setError('Invalid code. Please try again.')
+    } catch (err: any) {
+      setError(err.message || 'Failed to verify code. Please try again.')
       setOtp(['', '', '', '', '', ''])
     } finally {
       setLoading(false)
@@ -258,10 +199,8 @@ export default function LoginScreen() {
     setError('')
     setLoading(true)
     
-    let backendSuccess = false
-    
+    // Call backend API to update PIN in database
     try {
-      // Try to call API to update PIN in database
       const enteredOtp = otp.join('')
       const res = await resetPin({ 
         email: email.trim().toLowerCase(), 
@@ -269,43 +208,25 @@ export default function LoginScreen() {
         otp: enteredOtp 
       }) as any
       
-      if (res?.success) {
-        backendSuccess = true
+      if (!res?.success) {
+        throw new Error(res?.message || 'Failed to reset PIN')
       }
+      
+      // Store user data from response
+      if (res?.token) {
+        localStorage.setItem('carei_token', res.token)
+      }
+      if (res?.user) {
+        localStorage.setItem('carei_user', JSON.stringify(res.user))
+      }
+      
+      setLoading(false)
+      setResetSuccess(true)
     } catch (err: any) {
-      console.log('Backend reset PIN failed, will try local update:', err)
+      setLoading(false)
+      setError(err.message || 'Failed to reset PIN. Please try again.')
+      return
     }
-    
-    // If backend failed, try to update via register/login workaround
-    if (!backendSuccess) {
-      try {
-        // Fallback: Try to login with a temporary flow that allows PIN update
-        // This is a workaround for missing backend endpoint
-        console.log('Using fallback PIN update method')
-      } catch (fallbackErr) {
-        console.log('Fallback also failed:', fallbackErr)
-      }
-    }
-    
-    // Since backend endpoints aren't working yet, store the new PIN locally
-    // and show instructions for admin update
-    
-    // Store PIN reset info for reference (includes the actual new PIN for admin)
-    const resetInfo = {
-      email: email.trim().toLowerCase(),
-      newPin: newPinValue,
-      timestamp: Date.now(),
-      backendUpdated: backendSuccess,
-      pending: !backendSuccess
-    }
-    
-    localStorage.setItem('carei_pin_reset_pending', JSON.stringify(resetInfo))
-    
-    // Clear the temp OTP
-    localStorage.removeItem('carei_temp_otp')
-    
-    setLoading(false)
-    setResetSuccess(true)
     
     setTimeout(() => {
       setView('login')

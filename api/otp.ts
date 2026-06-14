@@ -106,6 +106,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return
         }
 
+        // If this is a PIN reset, just verify the OTP (PIN update handled by /auth/reset-pin)
+        if (purpose === 'reset-pin') {
+          // Just verify that the user exists
+          const users = await sql`SELECT id FROM users WHERE LOWER(email) = ${email.toLowerCase()}` as any[]
+          if (users.length === 0) {
+            res.status(404).json({ error: 'No account found with this email' })
+            return
+          }
+          res.status(200).json({ status: 'verified', valid: true, success: true, message: 'OTP verified for PIN reset' })
+          return
+        }
+
         res.status(400).json({ error: 'Unknown purpose' })
         return
       }
