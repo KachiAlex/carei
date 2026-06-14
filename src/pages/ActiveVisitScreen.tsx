@@ -523,7 +523,7 @@ export default function ActiveVisitScreen() {
             clientId: client.id,
             visitId,
             medicationName: selectedMedForAdmin,
-            dose: med?.dose,
+            dose: medNotGiven?.dose,
             status: 'refused',
             reason: notGivenReason,
             notes: `Action: ${notGivenAction} | Carer said: ${notGivenCarerSaid} | Note: ${notGivenFreeText}`,
