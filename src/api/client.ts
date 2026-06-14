@@ -212,6 +212,11 @@ export async function loginUser(data: { email: string; pin: string }) {
   return res
 }
 
+export async function resetPin(data: { email: string; newPin: string; otp: string }) {
+  const res = await post('/auth/reset-pin', data) as any
+  return res
+}
+
 export async function logoutUser() {
   localStorage.removeItem('carei_token')
   return post('/auth/logout', {})

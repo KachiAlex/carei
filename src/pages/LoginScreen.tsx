@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useLocation } from 'wouter'
-import { loginUser, sendOtp, verifyOtp } from '../api/client'
+import { loginUser, sendOtp, verifyOtp, resetPin } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -128,10 +128,21 @@ export default function LoginScreen() {
     setLoading(true)
     
     try {
-      // For now, generate OTP locally since email isn't configured
-      // In production, this would call sendOtp() which emails the code
-      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString()
-      setDisplayOtp(generatedOtp)
+      // Call API to generate and store OTP in database
+      const res = await sendOtp({ email: email.trim().toLowerCase(), purpose: 'reset-pin' }) as any
+      
+      // Display OTP on screen since email isn't configured yet
+      // The backend generates and stores the OTP, we display it here
+      if (res?.otp) {
+        setDisplayOtp(res.otp)
+      } else if (res?.code) {
+        setDisplayOtp(res.code)
+      } else {
+        // Fallback - generate locally for demo (shouldn't happen with real backend)
+        const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString()
+        setDisplayOtp(generatedOtp)
+      }
+      
       setLoading(false)
       setView('reset-verify')
     } catch (err: any) {
@@ -140,26 +151,40 @@ export default function LoginScreen() {
     }
   }
 
-  // Verify OTP
-  const handleVerifyOtp = () => {
+  // Verify OTP against backend
+  const handleVerifyOtp = async () => {
     const enteredOtp = otp.join('')
     if (enteredOtp.length !== 6) {
       setError('Please enter all 6 digits.')
       return
     }
     
-    // For now, compare with displayed OTP
-    // In production, this would call verifyOtp() against backend
-    if (enteredOtp === displayOtp) {
-      setError('')
-      setView('reset-newpin')
-    } else {
-      setError('Invalid code. Please try again.')
+    setLoading(true)
+    
+    try {
+      // Verify OTP against database
+      const res = await verifyOtp({ 
+        email: email.trim().toLowerCase(), 
+        code: enteredOtp, 
+        purpose: 'reset-pin' 
+      }) as any
+      
+      if (res?.success || res?.valid) {
+        setError('')
+        setView('reset-newpin')
+      } else {
+        setError('Invalid code. Please try again.')
+        setOtp(['', '', '', '', '', ''])
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to verify code.')
       setOtp(['', '', '', '', '', ''])
+    } finally {
+      setLoading(false)
     }
   }
 
-  // Set new PIN
+  // Set new PIN - sync with database
   const handleSetNewPin = async () => {
     const newPinValue = newPin.join('')
     const confirmValue = confirmNewPin.join('')
@@ -176,22 +201,35 @@ export default function LoginScreen() {
     setError('')
     setLoading(true)
     
-    // TODO: Call API to update PIN
-    // await resetPin({ email: email.trim().toLowerCase(), newPin: newPinValue, otp: displayOtp })
-    
-    setTimeout(() => {
+    try {
+      // Call API to update PIN in database
+      const enteredOtp = otp.join('')
+      const res = await resetPin({ 
+        email: email.trim().toLowerCase(), 
+        newPin: newPinValue, 
+        otp: enteredOtp 
+      }) as any
+      
+      if (res?.success) {
+        setLoading(false)
+        setResetSuccess(true)
+        setTimeout(() => {
+          setView('login')
+          setResetSuccess(false)
+          setPin(['', '', '', ''])
+          setNewPin(['', '', '', ''])
+          setConfirmNewPin(['', '', '', ''])
+          setOtp(['', '', '', '', '', ''])
+          setDisplayOtp('')
+        }, 2000)
+      } else {
+        setLoading(false)
+        setError(res?.message || 'Failed to reset PIN. Please try again.')
+      }
+    } catch (err: any) {
       setLoading(false)
-      setResetSuccess(true)
-      setTimeout(() => {
-        setView('login')
-        setResetSuccess(false)
-        setPin(['', '', '', ''])
-        setNewPin(['', '', '', ''])
-        setConfirmNewPin(['', '', '', ''])
-        setOtp(['', '', '', '', '', ''])
-        setDisplayOtp('')
-      }, 2000)
-    }, 1000)
+      setError(err.message || 'Failed to reset PIN. Please try again.')
+    }
   }
 
   // Render Login View
