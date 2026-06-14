@@ -70,7 +70,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const otpRow = rows[0]
-        await sql`UPDATE otp_codes SET used = TRUE WHERE id = ${otpRow.id}`
+        
+        // Mark OTP as used for login/register, but NOT for reset-pin (marked during actual reset)
+        if (purpose !== 'reset-pin') {
+          await sql`UPDATE otp_codes SET used = TRUE WHERE id = ${otpRow.id}`
+        }
 
         // If this is a registration, create the user
         if (purpose === 'register' && userData) {
