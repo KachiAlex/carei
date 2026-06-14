@@ -1,10 +1,17 @@
 function getApiBase(): string {
+  // Priority: 1. Environment variable, 2. Local dev, 3. Production
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
-  // Capacitor / native webview uses file:// or capacitor:// protocol;
-  // relative /api won't reach the backend, so use absolute production URL.
+  
+  // Capacitor / native webview uses file:// or capacitor:// protocol
   const isNative = typeof (window as any).Capacitor !== 'undefined' ||
     !['http:', 'https:'].includes(window.location.protocol)
-  if (isNative) return 'https://carei-app.vercel.app/api'
+  
+  if (isNative) {
+    // Use production API for native apps
+    return 'https://carei-app.vercel.app/api'
+  }
+  
+  // For web: use relative path (same origin) in production, or localhost in dev
   return '/api'
 }
 
@@ -16,28 +23,79 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-async function post(path: string, body: unknown) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
+async function postWithRetry(path: string, body: unknown, retries = 3): Promise<any> {
+  let lastError: Error | null = null
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method: 'POST',
+        headers: { ...jsonHeaders, ...authHeaders() },
+        body: JSON.stringify(body),
+      })
+      
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      
+      return await res.json()
+    } catch (err) {
+      lastError = err as Error
+      
+      // Don't retry on 4xx errors (client errors)
+      if (err instanceof Error && err.message.includes('HTTP 4')) {
+        throw err
+      }
+      
+      // Exponential backoff: wait longer between retries
+      if (attempt < retries - 1) {
+        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
+      }
+    }
   }
-  return res.json()
+  
+  throw lastError || new Error('Network error after retries')
+}
+
+async function post(path: string, body: unknown) {
+  return postWithRetry(path, body)
+}
+
+async function getWithRetry(path: string, retries = 3): Promise<any> {
+  let lastError: Error | null = null
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        headers: authHeaders(),
+      })
+      
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      
+      return await res.json()
+    } catch (err) {
+      lastError = err as Error
+      
+      // Don't retry on 4xx errors
+      if (err instanceof Error && err.message.includes('HTTP 4')) {
+        throw err
+      }
+      
+      if (attempt < retries - 1) {
+        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
+      }
+    }
+  }
+  
+  throw lastError || new Error('Network error after retries')
 }
 
 async function get(path: string) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    headers: authHeaders(),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return getWithRetry(path)
 }
 
 export async function chatWithAI(message: string, context?: string) {
