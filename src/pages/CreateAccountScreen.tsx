@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { registerUser } from '../api/client'
+import { createCaregiver } from '../api/client'
 import type { UserRole } from '../types'
 
 const COLORS = {
@@ -103,20 +103,19 @@ export default function CreateAccountScreen() {
     setError('')
     setLoading(true)
     
-    // Register via API
+    // Create carer via manager API
     try {
-      await registerUser({
-        id: crypto.randomUUID?.() || `u-${Date.now()}`,
+      await createCaregiver({
         name: fullName.trim(),
         email: email.trim().toLowerCase(),
         phone: '',
         region: agency.trim(),
-        role: selectedRole || 'carer',
         pin: pinValue,
+        role: 'carer',
       })
       setStep('done')
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.')
+      setError(err.message || 'Failed to create carer account. Please try again.')
       setLoading(false)
       return
     }

@@ -44,7 +44,7 @@ function App() {
         <Route path="/visit/:id" component={ActiveVisitScreen} />
         <Route path="/summary/:id" component={VisitSummaryScreen} />
         <Route path="/copilot" component={AICopilotScreen} />
-        <Route path="/register" component={CreateAccountScreen} />
+        <Route path="/manager/add-carer" component={CreateAccountScreen} />
         <Route path="/manager/login" component={ManagerLoginScreen} />
         <Route path="/manager" component={ManagerDashboard} />
         <Route path="/client/:id/overview" component={ClientOverviewScreen} />
