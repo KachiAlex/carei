@@ -8,13 +8,22 @@ import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDr
 import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
-  darkNavy: '#0B1120',
+  darkNavy: '#0F1D34',
   navy: '#1B2A49',
   teal: '#4FD1C5',
-  teal2: '#40E0D0',
+  teal2: '#38B2AC',
   red: '#FF5A5F',
   amber: '#F6B73C',
+  green: '#22C55E',
   lavender: '#A78BFA',
+  g2: '#94A3B8',
+}
+
+// PBS Risk levels per client
+const PBS_RISK_LEVELS: Record<string, 'green' | 'amber' | 'red'> = {
+  'Mary Johnson': 'amber',
+  'Tom Adams': 'green',
+  'Aisha Khan': 'red',
 }
 
 export default function ActiveVisitScreen() {
@@ -115,6 +124,17 @@ export default function ActiveVisitScreen() {
   const [showMealPrompt, setShowMealPrompt] = useState(false)
   const [mealStatus, setMealStatus] = useState<'full' | 'half' | 'refused' | null>(null)
 
+  // Phase 4: PBS Risk Bar
+  const [pbsRiskLevel, setPbsRiskLevel] = useState<'green' | 'amber' | 'red'>('green')
+
+  // Phase 4: Privacy Overlay
+  const [privacyMode, setPrivacyMode] = useState(false)
+
+  // Phase 4: Post-Medication Monitoring Timer (e.g., for Metformin nausea monitoring)
+  const [postMedTimers, setPostMedTimers] = useState<Record<string, number>>({})
+  const [activePostMedMonitor, setActivePostMedMonitor] = useState<string | null>(null)
+  const postMedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn, mealStatus, loneWorkerElapsed, bpSystolic, bpDiastolic, pulse, o2Sat, nutritionNote, selectedMood, wellbeingNote }, 3000)
 
   // Load visit + client from API, then DB data + draft
@@ -147,6 +167,15 @@ export default function ActiveVisitScreen() {
             isControlled: m.isControlled || false,
             dueTime: m.dueTime || null,
           })))
+        }
+
+        // Set PBS Risk level based on client
+        if (c?.name && PBS_RISK_LEVELS[c.name]) {
+          setPbsRiskLevel(PBS_RISK_LEVELS[c.name])
+        } else if (c?.supportFramework?.toLowerCase().includes('red')) {
+          setPbsRiskLevel('red')
+        } else if (c?.supportFramework?.toLowerCase().includes('amber')) {
+          setPbsRiskLevel('amber')
         }
 
         // Phase 4: Fetch drug interactions
@@ -259,6 +288,24 @@ export default function ActiveVisitScreen() {
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [clockedIn])
+
+  // Phase 4: Post-medication monitoring timer (30 min countdown for certain meds)
+  useEffect(() => {
+    if (Object.keys(postMedTimers).length > 0) {
+      postMedTimerRef.current = setInterval(() => {
+        setPostMedTimers((prev) => {
+          const updated = { ...prev }
+          Object.keys(updated).forEach((med) => {
+            if (updated[med] > 0) updated[med] -= 1
+          })
+          return updated
+        })
+      }, 1000)
+    } else {
+      if (postMedTimerRef.current) clearInterval(postMedTimerRef.current)
+    }
+    return () => { if (postMedTimerRef.current) clearInterval(postMedTimerRef.current) }
+  }, [Object.keys(postMedTimers).length])
 
   // Phase 3: Lone Worker Safety timer — 25 min check-in window
   useEffect(() => {
@@ -432,6 +479,14 @@ export default function ActiveVisitScreen() {
           : m
       )
     )
+
+    // Start post-medication monitoring timer (30 min) for certain meds
+    const med = meds.find((m) => m.name === selectedMedForAdmin)
+    if (med && (med.name.toLowerCase().includes('metformin') || med.adminNote?.toLowerCase().includes('monitor'))) {
+      setActivePostMedMonitor(selectedMedForAdmin)
+      setPostMedTimers((prev) => ({ ...prev, [selectedMedForAdmin]: 30 * 60 })) // 30 minutes
+    }
+
     setShowMedAdmin(false)
     triggerHaptic(HAPTIC_PATTERNS.confirm)
   }
@@ -912,6 +967,30 @@ export default function ActiveVisitScreen() {
   // Active Visit view
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative items-center">
+      {/* Privacy Overlay - Blurs screen when privacy mode is active */}
+      {privacyMode && (
+        <div 
+          className="fixed inset-0 z-40 backdrop-blur-xl bg-slate-900/80 flex items-center justify-center"
+          onClick={() => setPrivacyMode(false)}
+        >
+          <div className="text-center text-white p-8">
+            <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </div>
+            <h3 className="text-xl font-bold mb-2">Privacy Mode Active</h3>
+            <p className="text-white/60 text-sm mb-6">Sensitive information is hidden. Tap anywhere to resume.</p>
+            <button 
+              onClick={() => setPrivacyMode(false)}
+              className="px-6 py-3 rounded-xl bg-white text-slate-900 font-semibold text-sm"
+            >
+              Show Screen
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="w-full max-w-3xl flex flex-col min-h-screen relative">
       {/* Header */}
       <div
@@ -937,9 +1016,46 @@ export default function ActiveVisitScreen() {
           <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
             {client.name.split(' ').map((n: string) => n[0]).join('')}
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="font-bold text-sm">{client.name}</div>
             <div className="text-[11px] text-white/40">{visit.time} · {visit.duration}</div>
+          </div>
+          {/* Privacy Toggle Button */}
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setPrivacyMode(true)}
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 transition-colors"
+            title="Privacy Mode"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </motion.button>
+        </div>
+
+        {/* PBS Risk Bar */}
+        <div className="relative z-10 mt-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[10px] text-white/50 uppercase tracking-wider">PBS Risk Level</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+              style={{
+                background: pbsRiskLevel === 'red' ? 'rgba(255,90,95,0.2)' : pbsRiskLevel === 'amber' ? 'rgba(246,183,60,0.2)' : 'rgba(34,197,94,0.2)',
+                color: pbsRiskLevel === 'red' ? COLORS.red : pbsRiskLevel === 'amber' ? COLORS.amber : COLORS.green,
+                border: `1px solid ${pbsRiskLevel === 'red' ? 'rgba(255,90,95,0.3)' : pbsRiskLevel === 'amber' ? 'rgba(246,183,60,0.3)' : 'rgba(34,197,94,0.3)'}`,
+              }}
+            >
+              {pbsRiskLevel === 'red' ? '🔴 RED' : pbsRiskLevel === 'amber' ? '🟠 AMBER' : '🟢 GREEN'}
+            </span>
+          </div>
+          <div className="flex gap-1 h-1.5 rounded-full overflow-hidden bg-white/10">
+            <div className="flex-1 rounded-full transition-all duration-300" style={{ background: pbsRiskLevel === 'green' ? COLORS.green : 'rgba(255,255,255,0.1)' }} />
+            <div className="flex-1 rounded-full transition-all duration-300" style={{ background: pbsRiskLevel === 'amber' ? COLORS.amber : 'rgba(255,255,255,0.1)' }} />
+            <div className="flex-1 rounded-full transition-all duration-300" style={{ background: pbsRiskLevel === 'red' ? COLORS.red : 'rgba(255,255,255,0.1)' }} />
+          </div>
+          <div className="flex justify-between text-[9px] text-white/30 mt-1">
+            <span>Green</span>
+            <span>Amber</span>
+            <span>Red</span>
           </div>
         </div>
       </div>
@@ -1025,6 +1141,18 @@ export default function ActiveVisitScreen() {
                             : 'rgba(0,0,0,0.08)',
                     }}
                   >
+                    {/* Duplicate Alert Banner */}
+                    {medsGivenToday.has(med.name) && !isGiven && !isRefused && (
+                      <div className="mb-2 rounded-lg p-2 border" style={{ background: 'rgba(246,183,60,0.08)', borderColor: `${COLORS.amber}40` }}>
+                        <div className="flex items-center gap-1.5">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.amber} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                          </svg>
+                          <span className="text-[10px] font-bold" style={{ color: COLORS.amber }}>Already given today — possible duplicate</span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold text-slate-800">{med.name}</span>
@@ -1034,6 +1162,14 @@ export default function ActiveVisitScreen() {
                             style={{ background: `${COLORS.red}15`, color: COLORS.red, border: `1px solid ${COLORS.red}25` }}
                           >
                             Controlled
+                          </span>
+                        )}
+                        {med.timeSensitive && !isGiven && !isRefused && (
+                          <span
+                            className="text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider"
+                            style={{ background: `${COLORS.amber}10`, color: COLORS.amber, border: `1px solid ${COLORS.amber}20` }}
+                          >
+                            ⏰ Time-Critical
                           </span>
                         )}
                         {alert && !isGiven && !isRefused && (
@@ -1059,6 +1195,41 @@ export default function ActiveVisitScreen() {
                     <div className="text-xs text-slate-500 mb-2">{med.dose}{med.dueTime ? ` · Due ${med.dueTime}` : ''}</div>
                     {med.adminNote && (
                       <div className="text-[11px] text-slate-500 mb-2 italic">{med.adminNote}</div>
+                    )}
+
+                    {/* Drug Interaction Warning */}
+                    {drugInteractions.length > 0 && !isGiven && !isRefused && (
+                      <div className="mb-2">
+                        {drugInteractions
+                          .filter((di) => di.drug_a === med.name || di.drug_b === med.name)
+                          .map((di, idx) => (
+                            <div key={idx} className="rounded-lg p-2 border mb-1" style={{ background: di.severity === 'major' ? 'rgba(255,90,95,0.06)' : 'rgba(246,183,60,0.06)', borderColor: di.severity === 'major' ? `${COLORS.red}30` : `${COLORS.amber}30` }}>
+                              <div className="flex items-start gap-1.5">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={di.severity === 'major' ? COLORS.red : COLORS.amber} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
+                                  <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+                                </svg>
+                                <div className="text-[10px]" style={{ color: di.severity === 'major' ? COLORS.red : COLORS.amber }}>
+                                  <span className="font-bold">{di.severity === 'major' ? '⚠️ Major Interaction' : 'Interaction'}:</span> {di.drug_a} + {di.drug_b} — {di.description}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+
+                    {/* Post-Medication Monitoring Timer */}
+                    {isGiven && activePostMedMonitor === med.name && postMedTimers[med.name] > 0 && (
+                      <div className="mb-2 rounded-lg p-2 border" style={{ background: 'rgba(79,209,197,0.08)', borderColor: `${COLORS.teal}40` }}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: COLORS.teal }} />
+                            <span className="text-[10px] font-medium text-slate-600">Monitoring for side effects...</span>
+                          </div>
+                          <span className="text-[11px] font-bold" style={{ color: COLORS.teal }}>
+                            {Math.floor(postMedTimers[med.name] / 60)}:{String(postMedTimers[med.name] % 60).padStart(2, '0')}
+                          </span>
+                        </div>
+                      </div>
                     )}
                     {isGiven || isRefused ? (
                       <span
@@ -1448,25 +1619,36 @@ export default function ActiveVisitScreen() {
               animate={{ height: 'auto', opacity: 1 }}
               className="px-4 pb-4 flex flex-col gap-3"
             >
-              {/* Severity */}
-              <div className="flex gap-2">
-                {[
-                  { key: 'low', label: 'Low', color: '#22c55e' },
-                  { key: 'medium', label: 'Medium', color: COLORS.amber },
-                  { key: 'high', label: 'High', color: COLORS.red },
-                ].map((s) => (
-                  <button
-                    key={s.key}
-                    onClick={() => setIncidentSeverity(s.key as any)}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold cursor-pointer border-none transition-all"
-                    style={{
-                      background: incidentSeverity === s.key ? s.color : '#f1f5f9',
-                      color: incidentSeverity === s.key ? 'white' : '#64748b',
-                    }}
-                  >
-                    {s.label}
-                  </button>
-                ))}
+              {/* Severity - Enhanced with icons and descriptions */}
+              <div className="flex flex-col gap-2">
+                <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Incident Severity</div>
+                <div className="flex gap-2">
+                  {[
+                    { key: 'low', label: 'Low', color: '#22c55e', icon: '✓', desc: 'Minor issue, no harm' },
+                    { key: 'medium', label: 'Medium', color: COLORS.amber, icon: '⚠', desc: 'Moderate concern' },
+                    { key: 'high', label: 'High', color: COLORS.red, icon: '🚨', desc: 'Serious incident' },
+                  ].map((s) => (
+                    <button
+                      key={s.key}
+                      onClick={() => setIncidentSeverity(s.key as any)}
+                      className="flex-1 py-2.5 rounded-xl text-xs font-semibold cursor-pointer border transition-all flex flex-col items-center gap-1"
+                      style={{
+                        background: incidentSeverity === s.key ? s.color : 'white',
+                        color: incidentSeverity === s.key ? 'white' : '#64748b',
+                        borderColor: incidentSeverity === s.key ? s.color : 'rgba(0,0,0,0.08)',
+                        boxShadow: incidentSeverity === s.key ? `0 2px 8px ${s.color}30` : 'none',
+                      }}
+                    >
+                      <span className="text-sm">{s.icon}</span>
+                      <span>{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="text-[10px] text-slate-400 text-center">
+                  {incidentSeverity === 'low' && 'Minor issue with no immediate risk to client'}
+                  {incidentSeverity === 'medium' && 'Moderate concern requiring supervisor notification'}
+                  {incidentSeverity === 'high' && 'Serious incident requiring immediate escalation'}
+                </div>
               </div>
 
               {/* Type */}

@@ -1,308 +1,251 @@
-import { useState, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useLocation } from 'wouter'
-import { sendOtp, verifyOtp, updateBiometrics, biometricLogin } from '../api/client'
+import { DEMO_CARER, DEMO_MANAGER } from '../data/demoData'
+import type { UserRole } from '../types'
 
 const COLORS = {
-  darkNavy: '#0f1a2e',
+  darkNavy: '#0F1D34',
   navy: '#1B2A49',
   teal: '#4FD1C5',
-  teal2: '#40E0D0',
+  teal2: '#38B2AC',
   red: '#FF5A5F',
+  green: '#22C55E',
+  g2: '#94A3B8',
 }
 
 function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
-export default function LoginScreen() {
-  const [, setLocation] = useLocation()
-  const [email, setEmail] = useState('')
-  const [otp, setOtp] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [otpSent, setOtpSent] = useState(false)
-  const [demoCode, setDemoCode] = useState('')
-  const [bioAvailable, setBioAvailable] = useState(false)
-  const [bioEnabled, setBioEnabled] = useState(false)
-  const [showBioSetup, setShowBioSetup] = useState(false)
+// PIN digit boxes component with auto-submit
+function PinBoxes({ pin, onChange, onComplete }: { pin: string[]; onChange: (i: number, val: string) => void; onComplete?: () => void }) {
+  const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
 
-  useEffect(() => {
-    if (window.PublicKeyCredential) {
-      setBioAvailable(true)
-    }
-  }, [])
-
-  useEffect(() => {
-    const stored = localStorage.getItem('carei_bio_email')
-    if (stored && stored === email.trim().toLowerCase()) {
-      setBioEnabled(true)
-    } else {
-      setBioEnabled(false)
-    }
-  }, [email])
-
-  const handleSendOtp = async () => {
-    setError('')
-    if (!validateEmail(email)) {
-      setError('Enter a valid email address')
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await sendOtp({ email: email.trim().toLowerCase(), purpose: 'login' }) as any
-      setLoading(false)
-      setOtpSent(true)
-      if (res?.demoCode) setDemoCode(res.demoCode)
-    } catch (err: any) {
-      setLoading(false)
-      setError(err.message || 'Failed to send code')
+  const handleChange = (i: number, val: string) => {
+    const digit = val.replace(/\D/g, '').slice(0, 1)
+    if (digit || val === '') {
+      onChange(i, digit)
+      if (digit && i < 3) {
+        refs[i + 1].current?.focus()
+      } else if (digit && i === 3 && onComplete) {
+        // Small delay to show the digit before submitting
+        setTimeout(onComplete, 150)
+      }
     }
   }
 
-  const handleVerify = async () => {
-    setError('')
-    if (otp.length !== 6) {
-      setError('Enter the 6-digit code')
-      return
-    }
-    setLoading(true)
-    try {
-      const res = await verifyOtp({ email: email.trim().toLowerCase(), code: otp, purpose: 'login' }) as any
-      setLoading(false)
-      if (res?.token) {
-        localStorage.setItem('carei_token', res.token)
-        const role = res?.user?.role
-        if (role === 'manager') {
-          setLocation('/manager')
-          return
-        }
-        const stored = localStorage.getItem('carei_bio_email')
-        if (bioAvailable && stored !== email.trim().toLowerCase()) {
-          setShowBioSetup(true)
-        } else {
-          setLocation('/dashboard')
-        }
-      }
-    } catch (err: any) {
-      setLoading(false)
-      setError(err.message || 'Invalid code')
-    }
-  }
-
-  const handleEnableBiometrics = async () => {
-    try {
-      const challenge = new Uint8Array(32)
-      window.crypto.getRandomValues(challenge)
-
-      const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
-        challenge,
-        rp: { name: 'CAREi', id: window.location.hostname },
-        user: {
-          id: new TextEncoder().encode(email.trim().toLowerCase()),
-          name: email.trim().toLowerCase(),
-          displayName: email.trim().toLowerCase(),
-        },
-        pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
-        authenticatorSelection: {
-          authenticatorAttachment: 'platform',
-          userVerification: 'required',
-        },
-        attestation: 'none',
-      }
-
-      const credential = await navigator.credentials.create({ publicKey: publicKeyCredentialCreationOptions })
-      if (credential) {
-        await updateBiometrics({ credential: { id: credential.id, rawId: Array.from(new Uint8Array((credential as any).rawId)), type: credential.type }, enabled: true })
-        localStorage.setItem('carei_bio_email', email.trim().toLowerCase())
-        setShowBioSetup(false)
-        setLocation('/dashboard')
-      }
-    } catch {
-      setShowBioSetup(false)
-      setLocation('/dashboard')
-    }
-  }
-
-  const handleBiometricLogin = async () => {
-    setError('')
-    if (!validateEmail(email)) {
-      setError('Enter your email first')
-      return
-    }
-    setLoading(true)
-    try {
-      const challenge = new Uint8Array(32)
-      window.crypto.getRandomValues(challenge)
-
-      const publicKeyCredentialRequestOptions: PublicKeyCredentialRequestOptions = {
-        challenge,
-        rpId: window.location.hostname,
-        userVerification: 'required',
-      }
-
-      const assertion = await navigator.credentials.get({ publicKey: publicKeyCredentialRequestOptions })
-      if (assertion) {
-        const res = await biometricLogin({ email: email.trim().toLowerCase(), credentialId: assertion.id }) as any
-        setLoading(false)
-        if (res?.user?.role === 'manager') {
-          setLocation('/manager')
-        } else {
-          setLocation('/dashboard')
-        }
-      }
-    } catch (err: any) {
-      setLoading(false)
-      setError(err.message || 'Biometric authentication failed')
+  const handleKeyDown = (i: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !pin[i] && i > 0) {
+      onChange(i - 1, '')
+      refs[i - 1].current?.focus()
     }
   }
 
   return (
+    <div className="flex gap-3 justify-center">
+      {pin.map((digit, i) => (
+        <input
+          key={i}
+          ref={refs[i]}
+          type="password"
+          inputMode="numeric"
+          maxLength={1}
+          value={digit ? '●' : ''}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          className="w-14 h-16 rounded-xl text-center text-2xl font-bold outline-none transition-all"
+          style={{
+            background: 'rgba(255,255,255,0.07)',
+            border: `2px solid ${digit ? COLORS.teal : 'rgba(255,255,255,0.2)'}`,
+            color: COLORS.teal,
+            caretColor: 'transparent',
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+export default function LoginScreen() {
+  const [, setLocation] = useLocation()
+  const [email, setEmail] = useState('')
+  const [pin, setPin] = useState(['', '', '', ''])
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [demoLoading, setDemoLoading] = useState<UserRole | null>(null)
+
+  const handlePinChange = (idx: number, val: string) => {
+    const next = [...pin]
+    next[idx] = val
+    setPin(next)
+    setError('')
+  }
+
+  const handleVerify = () => {
+    const pinValue = pin.join('')
+    if (!validateEmail(email)) {
+      setError('Please enter your email address.')
+      return
+    }
+    if (pinValue.length !== 4) {
+      setError('Please enter all 4 digits.')
+      return
+    }
+    
+    setError('')
+    setLoading(true)
+    
+    // Demo authentication - check stored user or default to demo
+    const storedUser = localStorage.getItem('carei_user')
+    let user = storedUser ? JSON.parse(storedUser) : null
+    
+    // For demo, accept any PIN if email matches demo accounts
+    if (email.toLowerCase().includes('sarah') || email.toLowerCase().includes('adjoy')) {
+      user = DEMO_CARER
+    } else if (email.toLowerCase().includes('alex') || email.toLowerCase().includes('manager')) {
+      user = DEMO_MANAGER
+    }
+    
+    if (user) {
+      localStorage.setItem('carei_user', JSON.stringify(user))
+      localStorage.setItem('carei_token', 'demo-token-' + Date.now())
+      
+      setTimeout(() => {
+        setLoading(false)
+        setLocation(user.role === 'manager' ? '/manager' : '/dashboard')
+      }, 800)
+    } else {
+      setLoading(false)
+      setError('Invalid email or PIN.')
+      setPin(['', '', '', ''])
+    }
+  }
+
+  const handleDemoLogin = (role: UserRole) => {
+    setDemoLoading(role)
+    const isManager = role === 'manager'
+    const user = isManager ? DEMO_MANAGER : DEMO_CARER
+    
+    setTimeout(() => {
+      localStorage.setItem('carei_user', JSON.stringify(user))
+      localStorage.setItem('carei_token', 'demo-token-' + Date.now())
+      setLocation(isManager ? '/manager' : '/dashboard')
+    }, 800)
+  }
+
+  const getInitials = (name: string) => {
+    return name.trim().split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  }
+
+  return (
     <div
-      className="min-h-screen flex flex-col font-sans"
+      className="min-h-screen flex flex-col font-sans overflow-y-auto"
       style={{ background: `linear-gradient(160deg, ${COLORS.darkNavy} 0%, ${COLORS.navy} 100%)` }}
     >
-      <div className="flex-1 flex flex-col justify-center px-6 max-w-md mx-auto w-full">
-        <button
-          onClick={() => setLocation('/')}
-          className="self-start mb-8 text-white/60 hover:text-white transition-colors text-sm flex items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-1 -ml-1 rounded-lg"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-          Back
-        </button>
-
-        <h1 className="font-serif text-white text-3xl mb-2">Welcome back</h1>
-        <p className="text-white/50 mb-6">
-          {otpSent ? 'Enter the 6-digit code sent to your email.' : 'Sign in with your email address.'}
-        </p>
-
-        <div className="mb-4">
-          <label className="block text-white/70 text-sm mb-2">Email address</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="carer@agency.co.uk"
-            disabled={otpSent}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors disabled:opacity-50"
-            onKeyDown={(e) => e.key === 'Enter' && !otpSent && handleSendOtp()}
-          />
+      <div className="flex-1 flex flex-col px-6 max-w-md mx-auto w-full py-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="font-serif text-white text-2xl mb-2">CARE<span style={{ color: COLORS.teal }}>i</span></h1>
+          <h2 className="font-serif text-white text-xl">Welcome back</h2>
         </div>
 
-        {otpSent && (
-          <div className="mb-6">
-            {demoCode && (
-              <div className="mb-4 rounded-xl border border-teal/30 bg-teal/10 p-4 text-center">
-                <p className="text-white/60 text-xs mb-1">Your verification code</p>
-                <p className="text-3xl font-mono font-bold tracking-[0.3em]" style={{ color: COLORS.teal }}>{demoCode}</p>
-                <p className="text-white/40 text-[10px] mt-1">This is shown on screen for testing. SMS will be sent once domain is verified.</p>
+        {/* Demo Accounts */}
+        <div className="flex flex-col gap-3 mb-6">
+          <div className="text-center">
+            <span className="text-white/30 text-[10px] font-bold uppercase tracking-wider">Demo Accounts</span>
+          </div>
+          
+          {[
+            { role: 'carer' as UserRole, icon: '👩‍⚕️', label: 'Care Worker', sub: 'Adjoy Healthcare · Sarah O\'Brien' },
+            { role: 'manager' as UserRole, icon: '🏢', label: 'Agency Manager', sub: 'Adjoy Healthcare · Manager Portal' },
+          ].map((acc) => (
+            <button
+              key={acc.role}
+              onClick={() => handleDemoLogin(acc.role)}
+              disabled={demoLoading !== null}
+              className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all text-left disabled:opacity-50"
+              style={{
+                border: `1.5px solid ${acc.role === 'carer' ? 'rgba(79,209,197,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                background: acc.role === 'carer' ? 'rgba(79,209,197,0.08)' : 'rgba(255,255,255,0.04)',
+              }}
+            >
+              <span className="text-2xl flex-shrink-0">{acc.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-white font-bold text-sm">{acc.label}</div>
+                <div className="text-white/50 text-xs truncate">{acc.sub}</div>
               </div>
-            )}
-            <label className="block text-white/70 text-sm mb-2">6-digit code</label>
+              {demoLoading === acc.role ? (
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: COLORS.teal }} />
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: COLORS.teal, animationDelay: '0.2s' }} />
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: COLORS.teal, animationDelay: '0.4s' }} />
+                </div>
+              ) : (
+                <span style={{ color: acc.role === 'manager' ? COLORS.teal : COLORS.g2 }}>›</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex-1 h-px bg-white/10" />
+          <span className="text-white/30 text-xs">or sign in with your account</span>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+
+        {/* Email Input */}
+        <div className="space-y-4 mb-6">
+          <div>
+            <label className="block text-white/70 text-sm mb-2 font-medium">Email address</label>
             <input
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              value={otp}
-              onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setOtp(v) }}
-              placeholder="••••••"
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors text-center text-2xl tracking-[0.5em]"
-              onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email address"
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
             />
           </div>
-        )}
-
-        {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
-
-        {!otpSent ? (
-          <button
-            onClick={handleSendOtp}
-            disabled={loading}
-            className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none disabled:opacity-50"
-            style={{
-              background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
-              color: COLORS.darkNavy,
-            }}
-          >
-            {loading ? 'Sending…' : 'Send Code'}
-          </button>
-        ) : (
-          <button
-            onClick={handleVerify}
-            disabled={loading}
-            className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none disabled:opacity-50"
-            style={{
-              background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
-              color: COLORS.darkNavy,
-            }}
-          >
-            {loading ? 'Verifying…' : 'Verify & Sign In'}
-          </button>
-        )}
-
-        {otpSent && (
-          <button
-            onClick={handleSendOtp}
-            disabled={loading}
-            className="w-full mt-3 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
-          >
-            Didn't receive it? Resend code
-          </button>
-        )}
-
-        {bioAvailable && bioEnabled && (
-          <button
-            onClick={handleBiometricLogin}
-            disabled={loading}
-            className="w-full mt-3 py-3 rounded-full font-bold text-sm cursor-pointer border flex items-center justify-center gap-2 disabled:opacity-50"
-            style={{ borderColor: 'rgba(255,255,255,0.15)', color: 'white', background: 'transparent' }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2Z"/>
-              <path d="M12 6v6l4 2"/>
-            </svg>
-            Sign in with Biometrics
-          </button>
-        )}
-
-        <button
-          onClick={() => setLocation('/manager/login')}
-          className="w-full mt-4 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
-        >
-          Manager Login →
-        </button>
-      </div>
-
-      {/* Biometric Setup Modal */}
-      {showBioSetup && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(79,209,197,0.1)' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2Z"/>
-                <path d="M12 6v6l4 2"/>
-              </svg>
-            </div>
-            <h3 className="font-bold text-slate-800 mb-2">Enable Biometric Login?</h3>
-            <p className="text-sm text-slate-500 mb-6">Sign in faster with fingerprint or Face ID next time.</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setShowBioSetup(false); setLocation('/dashboard') }}
-                className="flex-1 py-3 rounded-xl text-sm font-semibold border cursor-pointer"
-                style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
-              >
-                Skip
-              </button>
-              <button
-                onClick={handleEnableBiometrics}
-                className="flex-1 py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
-                style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
-              >
-                Enable
-              </button>
-            </div>
+          
+          <div>
+            <label className="block text-white/70 text-sm mb-4 font-medium">4-digit PIN</label>
+            <PinBoxes 
+              pin={pin} 
+              onChange={handlePinChange} 
+              onComplete={handleVerify}
+            />
           </div>
         </div>
-      )}
+
+        {/* Error */}
+        {error && <p className="text-red-400 text-sm mb-4 text-center">{error}</p>}
+
+        {/* Login Button */}
+        <button
+          onClick={handleVerify}
+          disabled={loading}
+          className="w-full py-3.5 rounded-xl font-bold text-base cursor-pointer border-none disabled:opacity-50"
+          style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
+        >
+          {loading ? 'Signing in…' : 'Log In'}
+        </button>
+
+        {/* Forgot PIN */}
+        <button
+          onClick={() => alert('Please email support@carei.co.uk to reset your PIN.')}
+          className="w-full mt-4 text-xs text-white/30 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
+        >
+          Forgot PIN? Email support@carei.co.uk
+        </button>
+
+        {/* Sign Up Link */}
+        <button
+          onClick={() => setLocation('/register')}
+          className="w-full mt-6 text-sm text-white/50 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
+        >
+          New here? Sign up instead
+        </button>
+      </div>
     </div>
   )
 }

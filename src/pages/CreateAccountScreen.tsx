@@ -1,278 +1,386 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useLocation } from 'wouter'
-import { sendOtp, verifyOtp } from '../api/client'
+import type { UserRole } from '../types'
 
 const COLORS = {
-  darkNavy: '#0f1a2e',
+  darkNavy: '#0F1D34',
   navy: '#1B2A49',
   teal: '#4FD1C5',
-  teal2: '#40E0D0',
+  teal2: '#38B2AC',
   red: '#FF5A5F',
-}
-
-function validateUKMobile(phone: string): boolean {
-  const cleaned = phone.replace(/\s/g, '').replace(/^\+44/, '0')
-  return /^07\d{9}$/.test(cleaned)
+  green: '#22C55E',
+  g2: '#94A3B8',
 }
 
 function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
+// PIN digit boxes component
+function PinBoxes({ pin, onChange }: { pin: string[]; onChange: (i: number, val: string) => void }) {
+  const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
+
+  const handleChange = (i: number, val: string) => {
+    const digit = val.replace(/\D/g, '').slice(0, 1)
+    if (digit || val === '') {
+      onChange(i, digit)
+      if (digit && i < 3) {
+        refs[i + 1].current?.focus()
+      }
+    }
+  }
+
+  const handleKeyDown = (i: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !pin[i] && i > 0) {
+      onChange(i - 1, '')
+      refs[i - 1].current?.focus()
+    }
+  }
+
+  return (
+    <div className="flex gap-3 justify-center">
+      {pin.map((digit, i) => (
+        <input
+          key={i}
+          ref={refs[i]}
+          type="password"
+          inputMode="numeric"
+          maxLength={1}
+          value={digit ? '●' : ''}
+          onChange={(e) => handleChange(i, e.target.value)}
+          onKeyDown={(e) => handleKeyDown(i, e)}
+          className="w-14 h-16 rounded-xl text-center text-2xl font-bold outline-none transition-all"
+          style={{
+            background: 'rgba(255,255,255,0.07)',
+            border: `2px solid ${digit ? COLORS.teal : 'rgba(255,255,255,0.2)'}`,
+            color: COLORS.teal,
+            caretColor: 'transparent',
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function CreateAccountScreen() {
   const [, setLocation] = useLocation()
-  const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [name, setName] = useState('')
+  const [step, setStep] = useState<'name' | 'role' | 'pin' | 'done'>('name')
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [region, setRegion] = useState('Manchester')
-  const [pin, setPin] = useState('')
-  const [confirmPin, setConfirmPin] = useState('')
-  const [otp, setOtp] = useState('')
+  const [agency, setAgency] = useState('')
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null)
+  const [pin, setPin] = useState(['', '', '', ''])
+  const [confirmPin, setConfirmPin] = useState(['', '', '', ''])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [demoCode, setDemoCode] = useState('')
 
-  const regions = ['Manchester', 'London', 'Birmingham', 'Leeds', 'Liverpool', 'Bristol', 'Sheffield']
+  const stepLabels = ['Details', 'Your role', 'Set PIN']
+  const stepIndex = step === 'name' ? 0 : step === 'role' ? 1 : step === 'pin' ? 2 : 2
 
-  const handleStep1 = () => {
-    setError('')
-    if (!name.trim()) { setError('Enter your full name'); return }
-    if (!validateEmail(email)) { setError('Enter a valid email address'); return }
-    if (!validateUKMobile(phone)) { setError('Enter a valid UK mobile number'); return }
-    setStep(2)
+  const getInitials = (name: string) => {
+    return name.trim().split(' ').filter(Boolean).map(n => n[0]).join('').slice(0, 2).toUpperCase()
   }
 
-  const handleStep2 = () => {
+  const handleNameNext = () => {
     setError('')
-    if (pin.length !== 4) { setError('PIN must be 4 digits'); return }
-    if (pin !== confirmPin) { setError('PINs do not match'); return }
-    setStep(3)
-    // Auto-send OTP when entering step 3
-    handleSendOtp()
+    if (!fullName.trim()) { setError('Please enter your full name.'); return }
+    if (!validateEmail(email)) { setError('Please enter a valid email address.'); return }
+    if (!agency.trim()) { setError('Please enter your agency name.'); return }
+    setStep('role')
   }
 
-  const handleSendOtp = async () => {
+  const handleRoleSelect = (role: UserRole) => {
+    setSelectedRole(role)
+    setStep('pin')
+  }
+
+  const handleCreate = async () => {
+    const pinValue = pin.join('')
+    if (pinValue.length !== 4) { setError('Please enter all 4 digits.'); return }
+    if (pinValue !== confirmPin.join('')) { setError('PINs do not match.'); return }
+    
     setError('')
     setLoading(true)
-    try {
-      const res = await sendOtp({ email: email.trim().toLowerCase(), purpose: 'register' }) as any
-      setLoading(false)
-      if (res?.demoCode) setDemoCode(res.demoCode)
-    } catch (err: any) {
-      setLoading(false)
-      setError(err.message || 'Failed to send code')
+    
+    // Store user data for demo
+    const userData = {
+      id: crypto.randomUUID?.() || `u-${Date.now()}`,
+      name: fullName.trim(),
+      email: email.trim(),
+      agency: agency.trim(),
+      role: selectedRole || 'carer',
+      pin: pinValue,
+      initials: getInitials(fullName),
     }
+    localStorage.setItem('carei_user', JSON.stringify(userData))
+    localStorage.setItem('carei_token', 'demo-token-' + Date.now())
+    
+    setStep('done')
+    setLoading(false)
+    
+    setTimeout(() => {
+      const role = selectedRole || 'carer'
+      setLocation(role === 'manager' ? '/manager' : '/dashboard')
+    }, 2500)
   }
 
-  const handleVerify = async () => {
+  const handlePinChange = (idx: number, val: string) => {
+    const next = [...pin]
+    next[idx] = val
+    setPin(next)
     setError('')
-    if (otp.length !== 6) { setError('Enter the 6-digit code'); return }
+  }
 
-    setLoading(true)
-    try {
-      const userData = {
-        id: crypto.randomUUID ? crypto.randomUUID() : `u-${Date.now()}`,
-        name: name.trim(),
-        phone: phone.replace(/\s/g, ''),
-        region,
-        pin,
-        role: 'carer',
-      }
-      const res = await verifyOtp({
-        email: email.trim().toLowerCase(),
-        code: otp,
-        purpose: 'register',
-        userData,
-      }) as any
-      setLoading(false)
-      if (res?.token) {
-        localStorage.setItem('carei_token', res.token)
-        setLocation('/dashboard')
-      }
-    } catch (err: any) {
-      setLoading(false)
-      setError(err.message || 'Invalid code or registration failed')
-    }
+  const handleConfirmPinChange = (idx: number, val: string) => {
+    const next = [...confirmPin]
+    next[idx] = val
+    setConfirmPin(next)
+    setError('')
   }
 
   const handleBack = () => {
-    if (step === 3) setStep(2)
-    else if (step === 2) setStep(1)
+    if (step === 'pin') setStep('role')
+    else if (step === 'role') setStep('name')
     else setLocation('/')
   }
 
   return (
     <div
-      className="min-h-screen flex flex-col font-sans"
+      className="min-h-screen flex flex-col font-sans overflow-y-auto"
       style={{ background: `linear-gradient(160deg, ${COLORS.darkNavy} 0%, ${COLORS.navy} 100%)` }}
     >
-      <div className="flex-1 flex flex-col justify-center px-6 max-w-md mx-auto w-full">
-        <button
-          onClick={handleBack}
-          className="self-start mb-8 text-white/60 hover:text-white transition-colors text-sm flex items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-1 -ml-1 rounded-lg"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-          Back
-        </button>
-
-        <h1 className="font-serif text-white text-3xl mb-2">
-          {step === 1 ? 'Create Account' : step === 2 ? 'Set Your PIN' : 'Verify Your Email'}
-        </h1>
-        <p className="text-white/50 mb-6">
-          {step === 1
-            ? 'Join CAREi to manage your care shifts digitally.'
-            : step === 2
-            ? 'Choose a 4-digit PIN for quick login.'
-            : 'Enter the 6-digit code sent to your email.'}
-        </p>
-
-        {step === 1 && (
-          <>
-            <div className="mb-4">
-              <label className="block text-white/70 text-sm mb-2">Full name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Jane Smith"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
-                onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
-              />
-            </div>
-            <div className="mb-4">
-              <label className="block text-white/70 text-sm mb-2">Email address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="carer@agency.co.uk"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
-                onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
-              />
-            </div>
-            <div className="mb-4">
-              <label className="block text-white/70 text-sm mb-2">Mobile number</label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="07XXX XXXXXX"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
-                onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
-              />
-            </div>
-            <div className="mb-6">
-              <label className="block text-white/70 text-sm mb-2">Region</label>
-              <select
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white outline-none focus:border-teal transition-colors appearance-none"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center' }}
-              >
-                {regions.map((r) => (
-                  <option key={r} value={r} className="bg-slate-800 text-white">{r}</option>
-                ))}
-              </select>
-            </div>
-            {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
-            <button
-              onClick={handleStep1}
-              className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none"
-              style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
-            >
-              Continue
-            </button>
-          </>
-        )}
-
-        {step === 2 && (
-          <>
-            <div className="mb-4">
-              <label className="block text-white/70 text-sm mb-2">4-digit PIN</label>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={4}
-                value={pin}
-                onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setPin(v) }}
-                placeholder="••••"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors text-center text-2xl tracking-[0.5em]"
-                onKeyDown={(e) => e.key === 'Enter' && handleStep2()}
-              />
-            </div>
-            <div className="mb-6">
-              <label className="block text-white/70 text-sm mb-2">Confirm PIN</label>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={4}
-                value={confirmPin}
-                onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setConfirmPin(v) }}
-                placeholder="••••"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors text-center text-2xl tracking-[0.5em]"
-                onKeyDown={(e) => e.key === 'Enter' && handleStep2()}
-              />
-            </div>
-            {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
-            <button
-              onClick={handleStep2}
-              disabled={loading}
-              className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none disabled:opacity-50"
-              style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
-            >
-              {loading ? 'Sending code…' : 'Continue'}
-            </button>
-          </>
-        )}
-
-        {step === 3 && (
-          <>
-            {demoCode && (
-              <div className="mb-4 rounded-xl border border-teal/30 bg-teal/10 p-4 text-center">
-                <p className="text-white/60 text-xs mb-1">Your verification code</p>
-                <p className="text-3xl font-mono font-bold tracking-[0.3em]" style={{ color: COLORS.teal }}>{demoCode}</p>
-                <p className="text-white/40 text-[10px] mt-1">This is shown on screen for testing. SMS will be sent once domain is verified.</p>
+      <div className="flex-1 flex flex-col px-6 max-w-md mx-auto w-full py-8">
+        {/* Progress bar */}
+        {step !== 'done' && (
+          <div className="flex gap-0 mb-8">
+            {stepLabels.map((label, i) => (
+              <div key={label} className="flex-1 flex flex-col items-center gap-2">
+                <div 
+                  className="w-full h-1 rounded-full transition-colors"
+                  style={{ background: i <= stepIndex ? COLORS.teal : 'rgba(255,255,255,0.1)' }}
+                />
+                <span 
+                  className="text-[10px] font-medium"
+                  style={{ color: i <= stepIndex ? COLORS.teal : COLORS.g2 }}
+                >
+                  {label}
+                </span>
               </div>
-            )}
-            <div className="mb-6">
-              <label className="block text-white/70 text-sm mb-2">6-digit code</label>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                value={otp}
-                onChange={(e) => { const v = e.target.value.replace(/\D/g, ''); setOtp(v) }}
-                placeholder="••••••"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors text-center text-2xl tracking-[0.5em]"
-                onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
-              />
+            ))}
+          </div>
+        )}
+
+        {step !== 'done' && (
+          <button
+            onClick={handleBack}
+            className="self-start mb-6 text-white/60 hover:text-white transition-colors text-sm flex items-center gap-1 bg-transparent border-none cursor-pointer py-1 px-1 -ml-1 rounded-lg"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            Back
+          </button>
+        )}
+
+        {/* STEP 1: Details */}
+        {step === 'name' && (
+          <>
+            <div className="text-center mb-8">
+              <h1 className="font-serif text-white text-2xl mb-2">CARE<span style={{ color: COLORS.teal }}>i</span></h1>
+              <h2 className="font-serif text-white text-xl">Create your account</h2>
             </div>
-            {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-white/70 text-sm mb-2 font-medium">Full name</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Enter your full name"
+                  autoFocus
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
+                  onKeyDown={(e) => e.key === 'Enter' && handleNameNext()}
+                />
+              </div>
+              <div>
+                <label className="block text-white/70 text-sm mb-2 font-medium">Email address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email address"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
+                  onKeyDown={(e) => e.key === 'Enter' && handleNameNext()}
+                />
+              </div>
+              <div>
+                <label className="block text-white/70 text-sm mb-2 font-medium">Agency name</label>
+                <input
+                  type="text"
+                  value={agency}
+                  onChange={(e) => setAgency(e.target.value)}
+                  placeholder="Enter your agency name"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
+                  onKeyDown={(e) => e.key === 'Enter' && handleNameNext()}
+                />
+              </div>
+            </div>
+            
+            {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
+            
             <button
-              onClick={handleVerify}
-              disabled={loading}
-              className="w-full py-3.5 rounded-full font-bold text-base cursor-pointer border-none disabled:opacity-50"
+              onClick={handleNameNext}
+              className="w-full py-3.5 rounded-xl font-bold text-base cursor-pointer border-none mt-6"
               style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
             >
-              {loading ? 'Verifying…' : 'Verify & Create Account'}
+              Continue →
             </button>
+            
             <button
-              onClick={handleSendOtp}
-              disabled={loading}
-              className="w-full mt-3 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
+              onClick={() => setLocation('/login')}
+              className="w-full mt-4 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
             >
-              Didn't receive it? Resend code
+              Already have an account? Log in
             </button>
           </>
         )}
 
-        <button
-          onClick={() => setLocation('/login')}
-          className="w-full mt-4 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
-        >
-          Already have an account? Sign in →
-        </button>
+        {/* STEP 2: Role Selection */}
+        {step === 'role' && (
+          <>
+            <div className="text-center mb-6">
+              <p className="text-white/50 text-sm">How will you be using CAREi?</p>
+            </div>
+            
+            <div className="space-y-4">
+              {[
+                { 
+                  role: 'manager' as UserRole, 
+                  icon: '🏢', 
+                  title: 'I manage a care team', 
+                  sub: 'Set up your agency, invite carers, manage clients and approve shift summaries.', 
+                  tags: ['Team Management', 'Client Allocation', 'Approvals'] 
+                },
+                { 
+                  role: 'carer' as UserRole, 
+                  icon: '👩‍⚕️', 
+                  title: "I'm a care worker", 
+                  sub: 'Access your schedule, complete visits, record medications and submit handovers.', 
+                  tags: ['Visit Recording', 'Medication Log', 'AI Copilot'] 
+                },
+              ].map((opt) => (
+                <button
+                  key={opt.role}
+                  onClick={() => handleRoleSelect(opt.role)}
+                  className="w-full text-left rounded-2xl p-5 cursor-pointer transition-all"
+                  style={{
+                    background: selectedRole === opt.role ? 'rgba(79,209,197,0.12)' : 'rgba(255,255,255,0.04)',
+                    border: `2px solid ${selectedRole === opt.role ? 'rgba(79,209,197,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                  }}
+                >
+                  <div className="text-3xl mb-2">{opt.icon}</div>
+                  <div className="text-white font-bold text-base mb-1">{opt.title}</div>
+                  <div className="text-white/50 text-sm leading-relaxed mb-3">{opt.sub}</div>
+                  <div className="flex gap-2 flex-wrap">
+                    {opt.tags.map(t => (
+                      <span 
+                        key={t} 
+                        className="text-[10px] font-bold px-2 py-1 rounded-full"
+                        style={{ background: 'rgba(79,209,197,0.1)', color: COLORS.teal }}
+                      >
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* STEP 3: PIN Setup */}
+        {step === 'pin' && (
+          <>
+            <div className="text-center mb-8">
+              <h2 className="text-white font-semibold text-lg mb-1">Choose a 4-digit PIN</h2>
+              <p className="text-white/50 text-sm">You'll use this to log in each time</p>
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-white/50 text-xs mb-3 text-center uppercase tracking-wider">Enter PIN</label>
+                <PinBoxes pin={pin} onChange={handlePinChange} />
+              </div>
+              
+              <div>
+                <label className="block text-white/50 text-xs mb-3 text-center uppercase tracking-wider">Confirm PIN</label>
+                <PinBoxes pin={confirmPin} onChange={handleConfirmPinChange} />
+              </div>
+            </div>
+            
+            {error && <p className="text-red-400 text-sm mt-6 text-center">{error}</p>}
+            
+            <button
+              onClick={handleCreate}
+              disabled={loading || !pin.every(p => p) || !confirmPin.every(p => p)}
+              className="w-full py-3.5 rounded-xl font-bold text-base cursor-pointer border-none disabled:opacity-50 mt-8"
+              style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
+            >
+              {loading ? 'Creating account…' : 'Create Account'}
+            </button>
+          </>
+        )}
+
+        {/* STEP 4: Avatar Reveal / Success */}
+        {step === 'done' && (
+          <div className="flex-1 flex flex-col items-center justify-center animate-fadeIn">
+            {/* Avatar with initials */}
+            <div className="relative mb-6">
+              <div 
+                className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold shadow-lg"
+                style={{ 
+                  background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`,
+                  color: COLORS.darkNavy,
+                  boxShadow: `0 0 0 6px rgba(79,209,197,0.18), 0 0 0 12px rgba(79,209,197,0.07)`,
+                }}
+              >
+                {getInitials(fullName) || '?'}
+              </div>
+              <div 
+                className="absolute bottom-0 right-0 w-7 h-7 rounded-full flex items-center justify-center border-2"
+                style={{ background: COLORS.green, borderColor: COLORS.darkNavy }}
+              >
+                <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
+                  <polyline points="2,7 5,10 11,3" stroke={COLORS.darkNavy} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            </div>
+            
+            <h2 className="text-white font-bold text-2xl mb-1">Welcome, {fullName.trim().split(' ')[0]}!</h2>
+            <p className="text-white/50 mb-3">{agency.trim() || 'Your Agency'}</p>
+            
+            <div className="inline-flex gap-2 mb-6">
+              <span 
+                className="px-4 py-1.5 rounded-full text-xs font-bold"
+                style={{ 
+                  background: selectedRole === 'manager' ? 'rgba(79,209,197,0.15)' : 'rgba(255,255,255,0.08)', 
+                  color: selectedRole === 'manager' ? COLORS.teal : COLORS.g2,
+                  border: `1px solid ${selectedRole === 'manager' ? 'rgba(79,209,197,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                }}
+              >
+                {selectedRole === 'manager' ? '🏢 Agency Manager' : '👩‍⚕️ Care Worker'}
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2 text-white/30 text-xs">
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: COLORS.teal, animationDelay: '0s' }} />
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: COLORS.teal, animationDelay: '0.4s' }} />
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: COLORS.teal, animationDelay: '0.8s' }} />
+              </div>
+              <span>Setting up your {selectedRole === 'manager' ? 'portal' : 'workspace'}…</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

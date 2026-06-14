@@ -2,15 +2,43 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation, useParams } from 'wouter'
 import { getClient, startVisit } from '../api/client'
+import { getClientById } from '../data/demoData'
 
 const COLORS = {
-  darkNavy: '#0B1120',
+  darkNavy: '#0F1D34',
   navy: '#1B2A49',
   teal: '#4FD1C5',
-  teal2: '#40E0D0',
+  teal2: '#38B2AC',
   amber: '#F6B73C',
   red: '#FF5A5F',
-  lavender: '#A78BFA',
+  green: '#22C55E',
+  g2: '#94A3B8',
+}
+
+// Client emoji avatars matching the document
+const CLIENT_EMOJIS: Record<string, string> = {
+  'Mary Johnson': '👵',
+  'Tom Adams': '👴',
+  'Aisha Khan': '🧕',
+}
+
+// Demo handover bullets with emoji tags per client
+const DEMO_HANDOVER_BULLETS: Record<string, string[]> = {
+  'Mary Johnson': [
+    '⚡ PBS Risk — First hour after arrival is sensitive; use calm voice',
+    '🍽️ Must finish lunch within 30 min (dysphagia protocol)',
+    '🌡️ Check temperature if appears flushed'
+  ],
+  'Tom Adams': [
+    '💨 COPD — No aerosol sprays near room',
+    '🩺 Oxygen concentrator at 2L/min via nasal cannula',
+    '🍽️ Soft diet only — choking risk on solids'
+  ],
+  'Aisha Khan': [
+    '🧩 Non-verbal — Use picture cards; do not force speech',
+    '🏠 Familiar carer only — strangers trigger distress',
+    '⚡ PBS Red Zone — Do not approach if pacing; call supervisor'
+  ],
 }
 
 interface ClientDetail {
@@ -30,6 +58,18 @@ interface ClientDetail {
   careCues?: string[]
   lastHandover?: string | null
   lastHandoverAt?: string | null
+  pronouns?: string
+  preferredName?: string
+  gpInfo?: {
+    name: string
+    phone: string
+    surgery: string
+  }
+  nextOfKin?: {
+    name: string
+    relationship: string
+    phone: string
+  }
 }
 
 export default function ClientOverviewScreen() {
@@ -77,6 +117,8 @@ export default function ClientOverviewScreen() {
   }
 
   const initials = client.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+  const demoClient = getClientById(client.id)
+  const handoverBullets = DEMO_HANDOVER_BULLETS[client.name] || client.careCues?.slice(0, 3) || []
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative items-center">
@@ -103,18 +145,39 @@ export default function ClientOverviewScreen() {
           </div>
 
           <div className="relative z-10 flex items-center gap-4 mb-4">
+            {/* Emoji Avatar */}
             <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold shrink-0"
-              style={{ background: `linear-gradient(135deg, ${COLORS.teal}30, ${COLORS.teal2}20)`, color: COLORS.teal }}
+              className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shrink-0"
+              style={{ 
+                background: `linear-gradient(135deg, ${COLORS.teal}20, ${COLORS.teal2}10)`,
+                border: `2px solid ${COLORS.teal}30`,
+              }}
             >
-              {initials}
+              {CLIENT_EMOJIS[client.name] || '👤'}
             </div>
-            <div>
-              <h1 className="font-serif text-xl">{client.name}</h1>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="font-serif text-xl">{client.name}</h1>
+                {client.pronouns && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/60">
+                    {client.pronouns}
+                  </span>
+                )}
+              </div>
               <div className="text-[11px] text-white/50">
+                {client.preferredName && <span className="text-white/70">"{client.preferredName}" · </span>}
                 {client.age ? `${client.age} yrs · ` : ''}
                 {client.address}
               </div>
+              {/* GP Info inline */}
+              {client.gpInfo && (
+                <div className="text-[10px] text-white/40 mt-1 flex items-center gap-1">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="6" width="18" height="16" rx="2"/>
+                  </svg>
+                  GP: {client.gpInfo.name} · {client.gpInfo.surgery}
+                </div>
+              )}
             </div>
           </div>
 
@@ -136,6 +199,24 @@ export default function ClientOverviewScreen() {
 
         {/* Body */}
         <div className="flex-1 px-4 py-5 overflow-auto">
+          {/* 3 Handover Bullets with Emoji Tags */}
+          <div className="mb-4 rounded-2xl p-4 border border-slate-100 bg-white">
+            <div className="flex items-center gap-2 mb-3">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/>
+              </svg>
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Pre-Visit Handover</div>
+            </div>
+            <div className="space-y-2.5">
+              {handoverBullets.map((bullet, idx) => (
+                <div key={idx} className="flex items-start gap-2.5">
+                  <span className="text-lg shrink-0">{bullet.split(' ')[0]}</span>
+                  <span className="text-xs text-slate-700 leading-relaxed">{bullet.substring(bullet.indexOf(' ') + 1)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Allergy Banner */}
           {client.allergies && !dismissedAllergy && (
             <motion.div
@@ -254,8 +335,38 @@ export default function ClientOverviewScreen() {
             </div>
           )}
 
-          {/* Emergency Contact */}
-          {client.emergencyContact && (
+          {/* GP Info Card */}
+          {client.gpInfo && (
+            <div className="mb-4 rounded-2xl p-4 border border-slate-100 bg-white">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">GP Information</div>
+              <div className="text-sm font-medium text-slate-800">{client.gpInfo.name}</div>
+              <div className="text-xs text-slate-500">{client.gpInfo.surgery}</div>
+              <a href={`tel:${client.gpInfo.phone}`} className="text-xs text-teal-600 mt-1 inline-flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+                {client.gpInfo.phone}
+              </a>
+            </div>
+          )}
+
+          {/* Next of Kin */}
+          {client.nextOfKin && (
+            <div className="mb-4 rounded-2xl p-4 border border-slate-100 bg-white">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Next of Kin</div>
+              <div className="text-sm font-medium text-slate-800">{client.nextOfKin.name}</div>
+              <div className="text-xs text-slate-500">{client.nextOfKin.relationship}</div>
+              <a href={`tel:${client.nextOfKin.phone}`} className="text-xs text-teal-600 mt-1 inline-flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+                {client.nextOfKin.phone}
+              </a>
+            </div>
+          )}
+
+          {/* Emergency Contact (fallback) */}
+          {client.emergencyContact && !client.nextOfKin && (
             <div className="mb-4 rounded-2xl p-4 border border-slate-100 bg-white">
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Emergency Contact</div>
               <div className="text-sm text-slate-800">{client.emergencyContact}</div>
@@ -284,8 +395,26 @@ export default function ClientOverviewScreen() {
           )}
         </div>
 
-        {/* Sticky Start Visit Button */}
-        <div className="shrink-0 px-4 pb-5 pt-2 bg-slate-50">
+        {/* Sticky Action Buttons: View Care Plan + Start Visit */}
+        <div className="shrink-0 px-4 pb-5 pt-2 bg-slate-50 flex gap-3">
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setLocation(`/client/${client.id}/care-plan`)}
+            className="flex-1 py-3.5 rounded-2xl text-sm font-bold border cursor-pointer transition-all hover:opacity-90 active:scale-[0.98]"
+            style={{ 
+              background: 'white', 
+              borderColor: `${COLORS.teal}40`,
+              color: COLORS.teal 
+            }}
+          >
+            <span className="flex items-center justify-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/>
+              </svg>
+              View Care Plan
+            </span>
+          </motion.button>
+          
           <motion.button
             whileTap={{ scale: 0.97 }}
             disabled={startingVisit}
@@ -300,7 +429,7 @@ export default function ClientOverviewScreen() {
                 setStartingVisit(false)
               }
             }}
-            className="w-full py-3.5 rounded-2xl text-sm font-bold text-white border-none cursor-pointer transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-[2] py-3.5 rounded-2xl text-sm font-bold text-white border-none cursor-pointer transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
           >
             {startingVisit ? 'Starting Visit...' : 'Start Active Visit'}

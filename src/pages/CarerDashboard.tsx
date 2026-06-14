@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation } from 'wouter'
+import { SCHEDULE_CLIENTS } from '../data/demoData'
 import type { Visit } from '../data/clients'
 import {
   getVisits,
@@ -21,10 +22,12 @@ const COLORS = {
   darkNavy: '#0B1120',
   navy: '#1B2A49',
   teal: '#4FD1C5',
-  teal2: '#40E0D0',
+  teal2: '#38B2AC',
   amber: '#F6B73C',
   red: '#FF5A5F',
   lavender: '#A78BFA',
+  green: '#22C55E',
+  g2: '#94A3B8',
 }
 
 function getStatusDot(status: Visit['status']) {
@@ -58,6 +61,20 @@ interface UserProfile {
 
 function getInitials(name: string) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
+// Client emoji avatars matching the document
+const CLIENT_EMOJIS: Record<string, string> = {
+  'Mary Johnson': '👵',
+  'Tom Adams': '👴',
+  'Aisha Khan': '🧕',
+}
+
+// Demo visit briefings matching document structure
+const DEMO_BRIEFINGS: Record<string, string[]> = {
+  'Mary Johnson': ['⚡ PBS Risk - First hour sensitive', '🍽️ Must finish lunch within 30 min', '🌡️ Check temperature'],
+  'Tom Adams': ['💨 COPD - No aerosols', '🩺 Oxygen at 2L', '🍽️ Soft diet only'],
+  'Aisha Khan': ['🧩 Non-verbal - Use picture cards', '🏠 Familiar carer only', '⚡ PBS Red - Do not approach'],
 }
 
 export default function CarerDashboard() {
@@ -405,45 +422,55 @@ export default function CarerDashboard() {
               transition={{ duration: 0.3 }}
               className="group bg-white rounded-2xl p-4 border border-slate-100 shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
             >
-              {/* Top row: avatar + name + status */}
+              {/* Top row: emoji avatar + name + time pill + status */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2.5">
+                  {/* Emoji Avatar */}
                   <div
-                    className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-2xl shrink-0"
                     style={{
                       background: visit.status === 'completed'
                         ? 'rgba(34,197,94,0.1)' : visit.status === 'in-progress'
                         ? `linear-gradient(135deg, ${COLORS.teal}20, ${COLORS.teal2}15)`
                         : 'rgba(148,163,184,0.12)',
-                      color: getStatusDot(visit.status),
+                      border: `2px solid ${visit.status === 'completed' ? 'rgba(34,197,94,0.2)' : visit.status === 'in-progress' ? COLORS.teal : 'rgba(148,163,184,0.3)'}`,
                     }}
                   >
-                    {visit.clientName.split(' ').map((n) => n[0]).join('')}
+                    {CLIENT_EMOJIS[visit.clientName] || '👤'}
                   </div>
                   <div>
                     <div className="font-bold text-sm text-slate-800">{visit.clientName}</div>
                     <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                      <span 
+                        className="px-2 py-0.5 rounded-full"
+                        style={{ background: 'rgba(79,209,197,0.1)', color: COLORS.teal }}
+                      >
                         {visit.time}
                       </span>
-                      <span className="flex items-center gap-1">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 8 10" /></svg>
-                        {visit.duration}
-                      </span>
+                      <span>{visit.duration}</span>
                     </div>
                   </div>
                 </div>
                 <span
                   className="text-[10px] font-semibold px-2.5 py-1 rounded-full shrink-0"
                   style={{
-                    background: visit.status === 'completed' ? 'rgba(34,197,94,0.08)' : visit.status === 'in-progress' ? 'rgba(79,209,197,0.1)' : 'rgba(148,163,184,0.1)',
+                    background: visit.status === 'completed' ? 'rgba(34,197,94,0.08)' : visit.status === 'in-progress' ? 'rgba(79,209,197,0.1)' : visit.status === 'missed' ? 'rgba(255,90,95,0.1)' : 'rgba(148,163,184,0.1)',
                     color: getStatusDot(visit.status),
-                    border: `1px solid ${visit.status === 'completed' ? 'rgba(34,197,94,0.15)' : visit.status === 'in-progress' ? `${COLORS.teal}20` : 'rgba(148,163,184,0.15)'}`,
+                    border: `1px solid ${visit.status === 'completed' ? 'rgba(34,197,94,0.15)' : visit.status === 'in-progress' ? `${COLORS.teal}20` : visit.status === 'missed' ? 'rgba(255,90,95,0.2)' : 'rgba(148,163,184,0.15)'}`,
                   }}
                 >
                   {getStatusLabel(visit.status)}
                 </span>
+              </div>
+              
+              {/* 3 Handover Bullets with Emoji Tags */}
+              <div className="mb-3 space-y-1.5">
+                {(DEMO_BRIEFINGS[visit.clientName] || visit.flags.slice(0, 3)).map((bullet, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-[11px] text-slate-600">
+                    <span className="text-teal-500 mt-0.5">•</span>
+                    <span>{bullet}</span>
+                  </div>
+                ))}
               </div>
 
               {/* Flags */}
@@ -682,15 +709,66 @@ export default function CarerDashboard() {
         </div>
       )}
 
-      {/* SOS Floating Button */}
-      <button
-        onClick={handleSOS}
-        className="fixed bottom-6 right-6 w-14 h-14 rounded-full text-white font-bold text-sm shadow-lg cursor-pointer border-none z-50 flex items-center justify-center"
-        style={{ background: COLORS.red, boxShadow: '0 8px 32px rgba(255,90,95,0.4)' }}
-        aria-label="SOS Emergency"
-      >
-        SOS
-      </button>
+      {/* Bottom Navigation - Today | Copilot | SOS | History | Profile */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-2 pt-2 pb-safe z-40">
+        <div className="max-w-md mx-auto flex items-center justify-around">
+          <button 
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-colors hover:bg-slate-50"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>
+            </svg>
+            <span className="text-[10px] font-medium" style={{ color: COLORS.teal }}>Today</span>
+          </button>
+          
+          <button 
+            onClick={() => setLocation('/copilot')}
+            className="flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-colors hover:bg-slate-50"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={COLORS.g2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/>
+            </svg>
+            <span className="text-[10px] font-medium text-slate-400">Copilot</span>
+          </button>
+          
+          {/* SOS Button with pulse animation */}
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: COLORS.red }} />
+            <div className="absolute -inset-1 rounded-full animate-pulse opacity-30" style={{ background: COLORS.red }} />
+            <button
+              onClick={handleSOS}
+              className="relative w-12 h-12 rounded-full text-white font-bold text-xs shadow-lg cursor-pointer border-2 border-white flex items-center justify-center"
+              style={{ background: COLORS.red, boxShadow: '0 4px 20px rgba(255,90,95,0.5)' }}
+              aria-label="SOS Emergency"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </button>
+          </div>
+          
+          <button 
+            onClick={() => setLocation('/history')}
+            className="flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-colors hover:bg-slate-50"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={COLORS.g2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>
+            </svg>
+            <span className="text-[10px] font-medium text-slate-400">History</span>
+          </button>
+          
+          <button 
+            onClick={() => setShowProfile(true)}
+            className="flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-colors hover:bg-slate-50"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={COLORS.g2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span className="text-[10px] font-medium text-slate-400">Profile</span>
+          </button>
+        </div>
+      </div>
 
       {/* Profile Modal */}
       {showProfile && (

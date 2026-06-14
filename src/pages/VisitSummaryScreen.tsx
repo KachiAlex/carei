@@ -81,7 +81,13 @@ export default function VisitSummaryScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
-  useAutoSave(visitId, { handoverNote }, 3000)
+  // Phase 5: Structured handover form fields
+  const [handoverMood, setHandoverMood] = useState<'positive' | 'neutral' | 'low' | 'distressed'>('neutral')
+  const [tasksCompleted, setTasksCompleted] = useState<string[]>([])
+  const [concerns, setConcerns] = useState<string[]>([])
+  const [otherNotes, setOtherNotes] = useState('')
+
+  useAutoSave(visitId, { handoverNote, handoverMood, tasksCompleted, concerns, otherNotes }, 3000)
 
   useEffect(() => {
     if (!visitId) return
@@ -90,6 +96,11 @@ export default function VisitSummaryScreen() {
         if (!data) return
         if (data.snapshot) setSnapshot(data.snapshot)
         if (data.handoverNote) setHandoverNote(data.handoverNote)
+        // Load structured form data
+        if (data.handoverMood) setHandoverMood(data.handoverMood)
+        if (data.tasksCompleted) setTasksCompleted(data.tasksCompleted)
+        if (data.concerns) setConcerns(data.concerns)
+        if (data.otherNotes) setOtherNotes(data.otherNotes)
       })
       .catch(() => {})
   }, [visitId])
@@ -116,6 +127,53 @@ export default function VisitSummaryScreen() {
     }
   }
 
+  // Phase 5: Generate handover from structured form
+  const generateStructuredHandover = () => {
+    const moodText = {
+      positive: 'Client was in positive spirits, engaged well throughout the visit.',
+      neutral: 'Client was calm and neutral during the visit.',
+      low: 'Client appeared low in mood, required additional support and encouragement.',
+      distressed: 'Client showed signs of distress and needed reassurance and comfort.'
+    }
+
+    const lines: string[] = []
+    lines.push(`Handover for ${snapshot.clientName}:`)
+    lines.push('')
+    lines.push(`🧠 Mood: ${moodText[handoverMood]}`)
+    lines.push('')
+    
+    if (tasksCompleted.length > 0) {
+      lines.push('✅ Tasks Completed:')
+      tasksCompleted.forEach((t) => lines.push(`   • ${t}`))
+      lines.push('')
+    }
+    
+    if (concerns.length > 0) {
+      lines.push('⚠️ Concerns:')
+      concerns.forEach((c) => lines.push(`   • ${c}`))
+      lines.push('')
+    }
+    
+    if (otherNotes.trim()) {
+      lines.push('📝 Additional Notes:')
+      lines.push(otherNotes)
+    }
+    
+    setHandoverNote(lines.join('\n'))
+  }
+
+  const toggleTask = (task: string) => {
+    setTasksCompleted((prev) =>
+      prev.includes(task) ? prev.filter((t) => t !== task) : [...prev, task]
+    )
+  }
+
+  const toggleConcern = (concern: string) => {
+    setConcerns((prev) =>
+      prev.includes(concern) ? prev.filter((c) => c !== concern) : [...prev, concern]
+    )
+  }
+
   const handlePrint = () => {
     window.print()
   }
@@ -125,6 +183,10 @@ export default function VisitSummaryScreen() {
     const payload = {
       ...snapshot,
       handoverNote,
+      handoverMood,
+      tasksCompleted,
+      concerns,
+      otherNotes,
       submittedAt: new Date().toISOString(),
     }
     if (!navigator.onLine) {
@@ -436,24 +498,126 @@ export default function VisitSummaryScreen() {
           </div>
         )}
 
-        {/* Handover Note */}
+        {/* Phase 5: Structured Handover Form */}
         <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-bold text-sm text-slate-800">Handover Note</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-sm text-slate-800">Structured Handover</h3>
             <button
               onClick={generateHandover}
               disabled={generating}
-              className="text-[11px] font-semibold px-3 py-1.5 rounded-xl cursor-pointer border-none disabled:opacity-50 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5"
+              className="text-[10px] font-semibold px-2.5 py-1.5 rounded-lg cursor-pointer border-none disabled:opacity-50 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5"
               style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/><path d="M2 12h20"/></svg>
-              {generating ? 'Generating...' : 'Auto-Generate'}
+              {generating ? 'AI Gen...' : 'AI Assist'}
             </button>
           </div>
+
+          {/* Mood Selector */}
+          <div className="mb-4">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Client Mood</div>
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { key: 'positive', label: '😊 Positive', color: '#22c55e' },
+                { key: 'neutral', label: '😐 Neutral', color: '#94a3b8' },
+                { key: 'low', label: '😔 Low', color: '#f59e0b' },
+                { key: 'distressed', label: '😟 Distressed', color: '#ef4444' },
+              ].map((m) => (
+                <button
+                  key={m.key}
+                  onClick={() => setHandoverMood(m.key as any)}
+                  className="py-2 rounded-xl text-[10px] font-semibold cursor-pointer border transition-all"
+                  style={{
+                    background: handoverMood === m.key ? `${m.color}15` : 'white',
+                    borderColor: handoverMood === m.key ? m.color : 'rgba(0,0,0,0.08)',
+                    color: handoverMood === m.key ? m.color : '#64748b',
+                  }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tasks Completed */}
+          <div className="mb-4">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Key Tasks Completed</div>
+            <div className="flex flex-wrap gap-2">
+              {snapshot.tasks.filter((t) => t.done).map((task) => (
+                <button
+                  key={task.name}
+                  onClick={() => toggleTask(task.name)}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-medium cursor-pointer border transition-all"
+                  style={{
+                    background: tasksCompleted.includes(task.name) ? 'rgba(79,209,197,0.1)' : 'white',
+                    borderColor: tasksCompleted.includes(task.name) ? COLORS.teal : 'rgba(0,0,0,0.08)',
+                    color: tasksCompleted.includes(task.name) ? COLORS.teal : '#64748b',
+                  }}
+                >
+                  {tasksCompleted.includes(task.name) ? '✓ ' : ''}{task.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Concerns */}
+          <div className="mb-4">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Concerns / Follow-ups</div>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {[
+                'Skin integrity check needed',
+                'Medication concerns',
+                'Mobility issues',
+                'Appetite reduced',
+                'Sleep disturbance',
+                'Family contact required',
+              ].map((concern) => (
+                <button
+                  key={concern}
+                  onClick={() => toggleConcern(concern)}
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-medium cursor-pointer border transition-all"
+                  style={{
+                    background: concerns.includes(concern) ? 'rgba(246,183,60,0.1)' : 'white',
+                    borderColor: concerns.includes(concern) ? COLORS.amber : 'rgba(0,0,0,0.08)',
+                    color: concerns.includes(concern) ? '#d97706' : '#64748b',
+                  }}
+                >
+                  {concerns.includes(concern) ? '⚠️ ' : '+'}{concern}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Other Notes */}
+          <div className="mb-4">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Additional Notes</div>
+            <textarea
+              value={otherNotes}
+              onChange={(e) => setOtherNotes(e.target.value)}
+              placeholder="Any other important information for the next carer..."
+              className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
+              rows={2}
+            />
+          </div>
+
+          {/* Generate from Structured Form */}
+          <button
+            onClick={generateStructuredHandover}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold cursor-pointer border transition-all flex items-center justify-center gap-2 mb-4"
+            style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b', background: '#f8fafc' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v18"/><path d="m6 9 6-6 6 6"/><path d="m6 15 6 6 6-6"/>
+            </svg>
+            Generate Handover from Form
+          </button>
+
+          {/* Final Handover Note */}
+          <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Final Handover Note</div>
           <textarea
             value={handoverNote}
             onChange={(e) => setHandoverNote(e.target.value)}
-            placeholder="Write a handover note for the next carer..."
+            placeholder="Generated handover note will appear here..."
             className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
             rows={4}
           />
