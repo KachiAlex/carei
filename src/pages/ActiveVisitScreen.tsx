@@ -1914,17 +1914,16 @@ export default function ActiveVisitScreen() {
           <div className="bg-white rounded-2xl p-5 max-w-sm w-full">
             <h3 className="font-bold text-slate-800 mb-3">Body Map Photo</h3>
             <p className="text-sm text-slate-500 mb-4">Take a photo of any skin concerns, bruises, or wounds. This will be auto-tagged to this visit.</p>
-            <input
-              type="file"
-              accept="image/*"
-              className="w-full mb-4 text-sm text-slate-500"
-              onChange={(e) => {
-                if (e.target.files?.[0]) {
-                  setNotes((n) => n + '\n[Body map photo captured]')
-                  setShowBodyMap(false)
-                }
+            <button
+              onClick={() => {
+                setNotes((n) => n + '\n[Body map photo captured]')
+                setShowBodyMap(false)
               }}
-            />
+              className="w-full py-2.5 rounded-xl text-sm font-semibold border cursor-pointer mb-3"
+              style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b', background: '#f8fafc' }}
+            >
+              Mark Photo Taken
+            </button>
             <button
               onClick={() => setShowBodyMap(false)}
               className="w-full py-2.5 rounded-xl text-sm font-semibold border cursor-pointer"
