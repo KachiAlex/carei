@@ -521,6 +521,7 @@ export async function saveBodyMapMark(data: {
   side?: string
   type?: string
   note?: string
+  photoUrl?: string
 }) {
   return post('/body-map', data)
 }

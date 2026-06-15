@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useRoute } from 'wouter'
 import { motion } from 'framer-motion'
+import { saveBodyMapMark, getBodyMapMarks, deleteBodyMapMark } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -46,17 +47,45 @@ export default function BodyMapScreen() {
   const [selectedMark, setSelectedMark] = useState<BodyMark | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [allClientMarks, setAllClientMarks] = useState<BodyMark[]>([])
+  const [comparisonMode, setComparisonMode] = useState(false)
+  const [compareVisitId, setCompareVisitId] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load marks from localStorage for demo
-    const saved = localStorage.getItem(`body-map-${visitId}`)
-    if (saved) setMarks(JSON.parse(saved))
+    // Load marks from backend API
+    async function loadMarks() {
+      try {
+        const data = await getBodyMapMarks(visitId)
+        if (data && Array.isArray(data)) {
+          setMarks(data)
+        }
+      } catch (err) {
+        console.error('Failed to load body map marks:', err)
+      }
+    }
+    if (visitId) loadMarks()
   }, [visitId])
 
-  const saveMarks = (newMarks: BodyMark[]) => {
-    setMarks(newMarks)
-    localStorage.setItem(`body-map-${visitId}`, JSON.stringify(newMarks))
-  }
+  // Load all client marks for history view
+  useEffect(() => {
+    async function loadClientMarks() {
+      if (!showHistory) return
+      try {
+        // Extract clientId from current marks
+        const clientId = marks[0]?.client_id || null
+        if (clientId) {
+          const data = await getBodyMapMarks(undefined, clientId)
+          if (data && Array.isArray(data)) {
+            setAllClientMarks(data)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load client body map marks:', err)
+      }
+    }
+    loadClientMarks()
+  }, [showHistory, marks])
 
   const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return
@@ -87,28 +116,47 @@ export default function BodyMapScreen() {
     fileInputRef.current?.click()
   }
 
-  const addMark = () => {
+  const addMark = async () => {
     if (!clickPos) return
-    const id = 'bm-' + Date.now()
-    const newMark: BodyMark = {
-      id,
-      x: clickPos.x,
-      y: clickPos.y,
-      side,
-      type: markType,
-      note: markNote,
-      photoUrl: photoPreview || undefined,
-      createdAt: new Date().toISOString(),
+    try {
+      const res = await saveBodyMapMark({
+        visitId,
+        x: clickPos.x,
+        y: clickPos.y,
+        side,
+        type: markType,
+        note: markNote,
+        photoUrl: photoPreview || undefined,
+      })
+      if (res?.id) {
+        const newMark: BodyMark = {
+          id: res.id,
+          x: clickPos.x,
+          y: clickPos.y,
+          side,
+          type: markType,
+          note: markNote,
+          photoUrl: photoPreview || undefined,
+          createdAt: new Date().toISOString(),
+        }
+        setMarks([...marks, newMark])
+        setShowMarkForm(false)
+        setClickPos(null)
+        setPhotoPreview(null)
+      }
+    } catch (err) {
+      console.error('Failed to save body map mark:', err)
     }
-    saveMarks([...marks, newMark])
-    setShowMarkForm(false)
-    setClickPos(null)
-    setPhotoPreview(null)
   }
 
-  const deleteMark = (id: string) => {
-    saveMarks(marks.filter((m) => m.id !== id))
-    setSelectedMark(null)
+  const deleteMark = async (id: string) => {
+    try {
+      await deleteBodyMapMark(id)
+      setMarks(marks.filter((m) => m.id !== id))
+      setSelectedMark(null)
+    } catch (err) {
+      console.error('Failed to delete body map mark:', err)
+    }
   }
 
   const filteredMarks = marks.filter((m) => m.side === side)
@@ -122,7 +170,12 @@ export default function BodyMapScreen() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
             Back
           </button>
-          <span className="text-xs text-white/40">Tap body to mark</span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setShowHistory(!showHistory)} className="text-xs text-white/60 hover:text-white bg-transparent border-none cursor-pointer transition-colors">
+              {showHistory ? 'Current' : 'History'}
+            </button>
+            <span className="text-xs text-white/40">Tap body to mark</span>
+          </div>
         </div>
         <h1 className="font-serif text-lg font-bold">Body Map</h1>
         {/* Side toggle */}
@@ -331,6 +384,125 @@ export default function BodyMapScreen() {
                 Remove
               </button>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* History Timeline Modal */}
+      {showHistory && (
+        <div className="absolute inset-0 bg-black/40 flex items-end justify-center z-50" onClick={() => setShowHistory(false)}>
+          <motion.div
+            initial={{ y: 100 }}
+            animate={{ y: 0 }}
+            className="bg-white rounded-t-2xl p-5 w-full max-w-md max-h-[80vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-sm text-slate-800">Mark History</h3>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setComparisonMode(!comparisonMode)}
+                  className="text-xs px-2 py-1 rounded border cursor-pointer"
+                  style={{ 
+                    background: comparisonMode ? COLORS.teal : 'white',
+                    color: comparisonMode ? 'white' : '#64748b',
+                    borderColor: comparisonMode ? COLORS.teal : 'rgba(0,0,0,0.08)'
+                  }}
+                >
+                  {comparisonMode ? 'Exit Compare' : 'Compare'}
+                </button>
+                <button onClick={() => setShowHistory(false)} className="text-slate-400 hover:text-slate-600">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            {comparisonMode ? (
+              <div className="space-y-4">
+                <p className="text-xs text-slate-500 mb-2">Select a previous visit to compare with current</p>
+                {Array.from(new Set(allClientMarks.map(m => m.visit_id)))
+                  .filter(vid => vid !== visitId)
+                  .sort((a, b) => {
+                    const aDate = allClientMarks.find(m => m.visit_id === a)?.createdAt || ''
+                    const bDate = allClientMarks.find(m => m.visit_id === b)?.createdAt || ''
+                    return new Date(bDate).getTime() - new Date(aDate).getTime()
+                  })
+                  .map(vid => (
+                    <button
+                      key={vid}
+                      onClick={() => setCompareVisitId(vid)}
+                      className="w-full text-left p-3 rounded-xl border cursor-pointer transition-all"
+                      style={{
+                        background: compareVisitId === vid ? `${COLORS.teal}10` : 'white',
+                        borderColor: compareVisitId === vid ? COLORS.teal : 'rgba(0,0,0,0.08)'
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-slate-700">Visit {vid.slice(-6)}</span>
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(allClientMarks.find(m => m.visit_id === vid)?.createdAt || '').toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-1">
+                        {allClientMarks.filter(m => m.visit_id === vid).length} marks
+                      </div>
+                    </button>
+                  ))}
+                
+                {compareVisitId && (
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    <h4 className="text-xs font-semibold text-slate-700 mb-2">Comparison Summary</h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-600">Current marks:</span>
+                        <span className="font-semibold">{marks.length}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-600">Previous marks:</span>
+                        <span className="font-semibold">{allClientMarks.filter(m => m.visit_id === compareVisitId).length}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-600">New marks:</span>
+                        <span className="font-semibold text-green-600">
+                          {marks.filter(m => !allClientMarks.find(pm => pm.visit_id === compareVisitId && Math.abs(pm.x - m.x) < 5 && Math.abs(pm.y - m.y) < 5)).length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              allClientMarks.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-8">No history available</p>
+              ) : (
+                <div className="space-y-4">
+                  {allClientMarks
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .map((mark) => (
+                      <div key={mark.id} className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm">{MARK_CATEGORIES[mark.type]?.icon || '🔴'}</span>
+                          <span className="text-xs font-semibold text-slate-700">{MARK_CATEGORIES[mark.type]?.label || mark.type}</span>
+                          <span className="text-[10px] text-slate-400 ml-auto">
+                            {new Date(mark.createdAt).toLocaleDateString()} {new Date(mark.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 mb-1">
+                          {mark.side === 'anterior' ? 'Front' : 'Back'} • Position: {mark.x}%, {mark.y}%
+                        </div>
+                        {mark.note && <p className="text-xs text-slate-600">{mark.note}</p>}
+                        {mark.photoUrl && (
+                          <div className="mt-2 rounded-lg overflow-hidden">
+                            <img src={mark.photoUrl} alt="Mark photo" className="w-full h-20 object-cover" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )
+            )}
           </motion.div>
         </div>
       )}

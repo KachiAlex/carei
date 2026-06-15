@@ -21,15 +21,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const user = users[0] as any
 
     if (req.method === 'POST') {
-      const { visitId, clientId, x, y, side, type, note } = req.body || {}
+      const { visitId, clientId, x, y, side, type, note, photoUrl } = req.body || {}
       if (!visitId || x == null || y == null) {
         res.status(400).json({ error: 'visitId, x, y required' })
         return
       }
       const id = 'bm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6)
       await sql`
-        INSERT INTO body_map_marks (id, visit_id, client_id, carer_id, x, y, side, type, note)
-        VALUES (${id}, ${visitId}, ${clientId || null}, ${user.id}, ${x}, ${y}, ${side || 'anterior'}, ${type || 'skin_integrity'}, ${note || null})
+        INSERT INTO body_map_marks (id, visit_id, client_id, carer_id, x, y, side, type, note, photo_url)
+        VALUES (${id}, ${visitId}, ${clientId || null}, ${user.id}, ${x}, ${y}, ${side || 'anterior'}, ${type || 'skin_integrity'}, ${note || null}, ${photoUrl || null})
       `
       res.status(200).json({ id, status: 'saved' })
       return
