@@ -144,15 +144,14 @@ export default function ActiveVisitScreen() {
 
     async function load() {
       try {
-        const v = await fetchVisit(visitId)
+        // Critical data: fetch visit and client in parallel
+        const [v, c] = await Promise.all([
+          fetchVisit(visitId).catch(() => null),
+          fetchVisit(visitId).then((visit) => visit?.clientId ? fetchClient(visit.clientId).catch(() => null) : null).catch(() => null)
+        ])
+
         if (!mounted) return
         if (v && v.id) setVisit(v)
-
-        let c = null
-        if (v?.clientId) {
-          try { c = await fetchClient(v.clientId) } catch (err: any) { console.error('fetchClient failed', err.message) }
-        }
-        if (!mounted) return
         if (c) setClient(c)
 
         // Initialize tasks and meds from scheduled visit / client
@@ -178,30 +177,6 @@ export default function ActiveVisitScreen() {
           setPbsRiskLevel('amber')
         }
 
-        // Phase 4: Fetch drug interactions
-        if (c?.medications && Array.isArray(c.medications) && c.medications.length >= 2) {
-          try {
-            const drugNames = c.medications.map((m: any) => m.name)
-            const interactionRes = await getDrugInteractions(drugNames)
-            if (mounted && interactionRes.interactions) {
-              setDrugInteractions(interactionRes.interactions)
-            }
-          } catch (err: any) { console.error('getDrugInteractions failed', err.message) }
-        }
-
-        // Phase 4: Fetch today's medication logs for overdose safeguard
-        if (c?.id) {
-          try {
-            const logsRes = await getMedicationLogs(c.id, true)
-            if (mounted && logsRes.logs) {
-              const given = new Set<string>(
-                logsRes.logs.filter((l: any) => l.status === 'given').map((l: any) => l.medication_name)
-              )
-              setMedsGivenToday(given)
-            }
-          } catch (err: any) { console.error('getMedicationLogs failed', err.message) }
-        }
-
         // Load saved visit data from DB
         if (v && v.elapsed != null) {
           setElapsed(v.elapsed)
@@ -220,7 +195,37 @@ export default function ActiveVisitScreen() {
           if (v.wellbeing_note) setWellbeingNote(v.wellbeing_note)
         }
 
-        // Load draft
+        // CRITICAL: Set loading to false now so UI renders
+        if (mounted) setLoading(false)
+
+        // Load secondary data in background (non-blocking)
+        if (c) {
+          // Phase 4: Fetch drug interactions
+          if (c.medications && Array.isArray(c.medications) && c.medications.length >= 2) {
+            try {
+              const drugNames = c.medications.map((m: any) => m.name)
+              const interactionRes = await getDrugInteractions(drugNames)
+              if (mounted && interactionRes.interactions) {
+                setDrugInteractions(interactionRes.interactions)
+              }
+            } catch (err: any) { console.error('getDrugInteractions failed', err.message) }
+          }
+
+          // Phase 4: Fetch today's medication logs for overdose safeguard
+          if (c.id) {
+            try {
+              const logsRes = await getMedicationLogs(c.id, true)
+              if (mounted && logsRes.logs) {
+                const given = new Set<string>(
+                  logsRes.logs.filter((l: any) => l.status === 'given').map((l: any) => l.medication_name)
+                )
+                setMedsGivenToday(given)
+              }
+            } catch (err: any) { console.error('getMedicationLogs failed', err.message) }
+          }
+        }
+
+        // Load draft in background
         try {
           const draft = await getVisitDraft(visitId)
           if (!mounted || !draft) return
@@ -238,8 +243,10 @@ export default function ActiveVisitScreen() {
           if (draft.selectedMood) setSelectedMood(draft.selectedMood)
           if (draft.wellbeingNote) setWellbeingNote(draft.wellbeingNote)
         } catch (err: any) { console.error('getVisitDraft failed', err.message) }
-      } catch (err: any) { console.error('load visit failed', err.message) }
-      if (mounted) setLoading(false)
+      } catch (err: any) { 
+        console.error('load visit failed', err.message)
+        if (mounted) setLoading(false)
+      }
     }
 
     load()
