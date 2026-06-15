@@ -217,7 +217,7 @@ export default function ClientOverviewScreen() {
                 ))
               ) : (
                 <div className="text-xs text-slate-400 italic py-2">
-                  No handover notes available. Previous visit notes will appear here after your first visit.
+                  No handover note
                 </div>
               )}
             </div>
