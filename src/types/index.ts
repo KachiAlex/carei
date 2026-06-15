@@ -165,13 +165,23 @@ export type BodyMapCategory = 'Wound' | 'Bruise' | 'Redness' | 'Swelling' | 'Ras
 
 export interface BodyMapMark {
   id: string
-  zone: string
+  visit_id: string
+  client_id?: string
+  carer_id?: string
+  x: number
+  y: number
+  side: 'anterior' | 'posterior'
   type: BodyMapCategory
-  color: string
+  note?: string
+  photo_url?: string
+  created_at: string
+  // Legacy fields for backward compatibility
+  zone?: string
+  color?: string
   severity?: 'Mild' | 'Moderate' | 'Severe'
   description?: string
   photoUrl?: string
-  createdAt: string
+  createdAt?: string
 }
 
 // Carer (Team Management)
