@@ -211,23 +211,23 @@ export default function BodyMapScreen() {
           {/* Body outline */}
           {side === 'anterior' ? (
             <>
-              <ellipse cx="50" cy="12" rx="10" ry="10" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <path d="M35 22 L65 22 L60 50 L40 50 Z" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <rect x="40" y="50" width="20" height="40" rx="3" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <rect x="32" y="55" width="6" height="30" rx="2" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <rect x="62" y="55" width="6" height="30" rx="2" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <rect x="40" y="90" width="8" height="45" rx="3" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <rect x="52" y="90" width="8" height="45" rx="3" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
+              <ellipse cx="50" cy="12" rx="10" ry="10" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <path d="M35 22 L65 22 L60 50 L40 50 Z" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <rect x="40" y="50" width="20" height="40" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <rect x="32" y="55" width="6" height="30" rx="2" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <rect x="62" y="55" width="6" height="30" rx="2" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <rect x="40" y="90" width="8" height="45" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <rect x="52" y="90" width="8" height="45" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
             </>
           ) : (
             <>
-              <ellipse cx="50" cy="12" rx="10" ry="10" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <path d="M35 22 L65 22 L60 50 L40 50 Z" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <rect x="40" y="50" width="20" height="40" rx="3" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <rect x="32" y="55" width="6" height="30" rx="2" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <rect x="62" y="55" width="6" height="30" rx="2" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <rect x="40" y="90" width="8" height="45" rx="3" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
-              <rect x="52" y="90" width="8" height="45" rx="3" fill="none" stroke="#94a3b8" strokeWidth="0.8" />
+              <ellipse cx="50" cy="12" rx="10" ry="10" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <path d="M35 22 L65 22 L60 50 L40 50 Z" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <rect x="40" y="50" width="20" height="40" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <rect x="32" y="55" width="6" height="30" rx="2" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <rect x="62" y="55" width="6" height="30" rx="2" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <rect x="40" y="90" width="8" height="45" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <rect x="52" y="90" width="8" height="45" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
             </>
           )}
           {/* Marks */}
