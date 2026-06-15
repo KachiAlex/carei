@@ -24,6 +24,9 @@ const MARK_CATEGORIES: Record<string, { color: string; label: string; icon: stri
 
 interface BodyMark {
   id: string
+  visit_id: string
+  client_id?: string
+  carer_id?: string
   x: number
   y: number
   side: 'anterior' | 'posterior'
@@ -131,6 +134,7 @@ export default function BodyMapScreen() {
       if (res?.id) {
         const newMark: BodyMark = {
           id: res.id,
+          visit_id: visitId,
           x: clickPos.x,
           y: clickPos.y,
           side,
