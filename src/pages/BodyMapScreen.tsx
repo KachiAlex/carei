@@ -201,33 +201,32 @@ export default function BodyMapScreen() {
       </div>
 
       {/* SVG Body */}
-      <div className="flex-1 flex items-center justify-center p-4 relative">
+      <div className="flex-1 flex items-center justify-center p-4 relative bg-slate-50">
         <svg
           ref={svgRef}
           viewBox="0 0 100 180"
-          className="w-full max-w-xs cursor-crosshair"
-          onClick={handleSvgClick}
+          className="w-full max-w-xs"
         >
           {/* Body outline */}
           {side === 'anterior' ? (
             <>
-              <ellipse cx="50" cy="12" rx="10" ry="10" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <path d="M35 22 L65 22 L60 50 L40 50 Z" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <rect x="40" y="50" width="20" height="40" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <rect x="32" y="55" width="6" height="30" rx="2" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <rect x="62" y="55" width="6" height="30" rx="2" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <rect x="40" y="90" width="8" height="45" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <rect x="52" y="90" width="8" height="45" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <ellipse cx="50" cy="12" rx="10" ry="10" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <path d="M35 22 L65 22 L60 50 L40 50 Z" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <rect x="40" y="50" width="20" height="40" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <rect x="32" y="55" width="6" height="30" rx="2" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <rect x="62" y="55" width="6" height="30" rx="2" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <rect x="40" y="90" width="8" height="45" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <rect x="52" y="90" width="8" height="45" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
             </>
           ) : (
             <>
-              <ellipse cx="50" cy="12" rx="10" ry="10" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <path d="M35 22 L65 22 L60 50 L40 50 Z" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <rect x="40" y="50" width="20" height="40" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <rect x="32" y="55" width="6" height="30" rx="2" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <rect x="62" y="55" width="6" height="30" rx="2" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <rect x="40" y="90" width="8" height="45" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
-              <rect x="52" y="90" width="8" height="45" rx="3" fill="none" stroke="#475569" strokeWidth="1.5" />
+              <ellipse cx="50" cy="12" rx="10" ry="10" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <path d="M35 22 L65 22 L60 50 L40 50 Z" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <rect x="40" y="50" width="20" height="40" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <rect x="32" y="55" width="6" height="30" rx="2" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <rect x="62" y="55" width="6" height="30" rx="2" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <rect x="40" y="90" width="8" height="45" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
+              <rect x="52" y="90" width="8" height="45" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
             </>
           )}
           {/* Marks */}
