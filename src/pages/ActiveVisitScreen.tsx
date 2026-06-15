@@ -1917,7 +1917,6 @@ export default function ActiveVisitScreen() {
             <input
               type="file"
               accept="image/*"
-              capture="environment"
               className="w-full mb-4 text-sm text-slate-500"
               onChange={(e) => {
                 if (e.target.files?.[0]) {

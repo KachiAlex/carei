@@ -201,11 +201,11 @@ export default function BodyMapScreen() {
       </div>
 
       {/* SVG Body */}
-      <div className="flex-1 flex items-center justify-center p-4 relative bg-slate-50">
+      <div className="flex-1 flex items-center justify-center p-4 relative bg-slate-50 border-2 border-slate-300 rounded-lg">
         <svg
           ref={svgRef}
           viewBox="0 0 100 180"
-          className="w-full max-w-xs"
+          className="w-full max-w-xs bg-white"
         >
           {/* Body outline */}
           {side === 'anterior' ? (
