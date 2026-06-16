@@ -27,6 +27,7 @@ const ManagerApprovalsScreen = lazy(() => import('./pages/ManagerApprovalsScreen
 const FamilySummaryScreen = lazy(() => import('./pages/FamilySummaryScreen'))
 const AdminTeaserScreen = lazy(() => import('./pages/AdminTeaserScreen'))
 const SuperAdminScreen = lazy(() => import('./pages/SuperAdminScreen'))
+const AcceptInviteScreen = lazy(() => import('./pages/AcceptInviteScreen'))
 
 function LoadingFallback() {
   return (
@@ -46,6 +47,7 @@ function PublicRoutes() {
       <Route path="/manager/login" component={ManagerLoginScreen} />
       <Route path="/admin" component={AdminTeaserScreen} />
       <Route path="/super-admin" component={SuperAdminScreen} />
+      <Route path="/join" component={AcceptInviteScreen} />
       {/* Legacy routes - redirect to tenant routes after login */}
       <Route path="/dashboard" component={CarerDashboard} />
       <Route path="/visit/:id" component={ActiveVisitScreen} />

@@ -20,7 +20,18 @@ const jsonHeaders = { 'Content-Type': 'application/json' }
 
 function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('carei_token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  const tenant = localStorage.getItem('carei_current_tenant')
+  const headers: Record<string, string> = {}
+
+  if (token) headers.Authorization = `Bearer ${token}`
+  if (tenant) {
+    try {
+      const parsed = JSON.parse(tenant)
+      if (parsed.slug) headers['X-Tenant-Slug'] = parsed.slug
+    } catch { /* ignore */ }
+  }
+
+  return headers
 }
 
 async function postWithRetry(path: string, body: unknown, retries = 3): Promise<any> {

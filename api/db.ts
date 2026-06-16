@@ -410,6 +410,26 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_tenant_users_tenant ON tenant_users(tenant_id)`
     await sql`CREATE INDEX IF NOT EXISTS idx_tenant_users_user ON tenant_users(user_id)`
   })
+
+  await run(6, 'invites_table', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS invites (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        code TEXT NOT NULL UNIQUE,
+        email TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'carer',
+        created_by TEXT REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        used_by TEXT REFERENCES users(id),
+        used_at TIMESTAMPTZ
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_invites_code ON invites(code)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_invites_tenant ON invites(tenant_id)`
+  })
 }
 
 export function setCors(req: any, res: any) {
@@ -519,6 +539,59 @@ export async function tenantQuery(table: string, tenantId: string, action: 'sele
   }
 
   return null
+}
+
+// Tenant middleware for API endpoints
+export async function withTenant(
+  req: any,
+  res: any,
+  handler: (context: { tenantId: string; userId: string; role: string; sql: ReturnType<typeof getSql> }) => Promise<void>
+): Promise<void> {
+  const sql = getSql()
+
+  // Extract tenant slug from request
+  const tenantSlug = getTenantSlug(req)
+  if (!tenantSlug) {
+    res.status(400).json({ error: 'Tenant slug required. Provide via X-Tenant-Slug header or URL path.' })
+    return
+  }
+
+  // Get tenant by slug
+  const tenant = await getTenantFromSlug(tenantSlug)
+  if (!tenant) {
+    res.status(404).json({ error: 'Tenant not found' })
+    return
+  }
+
+  // Extract user from token
+  const token = getAuthToken(req)
+  if (!token) {
+    res.status(401).json({ error: 'Authentication required' })
+    return
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
+    const userId = payload.userId
+
+    if (!userId) {
+      res.status(401).json({ error: 'Invalid token' })
+      return
+    }
+
+    // Verify user has access to this tenant
+    const access = await verifyTenantAccess(userId, tenant.id)
+    if (!access.hasAccess) {
+      res.status(403).json({ error: 'Access denied for this organization' })
+      return
+    }
+
+    // Execute handler with tenant context
+    await handler({ tenantId: tenant.id, userId, role: access.role, sql })
+  } catch (err: any) {
+    console.error('Tenant middleware error:', err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
 }
 
 // Simple in-memory rate limiter (resets every 60s, not persisted across cold starts)
