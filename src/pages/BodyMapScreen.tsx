@@ -271,8 +271,8 @@ export default function BodyMapScreen() {
                     cy={zone.y}
                     rx={zone.w / 2}
                     ry={zone.h / 2}
-                    fill={hasMarks ? `${lastColor}30` : 'rgba(248,250,252,0.8)'}
-                    stroke={hasMarks ? lastColor : '#cbd5e1'}
+                    fill={hasMarks && lastColor ? `${lastColor}30` : 'rgba(248,250,252,0.8)'}
+                    stroke={hasMarks && lastColor ? lastColor : '#cbd5e1'}
                     strokeWidth={hasMarks ? 2 : 1}
                   />
                 ) : (
@@ -282,13 +282,13 @@ export default function BodyMapScreen() {
                     width={zone.w}
                     height={zone.h}
                     rx={4}
-                    fill={hasMarks ? `${lastColor}30` : 'rgba(248,250,252,0.8)'}
-                    stroke={hasMarks ? lastColor : '#cbd5e1'}
+                    fill={hasMarks && lastColor ? `${lastColor}30` : 'rgba(248,250,252,0.8)'}
+                    stroke={hasMarks && lastColor ? lastColor : '#cbd5e1'}
                     strokeWidth={hasMarks ? 2 : 1}
                   />
                 )}
                 {/* Mark indicator */}
-                {hasMarks && (
+                {hasMarks && lastColor && (
                   <circle
                     cx={zone.x + zone.w / 2 - 3}
                     cy={zone.y - zone.h / 2 + 3}
@@ -536,7 +536,7 @@ export default function BodyMapScreen() {
                       <div className="flex justify-between text-xs">
                         <span className="text-slate-600">New marks:</span>
                         <span className="font-semibold text-green-600">
-                          {marks.filter(m => !allClientMarks.find(pm => pm.visit_id === compareVisitId && Math.abs(pm.x - m.x) < 5 && Math.abs(pm.y - m.y) < 5)).length}
+                          {marks.filter(m => !allClientMarks.find(pm => pm.visit_id === compareVisitId && pm.zone === m.zone)).length}
                         </span>
                       </div>
                     </div>
@@ -560,7 +560,7 @@ export default function BodyMapScreen() {
                           </span>
                         </div>
                         <div className="text-[10px] text-slate-500 mb-1">
-                          {mark.side === 'anterior' ? 'Front' : 'Back'} • Position: {mark.x}%, {mark.y}%
+                          {mark.side === 'anterior' ? 'Front' : 'Back'} • Zone: {BODY_ZONES[mark.side].find(z => z.id === mark.zone)?.label || mark.zone}
                         </div>
                         {mark.note && <p className="text-xs text-slate-600">{mark.note}</p>}
                         {mark.photoUrl && (
