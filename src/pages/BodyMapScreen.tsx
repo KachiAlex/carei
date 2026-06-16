@@ -86,6 +86,7 @@ export default function BodyMapScreen() {
   const [allClientMarks, setAllClientMarks] = useState<BodyMark[]>([])
   const [comparisonMode, setComparisonMode] = useState(false)
   const [compareVisitId, setCompareVisitId] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     async function loadMarks() {
@@ -193,23 +194,41 @@ export default function BodyMapScreen() {
   const marksForZone = (zoneId: string) => filteredMarks.filter(m => m.zone === zoneId)
   const currentZones = BODY_ZONES[side]
 
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Header */}
-      <div className="px-4 pt-4 pb-3 text-white shrink-0" style={{ background: `linear-gradient(160deg, ${COLORS.darkNavy} 0%, ${COLORS.navy} 100%)` }}>
-        <div className="flex items-center justify-between mb-3">
-          <button onClick={() => setLocation('/dashboard')} className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-            Back
-          </button>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowHistory(!showHistory)} className="text-xs text-white/60 hover:text-white bg-transparent border-none cursor-pointer transition-colors">
-              {showHistory ? 'Current' : 'History'}
-            </button>
-            <span className="text-xs text-white/40">Tap body to mark</span>
-          </div>
+  // Success screen after saving
+  if (saved) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-8" style={{ background: COLORS.darkNavy }}>
+        <div className="text-5xl">✅</div>
+        <div className="text-white font-bold text-xl">Body Map Saved</div>
+        <div className="text-white/60 text-sm text-center">
+          {marks.length} mark{marks.length !== 1 ? 's' : ''} recorded and added to the audit trail
         </div>
-        <h1 className="font-serif text-lg font-bold">Body Map</h1>
+        <button
+          onClick={() => visitId && setLocation(`/visit/${visitId}`)}
+          className="px-8 py-3.5 rounded-xl font-bold text-sm border-none cursor-pointer mt-4"
+          style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
+        >
+          Back to Visit
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col font-sans" style={{ background: COLORS.darkNavy }}>
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3 text-white shrink-0">
+        <button onClick={() => visitId && setLocation(`/visit/${visitId}`)} className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors mb-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          Back to Visit
+        </button>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-serif text-lg font-bold">Skin Integrity Map</h1>
+            <div className="text-white/60 text-xs mt-0.5">Tap a body zone to mark it</div>
+          </div>
+          <span className="px-2 py-1 rounded-full text-xs font-semibold" style={{ color: COLORS.red, background: 'rgba(255,90,95,0.12)' }}>Audit</span>
+        </div>
         {/* Side toggle */}
         <div className="flex gap-2 mt-2">
           {(['anterior', 'posterior'] as const).map((s) => (
@@ -301,10 +320,6 @@ export default function BodyMapScreen() {
           })}
         </svg>
 
-        <p className="text-xs text-slate-500 mt-3 text-center">
-          Tap any body zone to mark it with: <span style={{ color: MARK_CATEGORIES[markType]?.color, fontWeight: 600 }}>{MARK_CATEGORIES[markType]?.label}</span>
-        </p>
-
         {/* Recorded Marks List */}
         {filteredMarks.length > 0 && (
           <div className="w-full mt-4">
@@ -316,12 +331,12 @@ export default function BodyMapScreen() {
                   <div
                     key={mark.id}
                     onClick={() => setSelectedMark(mark)}
-                    className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-sm border border-slate-100 cursor-pointer"
+                    className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 cursor-pointer"
                   >
                     <div className="w-2 h-2 rounded-full" style={{ background: MARK_CATEGORIES[mark.type]?.color }} />
-                    <span className="text-xs text-slate-700">{MARK_CATEGORIES[mark.type]?.label}</span>
-                    <span className="text-[10px] text-slate-400">·</span>
-                    <span className="text-[10px] text-slate-500">{zone?.label || mark.zone}</span>
+                    <span className="text-xs text-white/80">{MARK_CATEGORIES[mark.type]?.label}</span>
+                    <span className="text-[10px] text-white/40">·</span>
+                    <span className="text-[10px] text-white/60">{zone?.label || mark.zone}</span>
                     {mark.photoUrl && <span className="text-[10px] ml-auto">📷</span>}
                   </div>
                 )
@@ -329,6 +344,24 @@ export default function BodyMapScreen() {
             </div>
           </div>
         )}
+
+        {/* Save Body Map Button */}
+        <div className="w-full mt-6 pb-4">
+          <div className="text-[10px] text-white/50 text-center mb-3">
+            Tap any zone to mark it with: <span style={{ color: MARK_CATEGORIES[markType]?.color, fontWeight: 600 }}>{MARK_CATEGORIES[markType]?.label}</span>
+          </div>
+          <button
+            onClick={() => setSaved(true)}
+            disabled={marks.length === 0}
+            className="w-full py-3.5 rounded-xl font-bold text-sm border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              background: marks.length > 0 ? `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` : 'rgba(255,255,255,0.1)',
+              color: marks.length > 0 ? COLORS.darkNavy : 'rgba(255,255,255,0.5)'
+            }}
+          >
+            Save Body Map ({marks.length} mark{marks.length !== 1 ? 's' : ''})
+          </button>
+        </div>
       </div>
 
       {/* Phase 5: Enhanced Mark Form Modal with category selector and photo capture */}
