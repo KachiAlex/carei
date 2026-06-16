@@ -13,13 +13,12 @@ const COLORS = {
   lavender: '#A78BFA',
 }
 
-// Phase 5: Enhanced Category Selector per document spec
+// Zone-based categories like CAREiSource
 const MARK_CATEGORIES: Record<string, { color: string; label: string; icon: string }> = {
-  wound: { color: '#FF5A5F', label: 'Wound', icon: '🩹' },
-  bruise: { color: '#A78BFA', label: 'Bruise', icon: '💜' },
-  redness: { color: '#F6B73C', label: 'Redness', icon: '🔴' },
-  swelling: { color: '#F59E0B', label: 'Swelling', icon: '📈' },
-  rash: { color: '#22C55E', label: 'Rash', icon: '🔷' },
+  'pressure-sore': { color: '#FF5A5F', label: 'Pressure Sore', icon: '🔴' },
+  bruising: { color: '#8B5CF6', label: 'Bruising', icon: '💜' },
+  mark: { color: '#F6B73C', label: 'Mark', icon: '�' },
+  redness: { color: '#F97316', label: 'Redness', icon: '�' },
 }
 
 interface BodyMark {
@@ -27,8 +26,7 @@ interface BodyMark {
   visit_id: string
   client_id?: string
   carer_id?: string
-  x: number
-  y: number
+  zone: string
   side: 'anterior' | 'posterior'
   type: string
   note: string
@@ -36,16 +34,50 @@ interface BodyMark {
   createdAt: string
 }
 
+// Body zones definition (like CAREiSource)
+const BODY_ZONES = {
+  anterior: [
+    { id: 'head', label: 'Head', x: 50, y: 12, w: 20, h: 20, rx: 10 },
+    { id: 'neck', label: 'Neck', x: 50, y: 26, w: 10, h: 6 },
+    { id: 'l-shoulder', label: 'L Shoulder', x: 32, y: 35, w: 15, h: 12 },
+    { id: 'r-shoulder', label: 'R Shoulder', x: 68, y: 35, w: 15, h: 12 },
+    { id: 'chest', label: 'Chest', x: 50, y: 40, w: 24, h: 18 },
+    { id: 'abdomen', label: 'Abdomen', x: 50, y: 58, w: 22, h: 15 },
+    { id: 'l-arm', label: 'L Arm', x: 22, y: 48, w: 8, h: 28 },
+    { id: 'r-arm', label: 'R Arm', x: 78, y: 48, w: 8, h: 28 },
+    { id: 'l-thigh', label: 'L Thigh', x: 40, y: 78, w: 12, h: 25 },
+    { id: 'r-thigh', label: 'R Thigh', x: 60, y: 78, w: 12, h: 25 },
+    { id: 'l-shin', label: 'L Shin', x: 40, y: 105, w: 10, h: 22 },
+    { id: 'r-shin', label: 'R Shin', x: 60, y: 105, w: 10, h: 22 },
+    { id: 'l-foot', label: 'L Foot', x: 38, y: 128, w: 12, h: 6 },
+    { id: 'r-foot', label: 'R Foot', x: 62, y: 128, w: 12, h: 6 },
+  ],
+  posterior: [
+    { id: 'head-b', label: 'Head (Back)', x: 50, y: 12, w: 20, h: 20, rx: 10 },
+    { id: 'neck-b', label: 'Neck (Back)', x: 50, y: 26, w: 10, h: 6 },
+    { id: 'upper-back', label: 'Upper Back', x: 50, y: 38, w: 24, h: 14 },
+    { id: 'lower-back', label: 'Lower Back', x: 50, y: 54, w: 22, h: 12 },
+    { id: 'sacrum', label: 'Sacrum', x: 50, y: 68, w: 14, h: 6 },
+    { id: 'l-buttock', label: 'L Buttock', x: 40, y: 75, w: 12, h: 10 },
+    { id: 'r-buttock', label: 'R Buttock', x: 60, y: 75, w: 12, h: 10 },
+    { id: 'l-thigh-b', label: 'L Thigh (Back)', x: 40, y: 88, w: 12, h: 20 },
+    { id: 'r-thigh-b', label: 'R Thigh (Back)', x: 60, y: 88, w: 12, h: 20 },
+    { id: 'l-calf', label: 'L Calf', x: 40, y: 110, w: 10, h: 18 },
+    { id: 'r-calf', label: 'R Calf', x: 60, y: 110, w: 10, h: 18 },
+    { id: 'l-heel', label: 'L Heel', x: 40, y: 130, w: 10, h: 5 },
+    { id: 'r-heel', label: 'R Heel', x: 60, y: 130, w: 10, h: 5 },
+  ],
+}
+
 export default function BodyMapScreen() {
   const [, setLocation] = useLocation()
   const [match, params] = useRoute('/body-map/:visitId')
   const visitId = params?.visitId || ''
-  const svgRef = useRef<SVGSVGElement>(null)
   const [side, setSide] = useState<'anterior' | 'posterior'>('anterior')
   const [marks, setMarks] = useState<BodyMark[]>([])
   const [showMarkForm, setShowMarkForm] = useState(false)
-  const [clickPos, setClickPos] = useState<{ x: number; y: number } | null>(null)
-  const [markType, setMarkType] = useState('wound')
+  const [selectedZone, setSelectedZone] = useState<string | null>(null)
+  const [markType, setMarkType] = useState('pressure-sore')
   const [markNote, setMarkNote] = useState('')
   const [selectedMark, setSelectedMark] = useState<BodyMark | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -56,7 +88,6 @@ export default function BodyMapScreen() {
   const [compareVisitId, setCompareVisitId] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load marks from backend API
     async function loadMarks() {
       try {
         const data = await getBodyMapMarks(visitId)
@@ -70,12 +101,10 @@ export default function BodyMapScreen() {
     if (visitId) loadMarks()
   }, [visitId])
 
-  // Load all client marks for history view
   useEffect(() => {
     async function loadClientMarks() {
       if (!showHistory) return
       try {
-        // Extract clientId from current marks
         const clientId = marks[0]?.client_id || null
         if (clientId) {
           const data = await getBodyMapMarks(undefined, clientId)
@@ -90,20 +119,16 @@ export default function BodyMapScreen() {
     loadClientMarks()
   }, [showHistory, marks])
 
-  const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (!svgRef.current) return
-    const rect = svgRef.current.getBoundingClientRect()
-    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100)
-    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100)
-    setClickPos({ x, y })
-    setMarkType('wound')
+  // Zone-based marking (like CAREiSource)
+  const handleZoneClick = (zoneId: string) => {
+    setSelectedZone(zoneId)
+    setMarkType('pressure-sore')
     setMarkNote('')
     setPhotoPreview(null)
     setShowMarkForm(true)
     setSelectedMark(null)
   }
 
-  // Phase 5: Photo capture for body map marks
   const handlePhotoCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
@@ -120,13 +145,15 @@ export default function BodyMapScreen() {
   }
 
   const addMark = async () => {
-    if (!clickPos) return
+    if (!selectedZone) return
     try {
+      const zone = BODY_ZONES[side].find(z => z.id === selectedZone)
       const res = await saveBodyMapMark({
         visitId,
-        x: clickPos.x,
-        y: clickPos.y,
+        x: zone?.x || 50,
+        y: zone?.y || 50,
         side,
+        zone: selectedZone,
         type: markType,
         note: markNote,
         photoUrl: photoPreview || undefined,
@@ -135,8 +162,7 @@ export default function BodyMapScreen() {
         const newMark: BodyMark = {
           id: res.id,
           visit_id: visitId,
-          x: clickPos.x,
-          y: clickPos.y,
+          zone: selectedZone,
           side,
           type: markType,
           note: markNote,
@@ -145,7 +171,7 @@ export default function BodyMapScreen() {
         }
         setMarks([...marks, newMark])
         setShowMarkForm(false)
-        setClickPos(null)
+        setSelectedZone(null)
         setPhotoPreview(null)
       }
     } catch (err) {
@@ -164,6 +190,8 @@ export default function BodyMapScreen() {
   }
 
   const filteredMarks = marks.filter((m) => m.side === side)
+  const marksForZone = (zoneId: string) => filteredMarks.filter(m => m.zone === zoneId)
+  const currentZones = BODY_ZONES[side]
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -200,67 +228,107 @@ export default function BodyMapScreen() {
         </div>
       </div>
 
-      {/* SVG Body */}
-      <div className="flex-1 flex items-center justify-center p-4 relative bg-slate-50 border-2 border-slate-300 rounded-lg">
-        <svg
-          ref={svgRef}
-          viewBox="0 0 100 180"
-          className="w-full max-w-xs bg-white"
-        >
-          {/* Body outline */}
-          {side === 'anterior' ? (
-            <>
-              <ellipse cx="50" cy="12" rx="10" ry="10" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <path d="M35 22 L65 22 L60 50 L40 50 Z" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <rect x="40" y="50" width="20" height="40" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <rect x="32" y="55" width="6" height="30" rx="2" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <rect x="62" y="55" width="6" height="30" rx="2" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <rect x="40" y="90" width="8" height="45" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <rect x="52" y="90" width="8" height="45" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-            </>
-          ) : (
-            <>
-              <ellipse cx="50" cy="12" rx="10" ry="10" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <path d="M35 22 L65 22 L60 50 L40 50 Z" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <rect x="40" y="50" width="20" height="40" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <rect x="32" y="55" width="6" height="30" rx="2" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <rect x="62" y="55" width="6" height="30" rx="2" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <rect x="40" y="90" width="8" height="45" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-              <rect x="52" y="90" width="8" height="45" rx="3" fill="#f8fafc" stroke="#1e293b" strokeWidth="2" />
-            </>
-          )}
-          {/* Marks */}
-          {filteredMarks.map((mark) => (
-            <g key={mark.id} onClick={(e) => { e.stopPropagation(); setSelectedMark(mark) }} style={{ cursor: 'pointer' }}>
-              <circle
-                cx={mark.x}
-                cy={mark.y}
-                r="3.5"
-                fill={MARK_CATEGORIES[mark.type]?.color || COLORS.amber}
-                stroke="white"
-                strokeWidth="0.8"
-              />
-              {/* Photo indicator */}
-              {mark.photoUrl && (
-                <g transform={`translate(${mark.x + 4}, ${mark.y - 8})`}>
-                  <rect x="0" y="0" width="6" height="6" rx="1" fill="#4FD1C5" />
-                  <text x="3" y="4.5" fontSize="4" textAnchor="middle" fill="white">📷</text>
-                </g>
-              )}
-            </g>
-          ))}
-        </svg>
-
-        {/* Phase 5: Enhanced Legend with all categories */}
-        <div className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-2 justify-center">
+      {/* Zone-based SVG Body (like CAREiSource) */}
+      <div className="flex-1 flex flex-col items-center p-4 bg-slate-50">
+        {/* Mark Type Selector */}
+        <div className="flex gap-2 mb-4 flex-wrap justify-center">
           {Object.entries(MARK_CATEGORIES).map(([key, { color, label, icon }]) => (
-            <div key={key} className="flex items-center gap-1.5 bg-white rounded-lg px-2.5 py-1.5 shadow-sm border border-slate-100">
-              <span className="text-xs">{icon}</span>
-              <span className="w-2 h-2 rounded-full" style={{ background: color }} />
-              <span className="text-[10px] font-medium text-slate-600">{label}</span>
-            </div>
+            <button
+              key={key}
+              onClick={() => setMarkType(key)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer"
+              style={{
+                background: markType === key ? `${color}20` : 'white',
+                borderColor: markType === key ? color : 'rgba(0,0,0,0.08)',
+                color: markType === key ? color : '#64748b',
+              }}
+            >
+              <span>{icon}</span>
+              <span>{label}</span>
+            </button>
           ))}
         </div>
+
+        {/* SVG with clickable zones */}
+        <svg viewBox="0 0 100 140" className="w-full max-w-xs bg-white rounded-lg shadow-sm">
+          {currentZones.map((zone) => {
+            const zoneMarks = marksForZone(zone.id)
+            const hasMarks = zoneMarks.length > 0
+            const lastMark = hasMarks ? zoneMarks[zoneMarks.length - 1] : null
+            const lastColor = lastMark ? MARK_CATEGORIES[lastMark.type]?.color : null
+
+            return (
+              <g
+                key={zone.id}
+                onClick={() => handleZoneClick(zone.id)}
+                style={{ cursor: 'pointer' }}
+                className="transition-opacity hover:opacity-80"
+              >
+                {/* Zone shape */}
+                {zone.rx ? (
+                  <ellipse
+                    cx={zone.x}
+                    cy={zone.y}
+                    rx={zone.w / 2}
+                    ry={zone.h / 2}
+                    fill={hasMarks ? `${lastColor}30` : 'rgba(248,250,252,0.8)'}
+                    stroke={hasMarks ? lastColor : '#cbd5e1'}
+                    strokeWidth={hasMarks ? 2 : 1}
+                  />
+                ) : (
+                  <rect
+                    x={zone.x - zone.w / 2}
+                    y={zone.y - zone.h / 2}
+                    width={zone.w}
+                    height={zone.h}
+                    rx={4}
+                    fill={hasMarks ? `${lastColor}30` : 'rgba(248,250,252,0.8)'}
+                    stroke={hasMarks ? lastColor : '#cbd5e1'}
+                    strokeWidth={hasMarks ? 2 : 1}
+                  />
+                )}
+                {/* Mark indicator */}
+                {hasMarks && (
+                  <circle
+                    cx={zone.x + zone.w / 2 - 3}
+                    cy={zone.y - zone.h / 2 + 3}
+                    r={3}
+                    fill={lastColor}
+                  />
+                )}
+              </g>
+            )
+          })}
+        </svg>
+
+        <p className="text-xs text-slate-500 mt-3 text-center">
+          Tap any body zone to mark it with: <span style={{ color: MARK_CATEGORIES[markType]?.color, fontWeight: 600 }}>{MARK_CATEGORIES[markType]?.label}</span>
+        </p>
+
+        {/* Recorded Marks List */}
+        {filteredMarks.length > 0 && (
+          <div className="w-full mt-4">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Recorded Marks</div>
+            <div className="flex flex-col gap-2">
+              {filteredMarks.map((mark, i) => {
+                const zone = currentZones.find(z => z.id === mark.zone)
+                return (
+                  <div
+                    key={mark.id}
+                    onClick={() => setSelectedMark(mark)}
+                    className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-sm border border-slate-100 cursor-pointer"
+                  >
+                    <div className="w-2 h-2 rounded-full" style={{ background: MARK_CATEGORIES[mark.type]?.color }} />
+                    <span className="text-xs text-slate-700">{MARK_CATEGORIES[mark.type]?.label}</span>
+                    <span className="text-[10px] text-slate-400">·</span>
+                    <span className="text-[10px] text-slate-500">{zone?.label || mark.zone}</span>
+                    {mark.photoUrl && <span className="text-[10px] ml-auto">📷</span>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Phase 5: Enhanced Mark Form Modal with category selector and photo capture */}

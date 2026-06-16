@@ -519,6 +519,7 @@ export async function saveBodyMapMark(data: {
   x: number
   y: number
   side?: string
+  zone?: string
   type?: string
   note?: string
   photoUrl?: string
