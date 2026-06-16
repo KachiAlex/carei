@@ -343,6 +343,73 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_caregiver_assignments_caregiver ON caregiver_client_assignments(caregiver_id)`
     await sql`CREATE INDEX IF NOT EXISTS idx_caregiver_assignments_client ON caregiver_client_assignments(client_id)`
   })
+
+  await run(5, 'multi_tenant_support', async () => {
+    // Create tenants table
+    await sql`
+      CREATE TABLE IF NOT EXISTS tenants (
+        id TEXT PRIMARY KEY,
+        slug TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        domain TEXT,
+        plan TEXT DEFAULT 'trial',
+        settings JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+
+    // Create tenant_users junction table
+    await sql`
+      CREATE TABLE IF NOT EXISTS tenant_users (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT NOT NULL DEFAULT 'carer',
+        joined_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(tenant_id, user_id)
+      )
+    `
+
+    // Add tenant_id to all existing tables
+    const tables = [
+      'clients', 'users', 'visits', 'scheduled_visits', 'sos_alerts',
+      'incidents', 'voice_memos', 'caregiver_client_assignments', 'tasks',
+      'task_logs', 'medication_logs', 'body_map_marks', 'family_messages',
+      'visit_drafts', 'agencies', 'drug_interactions'
+    ]
+
+    for (const table of tables) {
+      try {
+        await sql`ALTER TABLE ${sql(table)} ADD COLUMN IF NOT EXISTS tenant_id TEXT`
+      } catch { /* ignore if column exists */ }
+    }
+
+    // Create default tenant for existing data
+    const defaultTenantId = 'default-tenant'
+    await sql`
+      INSERT INTO tenants (id, slug, name, plan)
+      VALUES (${defaultTenantId}, 'default', 'Default Organization', 'professional')
+      ON CONFLICT (id) DO NOTHING
+    `
+
+    // Migrate existing data to default tenant
+    for (const table of tables) {
+      try {
+        await sql`UPDATE ${sql(table)} SET tenant_id = ${defaultTenantId} WHERE tenant_id IS NULL`
+      } catch { /* ignore if table doesn't exist or no rows */ }
+    }
+
+    // Add indexes for tenant queries
+    for (const table of tables) {
+      try {
+        await sql`CREATE INDEX IF NOT EXISTS idx_${sql(table)}_tenant ON ${sql(table)}(tenant_id)`
+      } catch { /* ignore */ }
+    }
+
+    await sql`CREATE INDEX IF NOT EXISTS idx_tenant_users_tenant ON tenant_users(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_tenant_users_user ON tenant_users(user_id)`
+  })
 }
 
 export function setCors(req: any, res: any) {
@@ -358,6 +425,100 @@ export function getAuthToken(req: any): string {
   const cookie = req.headers?.cookie || ''
   const match = cookie.match(/carei_token=([^;]+)/)
   return match ? match[1] : ''
+}
+
+// Multi-tenant helpers
+export function getTenantSlug(req: any): string | null {
+  // Check header first (for API requests)
+  const headerSlug = req.headers?.['x-tenant-slug']
+  if (headerSlug) return headerSlug
+
+  // Check query param
+  const querySlug = req.query?.tenantSlug
+  if (querySlug) return querySlug
+
+  // Check URL path (for SSR/Vercel paths like /api/tenant/:slug/...)
+  const path = req.url || ''
+  const match = path.match(/\/tenant\/([^\/]+)/)
+  if (match) return match[1]
+
+  return null
+}
+
+export async function getTenantFromSlug(slug: string): Promise<{ id: string; slug: string; name: string } | null> {
+  const sql = getSql()
+  const rows = await sql`SELECT id, slug, name FROM tenants WHERE slug = ${slug}`
+  return rows[0] as any || null
+}
+
+export async function getUserTenants(userId: string): Promise<Array<{ tenantId: string; slug: string; name: string; role: string }>> {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT t.id as tenant_id, t.slug, t.name, tu.role
+    FROM tenant_users tu
+    JOIN tenants t ON t.id = tu.tenant_id
+    WHERE tu.user_id = ${userId}
+    ORDER BY tu.joined_at DESC
+  `
+  return (rows as any[]).map(r => ({
+    tenantId: r.tenant_id,
+    slug: r.slug,
+    name: r.name,
+    role: r.role
+  }))
+}
+
+export async function verifyTenantAccess(userId: string, tenantId: string): Promise<{ role: string; hasAccess: boolean }> {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT role FROM tenant_users
+    WHERE user_id = ${userId} AND tenant_id = ${tenantId}
+    LIMIT 1
+  `
+  if (rows.length === 0) return { role: '', hasAccess: false }
+  return { role: (rows[0] as any).role, hasAccess: true }
+}
+
+export async function createTenant(data: { slug: string; name: string; domain?: string; plan?: string }): Promise<{ id: string }> {
+  const sql = getSql()
+  const id = `tenant-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  await sql`
+    INSERT INTO tenants (id, slug, name, domain, plan)
+    VALUES (${id}, ${data.slug}, ${data.name}, ${data.domain || null}, ${data.plan || 'trial'})
+  `
+  return { id }
+}
+
+export async function addUserToTenant(userId: string, tenantId: string, role: string = 'carer'): Promise<void> {
+  const sql = getSql()
+  const id = `tu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  await sql`
+    INSERT INTO tenant_users (id, tenant_id, user_id, role)
+    VALUES (${id}, ${tenantId}, ${userId}, ${role})
+    ON CONFLICT (tenant_id, user_id) DO UPDATE SET role = ${role}
+  `
+}
+
+// Tenant-aware query helper - automatically filters by tenant_id
+export async function tenantQuery(table: string, tenantId: string, action: 'select' | 'insert' | 'update' | 'delete', conditions?: Record<string, any>) {
+  const sql = getSql()
+
+  if (action === 'select') {
+    const whereClause = Object.entries(conditions || {})
+      .map(([key, val]) => sql`${sql(key)} = ${val}`)
+      .join(' AND ')
+    return sql`SELECT * FROM ${sql(table)} WHERE tenant_id = ${tenantId} ${whereClause ? sql`AND ${sql(whereClause)}` : sql``}`
+  }
+
+  // For insert, add tenant_id to data
+  if (action === 'insert' && conditions) {
+    const data = { ...conditions, tenant_id: tenantId }
+    const columns = Object.keys(data).join(', ')
+    const values = Object.values(data)
+    return sql`INSERT INTO ${sql(table)} (${sql(columns)}) VALUES (${values})`
+  }
+
+  return null
 }
 
 // Simple in-memory rate limiter (resets every 60s, not persisted across cold starts)
