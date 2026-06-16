@@ -41,7 +41,6 @@ export default function ActiveVisitScreen() {
   const [tasks, setTasks] = useState<{ name: string; done: boolean; completedAt?: number }[]>([])
   const [fluid, setFluid] = useState(0)
   const [notes, setNotes] = useState('')
-  const [showBodyMap, setShowBodyMap] = useState(false)
   const [showVoiceDoc, setShowVoiceDoc] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcript, setTranscript] = useState('')
@@ -1820,10 +1819,10 @@ export default function ActiveVisitScreen() {
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => setShowBodyMap(true)}
+            onClick={() => visitId && setLocation(`/body-map/${visitId}`)}
             className="py-3.5 rounded-xl text-xs font-semibold border cursor-pointer flex items-center justify-center gap-1.5 min-h-[48px] transition-all duration-200 hover:shadow-sm"
             style={{ borderColor: 'rgba(0,0,0,0.06)', color: '#64748b', background: 'white' }}
-            aria-label="Body map photo"
+            aria-label="Body map"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.2 7.8l-7.7 7.7-4-4-5.7 5.7"/><path d="M15 7h6v6"/></svg>
             Body Map
@@ -1904,33 +1903,6 @@ export default function ActiveVisitScreen() {
                 Save
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Body Map Modal */}
-      {showBodyMap && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center sm:items-center p-4">
-          <div className="bg-white rounded-2xl p-5 max-w-sm w-full">
-            <h3 className="font-bold text-slate-800 mb-3">Body Map Photo</h3>
-            <p className="text-sm text-slate-500 mb-4">Take a photo of any skin concerns, bruises, or wounds. This will be auto-tagged to this visit.</p>
-            <button
-              onClick={() => {
-                setNotes((n) => n + '\n[Body map photo captured]')
-                setShowBodyMap(false)
-              }}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold border cursor-pointer mb-3"
-              style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b', background: '#f8fafc' }}
-            >
-              Mark Photo Taken
-            </button>
-            <button
-              onClick={() => setShowBodyMap(false)}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold border cursor-pointer"
-              style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
-            >
-              Close
-            </button>
           </div>
         </div>
       )}
