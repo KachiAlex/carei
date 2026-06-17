@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useLocation } from 'wouter'
-import { loginUser, sendOtp, verifyOtp, resetPin } from '../api/client'
+import { loginUser, loginWithPassword, sendOtp, verifyOtp, resetPin } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -78,6 +78,8 @@ export default function LoginScreen() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [resetSuccess, setResetSuccess] = useState(false)
+  const [isSuperAdminMode, setIsSuperAdminMode] = useState(false)
+  const [password, setPassword] = useState('')
 
   const handlePinChange = (idx: number, val: string) => {
     const next = [...pin]
@@ -114,6 +116,40 @@ export default function LoginScreen() {
       setLoading(false)
       setError(err.message || 'Login failed. Please try again.')
       setPin(['', '', '', ''])
+    }
+  }
+
+  const handlePasswordLogin = async () => {
+    if (!validateEmail(email)) {
+      setError('Please enter your email address.')
+      return
+    }
+    if (!password) {
+      setError('Please enter your password.')
+      return
+    }
+
+    setError('')
+    setLoading(true)
+
+    try {
+      const res = await loginWithPassword({ email: email.trim().toLowerCase(), password })
+      setLoading(false)
+      if (res.user) {
+        localStorage.setItem('carei_user', JSON.stringify(res.user))
+        if (res.user.role === 'superadmin') {
+          setLocation('/super-admin')
+        } else {
+          setLocation(res.user.role === 'manager' ? '/manager' : '/dashboard')
+        }
+      } else {
+        setError('Invalid email or password.')
+        setPassword('')
+      }
+    } catch (err: any) {
+      setLoading(false)
+      setError(err.message || 'Login failed. Please try again.')
+      setPassword('')
     }
   }
 
@@ -251,7 +287,31 @@ export default function LoginScreen() {
           <div className="text-center mb-8">
             <h1 className="font-serif text-white text-2xl mb-2">CARE<span style={{ color: COLORS.teal }}>i</span></h1>
             <h2 className="font-serif text-white text-xl">Welcome back</h2>
-            <p className="text-white/50 text-sm mt-2">Carer Login</p>
+            <p className="text-white/50 text-sm mt-2">{isSuperAdminMode ? 'Super Admin Login' : 'Carer Login'}</p>
+          </div>
+
+          {/* Mode Toggle */}
+          <div className="flex mb-6 bg-white/5 rounded-xl p-1">
+            <button
+              onClick={() => { setIsSuperAdminMode(false); setError(''); setPassword(''); setPin(['', '', '', '']) }}
+              className="flex-1 py-2 rounded-lg text-sm font-medium border-none cursor-pointer transition-all"
+              style={{
+                background: !isSuperAdminMode ? COLORS.teal : 'transparent',
+                color: !isSuperAdminMode ? COLORS.darkNavy : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              Carer
+            </button>
+            <button
+              onClick={() => { setIsSuperAdminMode(true); setError(''); setPassword(''); setPin(['', '', '', '']) }}
+              className="flex-1 py-2 rounded-lg text-sm font-medium border-none cursor-pointer transition-all"
+              style={{
+                background: isSuperAdminMode ? COLORS.teal : 'transparent',
+                color: isSuperAdminMode ? COLORS.darkNavy : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              Super Admin
+            </button>
           </div>
 
           {/* Email Input */}
@@ -266,15 +326,29 @@ export default function LoginScreen() {
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
               />
             </div>
-            
-            <div>
-              <label className="block text-white/70 text-sm mb-4 font-medium">4-digit PIN</label>
-              <PinBoxes 
-                pin={pin} 
-                onChange={handlePinChange} 
-                onComplete={handleVerify}
-              />
-            </div>
+
+            {isSuperAdminMode ? (
+              <div>
+                <label className="block text-white/70 text-sm mb-2 font-medium">Password</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError('') }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handlePasswordLogin() }}
+                  placeholder="Enter your password"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-white/70 text-sm mb-4 font-medium">4-digit PIN</label>
+                <PinBoxes
+                  pin={pin}
+                  onChange={handlePinChange}
+                  onComplete={handleVerify}
+                />
+              </div>
+            )}
           </div>
 
           {/* Error */}
@@ -282,7 +356,7 @@ export default function LoginScreen() {
 
           {/* Login Button */}
           <button
-            onClick={handleVerify}
+            onClick={isSuperAdminMode ? handlePasswordLogin : handleVerify}
             disabled={loading}
             className="w-full py-3.5 rounded-xl font-bold text-base cursor-pointer border-none disabled:opacity-50"
             style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
@@ -290,17 +364,19 @@ export default function LoginScreen() {
             {loading ? 'Signing in…' : 'Log In'}
           </button>
 
-          {/* Forgot PIN */}
-          <button
-            onClick={() => {
-              setView('reset-request')
-              setError('')
-              setPin(['', '', '', ''])
-            }}
-            className="w-full mt-4 text-sm text-white/50 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
-          >
-            Forgot PIN? Reset here
-          </button>
+          {/* Forgot PIN (only for carer mode) */}
+          {!isSuperAdminMode && (
+            <button
+              onClick={() => {
+                setView('reset-request')
+                setError('')
+                setPin(['', '', '', ''])
+              }}
+              className="w-full mt-4 text-sm text-white/50 bg-transparent border-none cursor-pointer hover:text-white transition-colors"
+            >
+              Forgot PIN? Reset here
+            </button>
+          )}
         </div>
       </div>
     )

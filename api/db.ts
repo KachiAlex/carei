@@ -143,6 +143,7 @@ async function runMigrations() {
       )
     `
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`
     await sql`
       CREATE TABLE IF NOT EXISTS visit_drafts (
         visit_id TEXT PRIMARY KEY,
@@ -467,6 +468,11 @@ export function getAuthToken(req: any): string {
   return match ? match[1] : ''
 }
 
+export async function getUserFromToken(sql: any, token: string): Promise<{ id: string; name: string; role: string } | null> {
+  const rows = await sql`SELECT id, name, role FROM users WHERE token = ${token} LIMIT 1` as any[]
+  return rows[0] || null
+}
+
 // Multi-tenant helpers
 export function getTenantSlug(req: any): string | null {
   // Check header first (for API requests)
@@ -608,38 +614,31 @@ export async function withTenant(
     return
   }
 
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    const userId = payload.userId
-
-    if (!userId) {
-      res.status(401).json({ error: 'Invalid token' })
-      return
-    }
-
-    // Verify user has access to this tenant
-    const access = await verifyTenantAccess(userId, tenant.id)
-    if (!access.hasAccess) {
-      await logAuditEvent({
-        userId,
-        tenantId: tenant.id,
-        action: 'cross_tenant_access_attempt',
-        resource: req.url,
-        ipAddress: req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress,
-        userAgent: req.headers?.['user-agent'],
-        statusCode: 403,
-        details: { method: req.method, slug: tenantSlug }
-      })
-      res.status(403).json({ error: 'Access denied for this organization' })
-      return
-    }
-
-    // Execute handler with tenant context
-    await handler({ tenantId: tenant.id, userId, role: access.role, sql })
-  } catch (err: any) {
-    console.error('Tenant middleware error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+  const user = await getUserFromToken(sql, token)
+  if (!user) {
+    res.status(401).json({ error: 'Invalid token' })
+    return
   }
+
+  // Verify user has access to this tenant
+  const access = await verifyTenantAccess(user.id, tenant.id)
+  if (!access.hasAccess) {
+    await logAuditEvent({
+      userId: user.id,
+      tenantId: tenant.id,
+      action: 'cross_tenant_access_attempt',
+      resource: req.url,
+      ipAddress: req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress,
+      userAgent: req.headers?.['user-agent'],
+      statusCode: 403,
+      details: { method: req.method, slug: tenantSlug }
+    })
+    res.status(403).json({ error: 'Access denied for this organization' })
+    return
+  }
+
+  // Execute handler with tenant context
+  await handler({ tenantId: tenant.id, userId: user.id, role: access.role, sql })
 }
 
 // Simple in-memory rate limiter (resets every 60s, not persisted across cold starts)

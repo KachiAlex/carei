@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { motion } from 'framer-motion'
+import { getMe } from '../api/client'
 
 interface Tenant {
   id: string
@@ -35,9 +36,15 @@ export default function SuperAdminScreen() {
       return
     }
 
-    // Verify super admin access (simple check - in production, verify role from token)
     try {
       setIsLoading(true)
+
+      // Verify super admin role via /auth/me
+      const meRes = await getMe() as any
+      if (!meRes?.user || meRes.user.role !== 'superadmin') {
+        setLocation('/login')
+        return
+      }
 
       // For now, fetch all tenants by making individual requests
       // In production, this would be a dedicated super admin endpoint

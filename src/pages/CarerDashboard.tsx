@@ -108,12 +108,22 @@ export default function CarerDashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const token = localStorage.getItem('carei_token')
+    if (!token) {
+      setLocation('/login')
+      return
+    }
     getMe()
       .then((data) => { if (data.user) setUser(data.user) })
       .catch(() => {})
   }, [])
 
   useEffect(() => {
+    const token = localStorage.getItem('carei_token')
+    if (!token) {
+      setLocation('/login')
+      return
+    }
     Promise.all([
       getVisits().then((data) => {
         setVisits(data.visits || [])
@@ -283,7 +293,10 @@ export default function CarerDashboard() {
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.9 }}
-              onClick={() => setLocation('/')}
+              onClick={async () => {
+                await logoutUser()
+                setLocation('/')
+              }}
               className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
               title="Log out"
             >

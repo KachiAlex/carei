@@ -18,6 +18,17 @@ function getApiBase(): string {
 const API_BASE = getApiBase()
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
+function handleAuthError(status: number) {
+  if (status === 401) {
+    localStorage.removeItem('carei_token')
+    localStorage.removeItem('carei_user')
+    localStorage.removeItem('carei_current_tenant')
+    if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/join')) {
+      window.location.href = '/login'
+    }
+  }
+}
+
 export function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('carei_token')
   const tenant = localStorage.getItem('carei_current_tenant')
@@ -46,26 +57,27 @@ async function postWithRetry(path: string, body: unknown, retries = 3): Promise<
       })
       
       if (!res.ok) {
+        handleAuthError(res.status)
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
       }
-      
+
       return await res.json()
     } catch (err) {
       lastError = err as Error
-      
+
       // Don't retry on 4xx errors (client errors)
       if (err instanceof Error && err.message.includes('HTTP 4')) {
         throw err
       }
-      
+
       // Exponential backoff: wait longer between retries
       if (attempt < retries - 1) {
         await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
       }
     }
   }
-  
+
   throw lastError || new Error('Network error after retries')
 }
 
@@ -75,33 +87,34 @@ async function post(path: string, body: unknown) {
 
 async function getWithRetry(path: string, retries = 3): Promise<any> {
   let lastError: Error | null = null
-  
+
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const res = await fetch(`${API_BASE}${path}`, {
         headers: authHeaders(),
       })
-      
+
       if (!res.ok) {
+        handleAuthError(res.status)
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
       }
-      
+
       return await res.json()
     } catch (err) {
       lastError = err as Error
-      
+
       // Don't retry on 4xx errors
       if (err instanceof Error && err.message.includes('HTTP 4')) {
         throw err
       }
-      
+
       if (attempt < retries - 1) {
         await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
       }
     }
   }
-  
+
   throw lastError || new Error('Network error after retries')
 }
 
@@ -185,6 +198,7 @@ export async function updateClient(clientId: string, data: Partial<{
     body: JSON.stringify(data),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -197,6 +211,7 @@ export async function deleteClient(clientId: string) {
     headers: authHeaders(),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -243,6 +258,7 @@ export async function updateScheduledVisit(visitId: string, data: Partial<{
     body: JSON.stringify(data),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -255,6 +271,7 @@ export async function deleteScheduledVisit(visitId: string) {
     headers: authHeaders(),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -279,6 +296,16 @@ export async function loginUser(data: { email: string; pin: string }) {
   const res = await post('/auth/login', data) as any
   if (res.token) localStorage.setItem('carei_token', res.token)
   return res
+}
+
+export async function loginWithPassword(data: { email: string; password: string }) {
+  const res = await post('/auth/login-password', data) as any
+  if (res.token) localStorage.setItem('carei_token', res.token)
+  return res
+}
+
+export async function seedSuperAdmin() {
+  return post('/seed-superadmin', {})
 }
 
 export async function resetPin(data: { email: string; newPin: string; otp: string }) {
@@ -331,6 +358,7 @@ export async function updateCaregiverStatus(caregiverId: string, status: string)
     body: JSON.stringify({ status }),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -343,6 +371,7 @@ export async function deleteCaregiver(caregiverId: string) {
     headers: authHeaders(),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -374,6 +403,7 @@ export async function updateAssignment(assignmentId: string, data: {
     body: JSON.stringify(data),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -386,6 +416,7 @@ export async function deleteAssignment(caregiverId: string, clientId: string) {
     headers: authHeaders(),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -417,6 +448,7 @@ export async function deleteManagerTask(taskId: string) {
     headers: authHeaders(),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -514,6 +546,7 @@ export async function deleteVisitDraft(visitId: string) {
     headers: authHeaders(),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
@@ -549,6 +582,7 @@ export async function deleteBodyMapMark(markId: string) {
     headers: authHeaders(),
   })
   if (!res.ok) {
+    handleAuthError(res.status)
     const err = await res.json().catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }

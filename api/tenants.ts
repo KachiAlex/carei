@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, getAuthToken, ensureTables, getTenantFromSlug, getUserTenants, verifyTenantAccess, createTenant, addUserToTenant, getTenantSlug } from './db.js'
+import { getSql, setCors, getAuthToken, ensureTables, getTenantFromSlug, getUserTenants, verifyTenantAccess, createTenant, addUserToTenant, getTenantSlug, getUserFromToken } from './db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -31,16 +31,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      // Decode token to get user ID (simple JWT decode)
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-      const userId = payload.userId
-
-      if (!userId) {
+      const user = await getUserFromToken(sql, token)
+      if (!user) {
         res.status(401).json({ error: 'Invalid token' })
         return
       }
 
-      const tenants = await getUserTenants(userId)
+      const tenants = await getUserTenants(user.id)
       res.status(200).json({ tenants })
       return
     }
@@ -53,10 +50,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-      const userId = payload.userId
-
-      if (!userId) {
+      const user = await getUserFromToken(sql, token)
+      if (!user) {
         res.status(401).json({ error: 'Invalid token' })
         return
       }
@@ -77,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         const tenant = await createTenant({ slug, name, domain, plan: plan || 'trial' })
         // Add creator as admin
-        await addUserToTenant(userId, tenant.id, 'admin')
+        await addUserToTenant(user.id, tenant.id, 'admin')
         res.status(201).json({ id: tenant.id, slug, name, message: 'Tenant created successfully' })
       } catch (err: any) {
         if (err.message?.includes('unique constraint')) {
@@ -97,10 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-      const userId = payload.userId
-
-      if (!userId) {
+      const user = await getUserFromToken(sql, token)
+      if (!user) {
         res.status(401).json({ error: 'Invalid token' })
         return
       }
@@ -112,7 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      await addUserToTenant(userId, tenantId, role)
+      await addUserToTenant(user.id, tenantId, role)
       res.status(200).json({ message: 'Joined tenant successfully' })
       return
     }
