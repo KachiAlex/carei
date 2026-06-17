@@ -143,7 +143,6 @@ async function runMigrations() {
       )
     `
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'`
-    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`
     await sql`
       CREATE TABLE IF NOT EXISTS visit_drafts (
         visit_id TEXT PRIMARY KEY,
@@ -450,6 +449,10 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant ON audit_logs(tenant_id)`
     await sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id)`
     await sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)`
+  })
+
+  await run(8, 'password_hash_column', async () => {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`
   })
 }
 

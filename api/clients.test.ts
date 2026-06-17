@@ -37,9 +37,10 @@ describe('clients API tenant isolation', () => {
   })
 
   it('lists only clients belonging to the tenant', async () => {
-    const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
+    const token = 'valid-token-123'
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'admin' }])
       .mockResolvedValueOnce([{ role: 'admin' }])
       .mockResolvedValueOnce([
         { id: 'c-1', name: 'Alice', conditions: '[]', medications: '[]' },
@@ -59,15 +60,16 @@ describe('clients API tenant isolation', () => {
       ])
     )
     // Ensure tenant filter is applied
-    const sqlCall = mockSql.mock.calls[2] // third call is the SELECT
+    const sqlCall = mockSql.mock.calls[3] // fourth call is the SELECT
     const template = sqlCall[0] as string[]
     expect(template.join('')).toContain('tenant_id')
   })
 
   it('returns 404 when client exists in another tenant', async () => {
-    const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
+    const token = 'valid-token-123'
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'admin' }])
       .mockResolvedValueOnce([{ role: 'admin' }])
       .mockResolvedValueOnce([]) // no matching client in this tenant
 
@@ -86,9 +88,10 @@ describe('clients API tenant isolation', () => {
   })
 
   it('creates client scoped to tenant on POST', async () => {
-    const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
+    const token = 'valid-token-123'
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'admin' }])
       .mockResolvedValueOnce([{ role: 'admin' }])
       .mockResolvedValueOnce([])
 
@@ -102,7 +105,7 @@ describe('clients API tenant isolation', () => {
     await clientsHandler(req, res)
 
     expect(res.status).toHaveBeenCalledWith(201)
-    const sqlCall = mockSql.mock.calls[2]
+    const sqlCall = mockSql.mock.calls[3]
     const template = sqlCall[0] as string[]
     expect(template.join('')).toContain('tenant_id')
   })

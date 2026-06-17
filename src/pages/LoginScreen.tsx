@@ -314,55 +314,65 @@ export default function LoginScreen() {
             </button>
           </div>
 
-          {/* Email Input */}
-          <div className="space-y-4 mb-6">
-            <div>
-              <label className="block text-white/70 text-sm mb-2 font-medium">Email address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email address"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
-              />
-            </div>
-
-            {isSuperAdminMode ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (isSuperAdminMode) {
+                handlePasswordLogin()
+              } else {
+                handleVerify()
+              }
+            }}
+          >
+            {/* Email Input */}
+            <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-white/70 text-sm mb-2 font-medium">Password</label>
+                <label className="block text-white/70 text-sm mb-2 font-medium">Email address</label>
                 <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError('') }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handlePasswordLogin() }}
-                  placeholder="Enter your password"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email address"
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
                 />
               </div>
-            ) : (
-              <div>
-                <label className="block text-white/70 text-sm mb-4 font-medium">4-digit PIN</label>
-                <PinBoxes
-                  pin={pin}
-                  onChange={handlePinChange}
-                  onComplete={handleVerify}
-                />
-              </div>
-            )}
-          </div>
 
-          {/* Error */}
-          {error && <p className="text-red-400 text-sm mb-4 text-center">{error}</p>}
+              {isSuperAdminMode ? (
+                <div>
+                  <label className="block text-white/70 text-sm mb-2 font-medium">Password</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setError('') }}
+                    placeholder="Enter your password"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-white/30 outline-none focus:border-teal transition-colors"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-white/70 text-sm mb-4 font-medium">4-digit PIN</label>
+                  <PinBoxes
+                    pin={pin}
+                    onChange={handlePinChange}
+                    onComplete={handleVerify}
+                  />
+                </div>
+              )}
+            </div>
 
-          {/* Login Button */}
-          <button
-            onClick={isSuperAdminMode ? handlePasswordLogin : handleVerify}
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl font-bold text-base cursor-pointer border-none disabled:opacity-50"
-            style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
-          >
-            {loading ? 'Signing in…' : 'Log In'}
-          </button>
+            {/* Error */}
+            {error && <p className="text-red-400 text-sm mb-4 text-center">{error}</p>}
+
+            {/* Login Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3.5 rounded-xl font-bold text-base cursor-pointer border-none disabled:opacity-50"
+              style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}
+            >
+              {loading ? 'Signing in…' : 'Log In'}
+            </button>
+          </form>
 
           {/* Forgot PIN (only for carer mode) */}
           {!isSuperAdminMode && (

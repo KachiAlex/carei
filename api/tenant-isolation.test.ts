@@ -111,10 +111,30 @@ describe('withTenant middleware', () => {
     )
   })
 
-  it('returns 403 when user has no access to tenant', async () => {
-    const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
+  it('returns 401 when token is invalid (user not found)', async () => {
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([])
+    const req = makeReq({
+      headers: { 'x-tenant-slug': 'acme', authorization: 'Bearer invalid-token' },
+    })
+    const res = makeRes()
+    const handler = vi.fn()
+
+    await withTenant(req, res, handler)
+
+    expect(handler).not.toHaveBeenCalled()
+    expect(res.status).toHaveBeenCalledWith(401)
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: 'Invalid token' })
+    )
+  })
+
+  it('returns 403 when user has no access to tenant', async () => {
+    const token = 'valid-token-123'
+    mockSql
+      .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'carer' }])
       .mockResolvedValueOnce([])
 
     const req = makeReq({
@@ -133,9 +153,10 @@ describe('withTenant middleware', () => {
   })
 
   it('executes handler with tenant context when access is valid', async () => {
-    const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
+    const token = 'valid-token-123'
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'carer' }])
       .mockResolvedValueOnce([{ role: 'admin' }])
 
     const req = makeReq({
@@ -154,20 +175,6 @@ describe('withTenant middleware', () => {
       })
     )
     expect(res.status).not.toHaveBeenCalledWith(403)
-  })
-
-  it('returns 500 for malformed token (catch-all error handling)', async () => {
-    mockSql.mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
-    const req = makeReq({
-      headers: { 'x-tenant-slug': 'acme', authorization: 'Bearer bad-token' },
-    })
-    const res = makeRes()
-    const handler = vi.fn()
-
-    await withTenant(req, res, handler)
-
-    expect(handler).not.toHaveBeenCalled()
-    expect(res.status).toHaveBeenCalledWith(500)
   })
 })
 
