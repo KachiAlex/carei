@@ -539,6 +539,33 @@ async function runMigrations() {
     }
   })
 
+  await run(12, 'ensure_tenant_id_columns_v2', async () => {
+    // Migration 11 was already marked as applied in the database but the code
+    // that ran at that time still had the broken dynamic SQL. This migration
+    // ensures the columns actually get created.
+    const tables = [
+      'clients', 'users', 'visits', 'scheduled_visits', 'sos_alerts',
+      'incidents', 'voice_memos', 'caregiver_client_assignments', 'tasks',
+      'task_logs', 'medication_logs', 'body_map_marks', 'family_messages',
+      'visit_drafts', 'agencies', 'drug_interactions'
+    ]
+    for (const table of tables) {
+      try {
+        await (sql as any)(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id TEXT`)
+      } catch { /* ignore if table doesn't exist or column already exists */ }
+    }
+    for (const table of tables) {
+      try {
+        await (sql as any)(`UPDATE ${table} SET tenant_id = 'default-tenant' WHERE tenant_id IS NULL`)
+      } catch { /* ignore */ }
+    }
+    for (const table of tables) {
+      try {
+        await (sql as any)(`CREATE INDEX IF NOT EXISTS idx_${table}_tenant ON ${table}(tenant_id)`)
+      } catch { /* ignore */ }
+    }
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (
