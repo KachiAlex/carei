@@ -475,6 +475,40 @@ async function runMigrations() {
     await sql`UPDATE tenants SET max_clients = 10 WHERE max_clients IS NULL`
   })
 
+  await run(10, 'ensure_tenant_id_columns', async () => {
+    // Create default tenant for backfill
+    const defaultTenantId = 'default-tenant'
+    await sql`
+      INSERT INTO tenants (id, slug, name, plan)
+      VALUES (${defaultTenantId}, 'default', 'Default Organization', 'professional')
+      ON CONFLICT (id) DO NOTHING
+    `
+    // Add tenant_id to all core tables
+    const tables = [
+      'clients', 'users', 'visits', 'scheduled_visits', 'sos_alerts',
+      'incidents', 'voice_memos', 'caregiver_client_assignments', 'tasks',
+      'task_logs', 'medication_logs', 'body_map_marks', 'family_messages',
+      'visit_drafts', 'agencies', 'drug_interactions'
+    ]
+    for (const table of tables) {
+      try {
+        await sql`ALTER TABLE ${(sql as any)(table)} ADD COLUMN IF NOT EXISTS tenant_id TEXT`
+      } catch { /* ignore */ }
+    }
+    // Backfill existing rows with default tenant
+    for (const table of tables) {
+      try {
+        await sql`UPDATE ${(sql as any)(table)} SET tenant_id = ${defaultTenantId} WHERE tenant_id IS NULL`
+      } catch { /* ignore */ }
+    }
+    // Ensure indexes exist
+    for (const table of tables) {
+      try {
+        await sql`CREATE INDEX IF NOT EXISTS idx_${(sql as any)(table)}_tenant ON ${(sql as any)(table)}(tenant_id)`
+      } catch { /* ignore */ }
+    }
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (
