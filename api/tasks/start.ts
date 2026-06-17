@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, getAuthToken } from '../db.js'
+import { getSql, setCors, ensureTables, getAuthToken, withTenant, getTenantSlug } from '../db.js'
 
 function generateId(): string {
   return 'tl-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
@@ -30,6 +30,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  const tenantSlug = getTenantSlug(req)
+
   try {
     await ensureTables()
     const sql = getSql()
@@ -39,6 +41,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
+    // If tenant slug provided, use tenant-aware filtering
+    if (tenantSlug) {
+      await withTenant(req, res, async ({ tenantId, sql: tenantSql }) => {
+        // Verify caregiver is assigned to this client in this tenant
+        const assignments = await tenantSql`
+          SELECT 1 FROM caregiver_client_assignments
+          WHERE caregiver_id = ${user.id} AND client_id = ${clientId} AND tenant_id = ${tenantId}
+          LIMIT 1
+        ` as any[]
+        if (assignments.length === 0) {
+          res.status(403).json({ error: 'Not assigned to this client in this organization' })
+          return
+        }
+
+        const id = generateId()
+        await tenantSql`
+          INSERT INTO task_logs (id, client_id, caregiver_id, task_name, start_time, tenant_id)
+          VALUES (${id}, ${clientId}, ${user.id}, ${taskName}, NOW(), ${tenantId})
+        `
+
+        res.status(201).json({ status: 'started', id, startTime: new Date().toISOString() })
+      })
+      return
+    }
+
+    // Legacy non-tenant handler
     // Verify caregiver is assigned to this client
     const assignments = await sql`
       SELECT 1 FROM caregiver_client_assignments
