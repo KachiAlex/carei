@@ -256,6 +256,7 @@ export default function CarerDashboard() {
             <div className="text-left">
               <div className="text-sm font-bold">{user?.name || 'Carer'}</div>
               <div className="text-[11px] text-white/40">{user?.role ? `${user.role.charAt(0).toUpperCase() + user.role.slice(1)}` : 'Carer'}{user?.region ? ` — ${user.region}` : ''}</div>
+              <TenantBadge />
             </div>
           </motion.button>
           <div className="flex items-center gap-2">
