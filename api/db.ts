@@ -381,7 +381,7 @@ async function runMigrations() {
 
     for (const table of tables) {
       try {
-        await sql`ALTER TABLE ${sql(table)} ADD COLUMN IF NOT EXISTS tenant_id TEXT`
+        await sql`ALTER TABLE ${(sql as any)(table)} ADD COLUMN IF NOT EXISTS tenant_id TEXT`
       } catch { /* ignore if column exists */ }
     }
 
@@ -396,14 +396,14 @@ async function runMigrations() {
     // Migrate existing data to default tenant
     for (const table of tables) {
       try {
-        await sql`UPDATE ${sql(table)} SET tenant_id = ${defaultTenantId} WHERE tenant_id IS NULL`
+        await sql`UPDATE ${(sql as any)(table)} SET tenant_id = ${defaultTenantId} WHERE tenant_id IS NULL`
       } catch { /* ignore if table doesn't exist or no rows */ }
     }
 
     // Add indexes for tenant queries
     for (const table of tables) {
       try {
-        await sql`CREATE INDEX IF NOT EXISTS idx_${sql(table)}_tenant ON ${sql(table)}(tenant_id)`
+        await sql`CREATE INDEX IF NOT EXISTS idx_${(sql as any)(table)}_tenant ON ${(sql as any)(table)}(tenant_id)`
       } catch { /* ignore */ }
     }
 
@@ -569,28 +569,6 @@ export async function addUserToTenant(userId: string, tenantId: string, role: st
     VALUES (${id}, ${tenantId}, ${userId}, ${role})
     ON CONFLICT (tenant_id, user_id) DO UPDATE SET role = ${role}
   `
-}
-
-// Tenant-aware query helper - automatically filters by tenant_id
-export async function tenantQuery(table: string, tenantId: string, action: 'select' | 'insert' | 'update' | 'delete', conditions?: Record<string, any>) {
-  const sql = getSql()
-
-  if (action === 'select') {
-    const whereClause = Object.entries(conditions || {})
-      .map(([key, val]) => sql`${sql(key)} = ${val}`)
-      .join(' AND ')
-    return sql`SELECT * FROM ${sql(table)} WHERE tenant_id = ${tenantId} ${whereClause ? sql`AND ${sql(whereClause)}` : sql``}`
-  }
-
-  // For insert, add tenant_id to data
-  if (action === 'insert' && conditions) {
-    const data = { ...conditions, tenant_id: tenantId }
-    const columns = Object.keys(data).join(', ')
-    const values = Object.values(data)
-    return sql`INSERT INTO ${sql(table)} (${sql(columns)}) VALUES (${values})`
-  }
-
-  return null
 }
 
 // Tenant middleware for API endpoints

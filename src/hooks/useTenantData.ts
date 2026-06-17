@@ -7,13 +7,13 @@ export function useTenantQuery<T>(
   queryFn: () => Promise<T>,
   deps: React.DependencyList = []
 ) {
-  const { currentTenant, isReady } = useTenant()
+  const { currentTenant, isLoading: tenantLoading } = useTenant()
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
   const refetch = useCallback(async () => {
-    if (!isReady || !currentTenant) {
+    if (tenantLoading || !currentTenant) {
       setLoading(false)
       return
     }
@@ -29,7 +29,7 @@ export function useTenantQuery<T>(
     } finally {
       setLoading(false)
     }
-  }, [isReady, currentTenant, queryFn])
+  }, [tenantLoading, currentTenant, queryFn])
 
   useEffect(() => {
     refetch()
@@ -44,7 +44,7 @@ export function useTenantClients() {
 
   return useTenantQuery(
     useCallback(async () => {
-      return api.fetchClients()
+      return api.getClients()
     }, []),
     [currentTenant?.id]
   )
@@ -56,7 +56,7 @@ export function useTenantCarers() {
 
   return useTenantQuery(
     useCallback(async () => {
-      return api.fetchCarers()
+      return api.getCarers()
     }, []),
     [currentTenant?.id]
   )
@@ -68,7 +68,7 @@ export function useTenantVisits() {
 
   return useTenantQuery(
     useCallback(async () => {
-      return api.fetchVisits()
+      return api.getVisits()
     }, []),
     [currentTenant?.id]
   )
@@ -147,7 +147,8 @@ export function useBodyMapMarks(visitId: string | null) {
 
 // Hook for fetching invites for current tenant (admin only)
 export function useTenantInvites() {
-  const { currentTenant, currentUserRole } = useTenant()
+  const { currentTenant } = useTenant()
+  const currentUserRole = currentTenant?.role
 
   return useTenantQuery(
     useCallback(async () => {
@@ -164,7 +165,8 @@ export function useTenantInvites() {
 
 // Hook for creating an invite (admin only)
 export function useCreateInvite() {
-  const { currentTenant, currentUserRole } = useTenant()
+  const { currentTenant } = useTenant()
+  const currentUserRole = currentTenant?.role
 
   const createInvite = useCallback(
     async (email: string, role: string = 'carer', expiresInHours: number = 48) => {
@@ -198,7 +200,8 @@ export function useCreateInvite() {
 
 // Hook for cancelling an invite (admin only)
 export function useCancelInvite() {
-  const { currentUserRole } = useTenant()
+  const { currentTenant } = useTenant()
+  const currentUserRole = currentTenant?.role
 
   const cancelInvite = useCallback(
     async (inviteId: string) => {

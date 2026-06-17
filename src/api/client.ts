@@ -18,7 +18,7 @@ function getApiBase(): string {
 const API_BASE = getApiBase()
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const token = localStorage.getItem('carei_token')
   const tenant = localStorage.getItem('carei_current_tenant')
   const headers: Record<string, string> = {}

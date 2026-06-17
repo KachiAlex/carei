@@ -28,7 +28,8 @@ const API_URL = import.meta.env.VITE_API_URL || '/api'
 export default function TenantMembersScreen() {
   const [, setLocation] = useLocation()
   const search = useSearch()
-  const { currentTenant, currentUserRole, isReady } = useTenant()
+  const { currentTenant, isLoading: tenantLoading } = useTenant()
+  const currentUserRole = currentTenant?.role
   const [members, setMembers] = useState<Member[]>([])
   const [invites, setInvites] = useState<Invite[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -47,10 +48,10 @@ export default function TenantMembersScreen() {
   const tenantSlug = params.get('tenant') || currentTenant?.slug
 
   useEffect(() => {
-    if (!isReady || !tenantSlug) return
+    if (tenantLoading || !tenantSlug) return
     fetchMembers()
     fetchInvites()
-  }, [isReady, tenantSlug])
+  }, [tenantLoading, tenantSlug])
 
   const fetchMembers = async () => {
     const token = localStorage.getItem('carei_token')
@@ -156,7 +157,7 @@ export default function TenantMembersScreen() {
     )
   }
 
-  if (!isReady) {
+  if (tenantLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0B1120' }}>
         <div className="animate-spin w-6 h-6 border-2 border-teal-400 border-t-transparent rounded-full" />
