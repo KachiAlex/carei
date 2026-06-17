@@ -46,8 +46,6 @@ export default function SuperAdminScreen() {
         return
       }
 
-      // For now, fetch all tenants by making individual requests
-      // In production, this would be a dedicated super admin endpoint
       const res = await fetch(`${API_URL}/tenants?admin=true`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -57,16 +55,14 @@ export default function SuperAdminScreen() {
         return
       }
 
-      // This is a placeholder - real implementation needs a super admin API
-      setTenants([
-        { id: '1', slug: 'demo', name: 'Demo Organization', plan: 'professional', created_at: new Date().toISOString(), user_count: 5 },
-        { id: '2', slug: 'sunrise', name: 'Sunrise Care', plan: 'enterprise', created_at: new Date().toISOString(), user_count: 12 },
-      ])
+      const data = await res.json().catch(() => ({}))
+      const tenantList: Tenant[] = Array.isArray(data) ? data : (data.tenants || [])
+      setTenants(tenantList)
 
       setStats({
-        totalTenants: 2,
-        totalUsers: 17,
-        activeToday: 8
+        totalTenants: tenantList.length,
+        totalUsers: tenantList.reduce((acc: number, t: Tenant) => acc + (t.user_count || 0), 0),
+        activeToday: 0
       })
     } catch (err: any) {
       setError(err.message)
@@ -192,21 +188,21 @@ export default function SuperAdminScreen() {
                 <span className="text-white/60">Database</span>
                 <span className="text-teal-400 flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-teal-400" />
-                  Healthy
+                  Connected
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-white/60">API</span>
                 <span className="text-teal-400 flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-teal-400" />
-                  Operational
+                  Online
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-white/60">Storage</span>
-                <span className="text-teal-400 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-teal-400" />
-                  12% used
+                <span className="text-white/40 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-slate-500" />
+                  N/A
                 </span>
               </div>
             </div>
@@ -215,9 +211,7 @@ export default function SuperAdminScreen() {
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
             <h3 className="font-medium text-white mb-2">Recent Activity</h3>
             <div className="space-y-2 text-sm">
-              <div className="text-white/60">New user registered at Sunrise Care</div>
-              <div className="text-white/60">Demo org upgraded to Professional</div>
-              <div className="text-white/60">System backup completed</div>
+              <div className="text-white/40">No recent activity</div>
             </div>
           </div>
         </div>

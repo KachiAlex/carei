@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation, useParams } from 'wouter'
 import { getClient, startVisit } from '../api/client'
-import { getClientById } from '../data/demoData'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -13,32 +12,6 @@ const COLORS = {
   red: '#FF5A5F',
   green: '#22C55E',
   g2: '#94A3B8',
-}
-
-// Client emoji avatars matching the document
-const CLIENT_EMOJIS: Record<string, string> = {
-  'Mary Johnson': '👵',
-  'Tom Adams': '👴',
-  'Aisha Khan': '🧕',
-}
-
-// Demo handover bullets with emoji tags per client
-const DEMO_HANDOVER_BULLETS: Record<string, string[]> = {
-  'Mary Johnson': [
-    '⚡ PBS Risk — First hour after arrival is sensitive; use calm voice',
-    '🍽️ Must finish lunch within 30 min (dysphagia protocol)',
-    '🌡️ Check temperature if appears flushed'
-  ],
-  'Tom Adams': [
-    '💨 COPD — No aerosol sprays near room',
-    '🩺 Oxygen concentrator at 2L/min via nasal cannula',
-    '🍽️ Soft diet only — choking risk on solids'
-  ],
-  'Aisha Khan': [
-    '🧩 Non-verbal — Use picture cards; do not force speech',
-    '🏠 Familiar carer only — strangers trigger distress',
-    '⚡ PBS Red Zone — Do not approach if pacing; call supervisor'
-  ],
 }
 
 interface ClientDetail {
@@ -117,8 +90,7 @@ export default function ClientOverviewScreen() {
   }
 
   const initials = client.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-  const demoClient = getClientById(client.id)
-  const handoverBullets = DEMO_HANDOVER_BULLETS[client.name] || client.careCues?.slice(0, 3) || []
+  const handoverBullets = client.careCues?.slice(0, 3) || []
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative items-center">
@@ -153,7 +125,7 @@ export default function ClientOverviewScreen() {
                 border: `2px solid ${COLORS.teal}30`,
               }}
             >
-              {CLIENT_EMOJIS[client.name] || '👤'}
+              {'👤'}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">

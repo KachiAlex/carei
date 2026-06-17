@@ -5,10 +5,9 @@ function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
-// Mock SMS sender — replace with Twilio/SendGrid in production
+// OTP sender — integrate with Twilio/SendGrid/Email provider in production
 async function sendOtpSms(email: string, code: string): Promise<void> {
-  console.log(`[MOCK SMS] To: ${email} | Code: ${code}`)
-  // Example real implementation:
+  // TODO: Replace with real SMS/email sender
   // await twilioClient.messages.create({ body: `Your CAREi code: ${code}`, from: '+1234567890', to: phone })
 }
 

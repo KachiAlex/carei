@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
+import { useTenant } from '../contexts/TenantContext'
 import { exportVisits } from '../utils/exportCsv'
 
 const COLORS = {
@@ -22,6 +23,7 @@ interface VisitApproval {
 
 export default function ManagerApprovalsScreen() {
   const [, setLocation] = useLocation()
+  const { currentTenant } = useTenant()
   const [visits, setVisits] = useState<VisitApproval[]>([])
   const [filter, setFilter] = useState<'pending' | 'approved' | 'released'>('pending')
 
@@ -59,7 +61,7 @@ export default function ManagerApprovalsScreen() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <div className="px-4 pt-4 pb-3 text-white shrink-0" style={{ background: `linear-gradient(160deg, ${COLORS.darkNavy} 0%, ${COLORS.navy} 100%)` }}>
-        <button onClick={() => setLocation('/manager')} className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors mb-3">
+        <button onClick={() => currentTenant && setLocation(`/tenant/${currentTenant.slug}/manager`)} className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors mb-3">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           Dashboard
         </button>

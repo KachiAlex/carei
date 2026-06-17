@@ -129,12 +129,7 @@ export default function SplashScreen() {
     },
   ]
 
-  const stats = [
-    { value: '10K+', label: 'Visits Managed' },
-    { value: '99.9%', label: 'Uptime SLA' },
-    { value: 'GDPR', label: 'Compliant' },
-    { value: '<2s', label: 'Alert Latency' },
-  ]
+  const stats: { value: string; label: string }[] = []
 
   if (loading) {
     return <LoadingOverlay onDone={() => setLoading(false)} />

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation } from 'wouter'
+import { useTenant } from '../contexts/TenantContext'
 import {
   getManagerData,
   createCaregiver,
@@ -35,6 +36,8 @@ const COLORS = {
 
 export default function ManagerDashboard() {
   const [, setLocation] = useLocation()
+  const { currentTenant } = useTenant()
+  const tenantSlug = currentTenant?.slug || ''
   const [tab, setTab] = useState<'overview' | 'team' | 'clients' | 'schedule' | 'logs'>('overview')
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null)
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set())
@@ -1059,7 +1062,7 @@ export default function ManagerDashboard() {
               <span style={{ color: sseConnected ? COLORS.teal : '#94a3b8' }}>{sseConnected ? 'Live' : 'Offline'}</span>
             </span>
             <button
-              onClick={() => setLocation('/manager/clients')}
+              onClick={() => tenantSlug && setLocation(`/tenant/${tenantSlug}/manager/clients`)}
               className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
               title="Client Management"
             >
@@ -1069,7 +1072,7 @@ export default function ManagerDashboard() {
               </svg>
             </button>
             <button
-              onClick={() => setLocation('/manager/schedule')}
+              onClick={() => tenantSlug && setLocation(`/tenant/${tenantSlug}/manager/schedule`)}
               className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
               title="Visit Scheduling"
             >
@@ -1081,7 +1084,12 @@ export default function ManagerDashboard() {
               </svg>
             </button>
             <button
-              onClick={() => setLocation('/manager/login')}
+              onClick={() => {
+                localStorage.removeItem('carei_token')
+                localStorage.removeItem('carei_user')
+                localStorage.removeItem('carei_current_tenant')
+                setLocation('/login')
+              }}
               className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
               title="Log out"
             >

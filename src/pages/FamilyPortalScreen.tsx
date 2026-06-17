@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useRoute } from 'wouter'
 import { motion } from 'framer-motion'
-import { MARY_JOHNSON, TOM_ADAMS, AISHA_KHAN } from '../data/demoData'
+import { getClient } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -79,37 +79,26 @@ export default function FamilyPortalScreen() {
   const [newMessage, setNewMessage] = useState('')
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'messages'>('overview')
   const [tasks, setTasks] = useState<TaskItem[]>([])
-
-  // Get client data based on ID
-  const getClient = () => {
-    switch (clientId) {
-      case 'mary': return MARY_JOHNSON
-      case 'tom': return TOM_ADAMS
-      case 'aisha': return AISHA_KHAN
-      default: return null
-    }
-  }
-
-  const client = getClient()
+  const [client, setClient] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const clientCondition = client?.condition || 'General'
 
   useEffect(() => {
+    if (!clientId) return
+    setLoading(true)
+    getClient(clientId)
+      .then((data) => { setClient(data) })
+      .catch(() => { setClient(null) })
+      .finally(() => { setLoading(false) })
+
     const saved = localStorage.getItem(`family-messages-${clientId}`)
     if (saved) setMessages(JSON.parse(saved))
 
-    // Load saved tasks or initialize from condition template
     const savedTasks = localStorage.getItem(`family-tasks-${clientId}`)
     if (savedTasks) {
       setTasks(JSON.parse(savedTasks))
-    } else {
-      // Initialize tasks based on client condition
-      const conditionKey = Object.keys(CONDITION_TASKS).find(c => 
-        clientCondition.toLowerCase().includes(c.toLowerCase())
-      )
-      const taskList = conditionKey ? CONDITION_TASKS[conditionKey].tasks : CONDITION_TASKS['Dementia'].tasks
-      setTasks(taskList.map((t, i) => ({ id: `ft-${i}`, text: t, completed: false, category: 'care' })))
     }
-  }, [clientId, clientCondition])
+  }, [clientId])
 
   const saveTasks = (newTasks: TaskItem[]) => {
     setTasks(newTasks)
@@ -157,10 +146,10 @@ export default function FamilyPortalScreen() {
         
         {client && (
           <div className="flex items-center gap-3 mb-2">
-            <div className="text-3xl">{client.emoji}</div>
+            <div className="text-3xl">{'👤'}</div>
             <div>
               <h1 className="font-serif text-lg font-bold">{client.name}</h1>
-              <p className="text-white/50 text-sm">{client.condition} • {client.age} years</p>
+              <p className="text-white/50 text-sm">{client.age ? `${client.age} years` : ''}</p>
             </div>
           </div>
         )}
@@ -204,15 +193,12 @@ export default function FamilyPortalScreen() {
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-slate-800">Sarah O'Brien visited</div>
-                  <div className="text-[10px] text-slate-500">Today · 09:00 – 11:00 · 2h</div>
+                  <div className="text-sm font-bold text-slate-800">Last Visit</div>
+                  <div className="text-[10px] text-slate-500">No recent visits</div>
                 </div>
               </div>
-              <div className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3">
-                ✅ All medications administered on time<br/>
-                🩺 Vitals recorded: BP 132/84, Pulse 72<br/>
-                🍽️ Breakfast eaten well, fluids 800ml<br/>
-                😊 Client was calm and cooperative
+              <div className="text-xs text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3">
+                No recent visit data available.
               </div>
             </div>
 
@@ -220,7 +206,7 @@ export default function FamilyPortalScreen() {
             <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
               <h3 className="font-bold text-sm text-slate-800 mb-3">Today's Medication</h3>
               <div className="flex flex-col gap-2">
-                {client?.meds?.slice(0, 3).map((med, i) => (
+                {client?.meds?.slice(0, 3).map((med: any, i: number) => (
                   <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-slate-100">

@@ -74,7 +74,6 @@ export default function LoginScreen() {
   const [newPin, setNewPin] = useState(['', '', '', ''])
   const [confirmNewPin, setConfirmNewPin] = useState(['', '', '', ''])
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
-  const [displayOtp, setDisplayOtp] = useState<string>('') // OTP shown on screen
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [resetSuccess, setResetSuccess] = useState(false)
@@ -167,11 +166,7 @@ export default function LoginScreen() {
       // Call backend API to generate and store OTP in database
       const res = await sendOtp({ email: email.trim().toLowerCase(), purpose: 'reset-pin' }) as any
       
-      // Display OTP on screen since email isn't configured yet
-      // Backend generates and stores the OTP, we display it here
-      if (res?.demoCode || res?.otp || res?.code) {
-        setDisplayOtp(res.demoCode || res.otp || res.code)
-      } else {
+      if (!res?.status || res.status !== 'sent') {
         setError('Failed to generate reset code. Please try again.')
         setLoading(false)
         return
@@ -271,7 +266,6 @@ export default function LoginScreen() {
       setNewPin(['', '', '', ''])
       setConfirmNewPin(['', '', '', ''])
       setOtp(['', '', '', '', '', ''])
-      setDisplayOtp('')
     }, 2000)
   }
 
@@ -458,15 +452,6 @@ export default function LoginScreen() {
             <h2 className="font-serif text-white text-xl">Enter Reset Code</h2>
             <p className="text-white/50 text-sm mt-2">Enter the 6-digit code sent to {email}</p>
           </div>
-
-          {/* On-screen OTP Display (temp until email configured) */}
-          {displayOtp && (
-            <div className="mb-6 p-4 rounded-xl border-2 border-dashed border-amber-500/50 bg-amber-500/10">
-              <p className="text-amber-400 text-xs font-bold uppercase tracking-wider mb-1">📧 Email not configured - Code displayed on screen:</p>
-              <p className="text-amber-300 text-3xl font-mono font-bold tracking-widest text-center">{displayOtp}</p>
-              <p className="text-amber-400/70 text-xs mt-2">In production, this will be sent to your email</p>
-            </div>
-          )}
 
           {/* OTP Input */}
           <div className="mb-6">

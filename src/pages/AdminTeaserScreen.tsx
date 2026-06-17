@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
+import { useTenant } from '../contexts/TenantContext'
 import { motion } from 'framer-motion'
 import { exportVisits } from '../utils/exportCsv'
-import { DEMO_CARERS, MARY_JOHNSON, TOM_ADAMS, AISHA_KHAN } from '../data/demoData'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -42,34 +42,14 @@ interface AgencyAlert {
 
 export default function AdminTeaserScreen() {
   const [, setLocation] = useLocation()
+  const { currentTenant } = useTenant()
   const [activeTab, setActiveTab] = useState<'overview' | 'shifts' | 'audit' | 'alerts'>('overview')
   
-  // Demo shift data
-  const [shifts] = useState<Shift[]>([
-    { id: 's1', carer: 'Sarah O\'Brien', client: 'Mary Johnson', startTime: '09:00', status: 'active', location: 'Reading' },
-    { id: 's2', carer: 'John Mensah', client: 'Tom Adams', startTime: '10:30', status: 'active', location: 'Newbury' },
-    { id: 's3', carer: 'Amina Diallo', client: 'Aisha Khan', startTime: '14:00', status: 'scheduled', location: 'Oxford' },
-    { id: 's4', carer: 'Priya Sharma', client: 'Mary Johnson', startTime: 'Yesterday', status: 'completed', location: 'Reading' },
-  ])
+  const [shifts] = useState<Shift[]>([])
+  const [auditTrail] = useState<AuditEntry[]>([])
+  const [alerts] = useState<AgencyAlert[]>([])
 
-  // Demo audit trail
-  const [auditTrail] = useState<AuditEntry[]>([
-    { id: 'a1', timestamp: '10:32', action: 'Medication given: Aspirin 75mg', user: 'Sarah O\'Brien', type: 'medication' },
-    { id: 'a2', timestamp: '10:15', action: 'Visit clocked in', user: 'Sarah O\'Brien', type: 'visit' },
-    { id: 'a3', timestamp: '09:45', action: 'Blood pressure recorded: 132/84', user: 'John Mensah', type: 'visit' },
-    { id: 'a4', timestamp: '09:30', action: 'Manager login', user: 'Alex Morgan', type: 'login' },
-    { id: 'a5', timestamp: 'Yesterday', action: 'Incident reported: Fall risk', user: 'Amina Diallo', type: 'incident' },
-  ])
-
-  // Demo agency alerts
-  const [alerts] = useState<AgencyAlert[]>([
-    { id: 'al1', title: 'Medication overdue', severity: 'high', timestamp: '10:45', description: 'Mary Johnson - Donepezil 30 min late' },
-    { id: 'al2', title: 'Staff running late', severity: 'medium', timestamp: '09:15', description: 'Aisha Khan visit delayed by 15 min' },
-    { id: 'al3', title: 'New incident logged', severity: 'high', timestamp: 'Yesterday', description: 'Tom Adams - Mobility concern noted' },
-    { id: 'al4', title: 'Audit complete', severity: 'low', timestamp: 'Yesterday', description: 'Monthly compliance check passed' },
-  ])
-
-  const complianceScore = 96
+  const complianceScore = 0
   const circumference = 2 * Math.PI * 40
   const dash = (complianceScore / 100) * circumference
 
@@ -81,7 +61,7 @@ export default function AdminTeaserScreen() {
       {/* Header */}
       <div className="px-4 pt-4 pb-3 text-white shrink-0" style={{ background: `linear-gradient(160deg, ${COLORS.darkNavy} 0%, ${COLORS.navy} 100%)` }}>
         <div className="flex items-center justify-between mb-3">
-          <button onClick={() => setLocation('/manager')} className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors">
+          <button onClick={() => currentTenant && setLocation(`/tenant/${currentTenant.slug}/manager`)} className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
             Back
           </button>
@@ -145,10 +125,10 @@ export default function AdminTeaserScreen() {
             {/* KPI Cards */}
             <div className="grid grid-cols-2 gap-2">
               {[
-                { label: 'Active Shifts', value: activeShifts, sub: '2 carers on duty', color: COLORS.teal, icon: '👥' },
+                { label: 'Active Shifts', value: activeShifts, sub: 'On duty', color: COLORS.teal, icon: '👥' },
                 { label: 'High Alerts', value: highAlerts, sub: 'Require attention', color: COLORS.red, icon: '🔔' },
-                { label: 'Staff', value: DEMO_CARERS.length, sub: '3 active · 1 invited', color: COLORS.lavender, icon: '👤' },
-                { label: 'Clients', value: '3', sub: '28 total visits', color: COLORS.amber, icon: '🏠' },
+                { label: 'Staff', value: '0', sub: 'No data', color: COLORS.lavender, icon: '👤' },
+                { label: 'Clients', value: '0', sub: 'No data', color: COLORS.amber, icon: '🏠' },
               ].map((stat) => (
                 <div key={stat.label} className="bg-white rounded-xl p-3 border border-slate-100 shadow-sm">
                   <div className="flex items-center gap-1.5 mb-1">
@@ -165,7 +145,7 @@ export default function AdminTeaserScreen() {
             <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
               <h3 className="font-bold text-sm text-slate-800 mb-3">Quick Actions</h3>
               <div className="flex flex-col gap-2">
-                <button onClick={() => setLocation('/manager')} className="text-left text-sm text-slate-600 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer bg-transparent border-none">
+                <button onClick={() => currentTenant && setLocation(`/tenant/${currentTenant.slug}/manager`)} className="text-left text-sm text-slate-600 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer bg-transparent border-none">
                   Manager Dashboard
                 </button>
                 <button onClick={() => { const saved = localStorage.getItem('carei_visits'); exportVisits(saved ? JSON.parse(saved) : []) }} className="text-left text-sm text-slate-600 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer bg-transparent border-none">

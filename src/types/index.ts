@@ -242,4 +242,4 @@ export interface OfflineQueueItem {
 export type SignupStep = 'name' | 'role' | 'pin' | 'done'
 
 // Login Method
-export type LoginMethod = 'pin' | 'demo-carer' | 'demo-manager'
+export type LoginMethod = 'pin' | 'password'

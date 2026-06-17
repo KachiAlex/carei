@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useLocation } from 'wouter'
-import { SCHEDULE_CLIENTS } from '../data/demoData'
 import type { Visit } from '../data/clients'
 import {
   getVisits,
@@ -61,20 +60,6 @@ interface UserProfile {
 
 function getInitials(name: string) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-}
-
-// Client emoji avatars matching the document
-const CLIENT_EMOJIS: Record<string, string> = {
-  'Mary Johnson': '👵',
-  'Tom Adams': '👴',
-  'Aisha Khan': '🧕',
-}
-
-// Demo visit briefings matching document structure
-const DEMO_BRIEFINGS: Record<string, string[]> = {
-  'Mary Johnson': ['⚡ PBS Risk - First hour sensitive', '🍽️ Must finish lunch within 30 min', '🌡️ Check temperature'],
-  'Tom Adams': ['💨 COPD - No aerosols', '🩺 Oxygen at 2L', '🍽️ Soft diet only'],
-  'Aisha Khan': ['🧩 Non-verbal - Use picture cards', '🏠 Familiar carer only', '⚡ PBS Red - Do not approach'],
 }
 
 // Helper to construct tenant-aware or legacy paths
@@ -461,7 +446,7 @@ export default function CarerDashboard() {
                       border: `2px solid ${visit.status === 'completed' ? 'rgba(34,197,94,0.2)' : visit.status === 'in-progress' ? COLORS.teal : 'rgba(148,163,184,0.3)'}`,
                     }}
                   >
-                    {CLIENT_EMOJIS[visit.clientName] || '👤'}
+                    {'👤'}
                   </div>
                   <div>
                     <div className="font-bold text-sm text-slate-800">{visit.clientName}</div>
@@ -490,7 +475,7 @@ export default function CarerDashboard() {
               
               {/* 3 Handover Bullets with Emoji Tags */}
               <div className="mb-3 space-y-1.5">
-                {(DEMO_BRIEFINGS[visit.clientName] || visit.flags.slice(0, 3)).map((bullet, idx) => (
+                {(visit.flags?.slice(0, 3) || []).map((bullet, idx) => (
                   <div key={idx} className="flex items-start gap-2 text-[11px] text-slate-600">
                     <span className="text-teal-500 mt-0.5">•</span>
                     <span>{bullet}</span>
