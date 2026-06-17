@@ -630,3 +630,70 @@ export async function sendOtp(data: { email: string; purpose?: string }) {
 export async function verifyOtp(data: { email: string; code: string; purpose?: string; userData?: any }) {
   return post('/otp', { action: 'verify', ...data })
 }
+
+export async function getTenantMembers(slug: string) {
+  return get(`/tenants?members=${encodeURIComponent(slug)}`)
+}
+
+export async function getTenantStatsApi(slug: string) {
+  return get(`/tenants?stats=${encodeURIComponent(slug)}`)
+}
+
+export async function updateTenant(slug: string, data: { name?: string; settings?: Record<string, unknown> }) {
+  const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}`, {
+    method: 'PUT',
+    headers: { ...jsonHeaders, ...authHeaders() },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function updateTenantPlan(slug: string, plan: string) {
+  const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}&action=plan`, {
+    method: 'PATCH',
+    headers: { ...jsonHeaders, ...authHeaders() },
+    body: JSON.stringify({ plan }),
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function updateTenantActive(slug: string, active: boolean) {
+  const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}&action=active`, {
+    method: 'PATCH',
+    headers: { ...jsonHeaders, ...authHeaders() },
+    body: JSON.stringify({ active }),
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function deleteTenant(slug: string) {
+  const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function getAllTenantsAdmin() {
+  return get('/tenants?admin=true')
+}

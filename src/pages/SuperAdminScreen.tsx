@@ -1,28 +1,34 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { motion } from 'framer-motion'
-import { getMe } from '../api/client'
+import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, deleteTenant } from '../api/client'
 
 interface Tenant {
   id: string
   slug: string
   name: string
   plan: string
+  active: boolean
+  max_users: number
+  max_clients: number
+  subscription_status: string
+  user_count: number
+  client_count: number
+  visit_count: number
   created_at: string
-  user_count?: number
 }
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 export default function SuperAdminScreen() {
   const [, setLocation] = useLocation()
   const [tenants, setTenants] = useState<Tenant[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [stats, setStats] = useState({
     totalTenants: 0,
     totalUsers: 0,
-    activeToday: 0
+    activeToday: 0,
+    totalClients: 0,
+    totalVisits: 0,
   })
 
   useEffect(() => {
@@ -38,36 +44,60 @@ export default function SuperAdminScreen() {
 
     try {
       setIsLoading(true)
+      setError(null)
 
-      // Verify super admin role via /auth/me
       const meRes = await getMe() as any
       if (!meRes?.user || meRes.user.role !== 'superadmin') {
         setLocation('/login')
         return
       }
 
-      const res = await fetch(`${API_URL}/tenants?admin=true`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      if (res.status === 401) {
-        setLocation('/login')
-        return
-      }
-
-      const data = await res.json().catch(() => ({}))
-      const tenantList: Tenant[] = Array.isArray(data) ? data : (data.tenants || [])
+      const data = await getAllTenantsAdmin()
+      const tenantList: Tenant[] = data.tenants || []
       setTenants(tenantList)
 
       setStats({
         totalTenants: tenantList.length,
-        totalUsers: tenantList.reduce((acc: number, t: Tenant) => acc + (t.user_count || 0), 0),
-        activeToday: 0
+        totalUsers: tenantList.reduce((acc, t) => acc + (t.user_count || 0), 0),
+        activeToday: tenantList.filter(t => t.active).length,
+        totalClients: tenantList.reduce((acc, t) => acc + (t.client_count || 0), 0),
+        totalVisits: tenantList.reduce((acc, t) => acc + (t.visit_count || 0), 0),
       })
     } catch (err: any) {
       setError(err.message)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handlePlanChange = async (slug: string, newPlan: string) => {
+    setActionError(null)
+    try {
+      await updateTenantPlan(slug, newPlan)
+      await loadData()
+    } catch (err: any) {
+      setActionError(err.message)
+    }
+  }
+
+  const handleToggleActive = async (slug: string, currentActive: boolean) => {
+    setActionError(null)
+    try {
+      await updateTenantActive(slug, !currentActive)
+      await loadData()
+    } catch (err: any) {
+      setActionError(err.message)
+    }
+  }
+
+  const handleDelete = async (slug: string) => {
+    if (!window.confirm(`Are you sure you want to delete tenant "${slug}"? This cannot be undone.`)) return
+    setActionError(null)
+    try {
+      await deleteTenant(slug)
+      await loadData()
+    } catch (err: any) {
+      setActionError(err.message)
     }
   }
 
@@ -110,7 +140,7 @@ export default function SuperAdminScreen() {
 
       <div className="max-w-7xl mx-auto p-6">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-5 gap-4 mb-8">
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
             <div className="text-3xl font-bold text-white mb-1">{stats.totalTenants}</div>
             <div className="text-white/50 text-sm">Organizations</div>
@@ -120,14 +150,22 @@ export default function SuperAdminScreen() {
             <div className="text-white/50 text-sm">Total Users</div>
           </div>
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-            <div className="text-3xl font-bold text-purple-400 mb-1">{stats.activeToday}</div>
-            <div className="text-white/50 text-sm">Active Today</div>
+            <div className="text-3xl font-bold text-purple-400 mb-1">{stats.totalClients}</div>
+            <div className="text-white/50 text-sm">Clients</div>
+          </div>
+          <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+            <div className="text-3xl font-bold text-amber-400 mb-1">{stats.totalVisits}</div>
+            <div className="text-white/50 text-sm">Visits</div>
+          </div>
+          <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+            <div className="text-3xl font-bold text-green-400 mb-1">{stats.activeToday}</div>
+            <div className="text-white/50 text-sm">Active Tenants</div>
           </div>
         </div>
 
-        {error && (
+        {(error || actionError) && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-6">
-            <p className="text-red-400 text-sm">{error}</p>
+            <p className="text-red-400 text-sm">{error || actionError}</p>
           </div>
         )}
 
@@ -135,47 +173,75 @@ export default function SuperAdminScreen() {
         <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
           <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
             <h2 className="font-semibold text-white">Organizations</h2>
-            <button className="px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-400 text-sm hover:bg-teal-500/30 transition-colors">
-              + New Organization
-            </button>
           </div>
 
-          <div className="divide-y divide-white/5">
-            {tenants.map((tenant) => (
-              <div key={tenant.id} className="px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-lg">
-                    🏥
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-white">{tenant.name}</h3>
-                    <p className="text-white/40 text-xs">carei.com/tenant/{tenant.slug}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      tenant.plan === 'enterprise'
-                        ? 'bg-purple-500/20 text-purple-400'
-                        : tenant.plan === 'professional'
-                        ? 'bg-teal-500/20 text-teal-400'
-                        : 'bg-amber-500/20 text-amber-400'
-                    }`}>
-                      {tenant.plan}
-                    </span>
-                  </div>
-                  <div className="text-right hidden sm:block">
-                    <p className="text-white text-sm">{tenant.user_count} users</p>
-                    <p className="text-white/40 text-xs">{new Date(tenant.created_at).toLocaleDateString()}</p>
-                  </div>
-                  <button className="p-2 text-white/40 hover:text-white transition-colors">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-white/5 text-white/50 text-xs uppercase">
+                <tr>
+                  <th className="px-4 py-2">Name</th>
+                  <th className="px-4 py-2">Slug</th>
+                  <th className="px-4 py-2">Plan</th>
+                  <th className="px-4 py-2">Users / Limit</th>
+                  <th className="px-4 py-2">Clients</th>
+                  <th className="px-4 py-2">Visits</th>
+                  <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {tenants.map((tenant) => (
+                  <tr key={tenant.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="text-white font-medium">{tenant.name}</div>
+                      <div className="text-white/30 text-xs">{new Date(tenant.created_at).toLocaleDateString()}</div>
+                    </td>
+                    <td className="px-4 py-3 text-white/60">{tenant.slug}</td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={tenant.plan}
+                        onChange={(e) => handlePlanChange(tenant.slug, e.target.value)}
+                        className="bg-slate-800 text-white text-xs rounded px-2 py-1 border border-white/10 outline-none"
+                      >
+                        <option value="trial">Trial</option>
+                        <option value="professional">Professional</option>
+                        <option value="enterprise">Enterprise</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-3 text-white/60">
+                      {tenant.user_count} / {tenant.max_users}
+                    </td>
+                    <td className="px-4 py-3 text-white/60">{tenant.client_count}</td>
+                    <td className="px-4 py-3 text-white/60">{tenant.visit_count}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        tenant.active
+                          ? 'bg-green-500/20 text-green-400'
+                          : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {tenant.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleActive(tenant.slug, tenant.active)}
+                          className="text-xs px-2 py-1 rounded bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                        >
+                          {tenant.active ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(tenant.slug)}
+                          className="text-xs px-2 py-1 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 

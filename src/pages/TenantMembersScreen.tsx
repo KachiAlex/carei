@@ -55,18 +55,24 @@ export default function TenantMembersScreen() {
 
   const fetchMembers = async () => {
     const token = localStorage.getItem('carei_token')
-    if (!token) return
+    if (!token || !tenantSlug) return
 
     try {
-      const res = await fetch(`${API_URL}/carers`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Tenant-Slug': tenantSlug!,
-        },
+      const res = await fetch(`${API_URL}/tenants?members=${encodeURIComponent(tenantSlug)}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to fetch members')
       const data = await res.json()
-      setMembers(data.carers || [])
+      const mapped = (data.members || []).map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        email: m.email,
+        role: m.role,
+        status: 'active',
+        joinedAt: m.joined_at,
+        avatar: m.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || '??',
+      }))
+      setMembers(mapped)
     } catch (err) {
       console.error('Error fetching members:', err)
     } finally {

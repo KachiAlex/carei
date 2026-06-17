@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, withTenant, getAuthToken, getTenantFromSlug, verifyTenantAccess, addUserToTenant } from './db.js'
+import { getSql, setCors, ensureTables, withTenant, getAuthToken, getTenantFromSlug, verifyTenantAccess, addUserToTenant, getTenantMemberCount } from './db.js'
 import { sendEmail } from './email.js'
 
 // Generate a secure random code
@@ -46,6 +46,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const sql = getSql()
+
+      // Check tenant active and not expired
+      const tenantInfo = await sql`SELECT name, active, expires_at, max_users, plan FROM tenants WHERE id = ${tenantId}` as any[]
+      if (tenantInfo.length === 0) { res.status(404).json({ error: 'Tenant not found' }); return }
+      const t = tenantInfo[0]
+      if (t.active === false) { res.status(403).json({ error: 'Tenant is inactive' }); return }
+      if (t.expires_at && new Date(t.expires_at) < new Date()) { res.status(403).json({ error: 'Tenant subscription expired' }); return }
+
+      // Check plan limit (current members + pending invites)
+      const currentCount = await getTenantMemberCount(tenantId)
+      const pendingInvites = await sql`SELECT COUNT(*) as count FROM invites WHERE tenant_id = ${tenantId} AND used = FALSE AND expires_at > NOW()` as any[]
+      const total = currentCount + parseInt(pendingInvites[0]?.count || '0', 10)
+      if (t.max_users && total >= t.max_users) {
+        res.status(403).json({ error: 'Tenant user limit reached. Upgrade plan to add more members.' })
+        return
+      }
+
       const code = generateInviteCode()
       const id = `inv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString()
@@ -58,8 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const inviteUrl = `${process.env.FRONTEND_URL || 'https://carei.com'}/join?code=${code}`
 
       // Fire-and-forget email send (don't block response)
-      const tenantRows = await sql`SELECT name FROM tenants WHERE id = ${tenantId}`
-      const tenantName = (tenantRows[0] as any)?.name || 'your organization'
+      const tenantName = t?.name || 'your organization'
       sendEmail({
         to: email,
         subject: `You've been invited to join ${tenantName} on CAREi`,

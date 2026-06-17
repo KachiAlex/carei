@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, getAuthToken } from '../db.js'
+import { getSql, setCors, ensureTables, withTenant, getTenantSlug, addUserToTenant } from '../db.js'
 
 function generateId(): string {
   return 'cg-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
@@ -17,9 +17,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const token = getAuthToken(req)
-  if (!token) {
-    res.status(401).json({ error: 'Unauthorized' })
+  const tenantSlug = getTenantSlug(req)
+  if (!tenantSlug) {
+    res.status(400).json({ error: 'Tenant slug required via X-Tenant-Slug header' })
     return
   }
 
@@ -32,35 +32,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     await ensureTables()
-    const sql = getSql()
+    await withTenant(req, res, async ({ tenantId, role: userRole, sql }) => {
+      const isManager = userRole === 'manager' || userRole === 'admin'
+      if (!isManager) {
+        res.status(403).json({ error: 'Only managers can create caregivers' })
+        return
+      }
 
-    // Verify manager
-    const managers = await sql`SELECT id, role FROM users WHERE token = ${token} LIMIT 1` as any[]
-    const manager = managers[0]
-    const isManager = manager && (manager.role === 'manager' || manager.role === 'admin')
-    if (!isManager) {
-      res.status(403).json({ error: 'Only managers can create caregivers' })
-      return
-    }
+      const id = generateId()
+      const caregiverToken = generateToken()
 
-    const id = generateId()
-    const caregiverToken = generateToken()
+      const result = await sql`
+        INSERT INTO users (id, tenant_id, name, email, phone, region, pin, role, token)
+        VALUES (${id}, ${tenantId}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role}, ${caregiverToken})
+        ON CONFLICT (email) DO NOTHING
+        RETURNING id
+      ` as any[]
 
-    const result = await sql`
-      INSERT INTO users (id, name, email, phone, region, pin, role, token)
-      VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role}, ${caregiverToken})
-      ON CONFLICT (email) DO NOTHING
-      RETURNING id
-    ` as any[]
+      if (result.length === 0) {
+        res.status(409).json({ error: 'Email already registered' })
+        return
+      }
 
-    if (result.length === 0) {
-      res.status(409).json({ error: 'Email already registered' })
-      return
-    }
+      // Link user to tenant
+      await addUserToTenant(id, tenantId, role)
 
-    res.status(201).json({
-      status: 'created',
-      caregiver: { id, name, email: email.toLowerCase(), phone, region, role },
+      res.status(201).json({
+        status: 'created',
+        caregiver: { id, name, email: email.toLowerCase(), phone, region, role },
+      })
     })
   } catch (err: any) {
     res.status(500).json({ error: err.message })

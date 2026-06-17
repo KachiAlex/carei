@@ -458,6 +458,23 @@ async function runMigrations() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`
   })
 
+  await run(9, 'tenant_licensing_fields', async () => {
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS max_users INTEGER`
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS max_clients INTEGER`
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE`
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS subscription_status TEXT DEFAULT 'active'`
+    // Set sensible defaults based on existing plan
+    await sql`UPDATE tenants SET max_users = 3 WHERE plan = 'trial' AND max_users IS NULL`
+    await sql`UPDATE tenants SET max_users = 15 WHERE plan = 'professional' AND max_users IS NULL`
+    await sql`UPDATE tenants SET max_users = 100 WHERE plan = 'enterprise' AND max_users IS NULL`
+    await sql`UPDATE tenants SET max_users = 3 WHERE max_users IS NULL`
+    await sql`UPDATE tenants SET max_clients = 10 WHERE plan = 'trial' AND max_clients IS NULL`
+    await sql`UPDATE tenants SET max_clients = 100 WHERE plan = 'professional' AND max_clients IS NULL`
+    await sql`UPDATE tenants SET max_clients = 500 WHERE plan = 'enterprise' AND max_clients IS NULL`
+    await sql`UPDATE tenants SET max_clients = 10 WHERE max_clients IS NULL`
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (
@@ -466,6 +483,11 @@ async function runMigrations() {
       name TEXT NOT NULL,
       domain TEXT,
       plan TEXT DEFAULT 'trial',
+      max_users INTEGER,
+      max_clients INTEGER,
+      active BOOLEAN DEFAULT TRUE,
+      expires_at TIMESTAMPTZ,
+      subscription_status TEXT DEFAULT 'active',
       settings JSONB DEFAULT '{}',
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -614,6 +636,104 @@ export async function addUserToTenant(userId: string, tenantId: string, role: st
     VALUES (${id}, ${tenantId}, ${userId}, ${role})
     ON CONFLICT (tenant_id, user_id) DO UPDATE SET role = ${role}
   `
+}
+
+export async function getTenantMemberCount(tenantId: string): Promise<number> {
+  const sql = getSql()
+  const rows = await sql`SELECT COUNT(*) as count FROM tenant_users WHERE tenant_id = ${tenantId}` as any[]
+  return parseInt(rows[0]?.count || '0', 10)
+}
+
+export async function getTenantClientCount(tenantId: string): Promise<number> {
+  const sql = getSql()
+  const rows = await sql`SELECT COUNT(*) as count FROM clients WHERE tenant_id = ${tenantId}` as any[]
+  return parseInt(rows[0]?.count || '0', 10)
+}
+
+export async function getTenantVisitCount(tenantId: string): Promise<number> {
+  const sql = getSql()
+  const rows = await sql`SELECT COUNT(*) as count FROM visits WHERE tenant_id = ${tenantId}` as any[]
+  return parseInt(rows[0]?.count || '0', 10)
+}
+
+export async function getTenantMembers(tenantId: string): Promise<Array<{ id: string; name: string; email: string; role: string; joined_at: string }>> {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT u.id, u.name, u.email, tu.role, tu.joined_at
+    FROM tenant_users tu
+    JOIN users u ON u.id = tu.user_id
+    WHERE tu.tenant_id = ${tenantId}
+    ORDER BY tu.joined_at DESC
+  ` as any[]
+  return rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    role: r.role,
+    joined_at: r.joined_at,
+  }))
+}
+
+export async function getTenantStats(tenantId: string): Promise<{
+  user_count: number
+  client_count: number
+  visit_count: number
+  active_today: number
+}> {
+  const sql = getSql()
+  const userRows = await sql`SELECT COUNT(*) as count FROM tenant_users WHERE tenant_id = ${tenantId}` as any[]
+  const clientRows = await sql`SELECT COUNT(*) as count FROM clients WHERE tenant_id = ${tenantId}` as any[]
+  const visitRows = await sql`SELECT COUNT(*) as count FROM visits WHERE tenant_id = ${tenantId}` as any[]
+  const today = new Date().toISOString().split('T')[0]
+  const activeRows = await sql`
+    SELECT COUNT(*) as count FROM visits
+    WHERE tenant_id = ${tenantId} AND DATE(clock_in_at) = ${today}
+  ` as any[]
+  return {
+    user_count: parseInt(userRows[0]?.count || '0', 10),
+    client_count: parseInt(clientRows[0]?.count || '0', 10),
+    visit_count: parseInt(visitRows[0]?.count || '0', 10),
+    active_today: parseInt(activeRows[0]?.count || '0', 10),
+  }
+}
+
+export async function getAllTenantsWithStats(): Promise<Array<{
+  id: string
+  slug: string
+  name: string
+  plan: string
+  active: boolean
+  max_users: number
+  max_clients: number
+  subscription_status: string
+  user_count: number
+  client_count: number
+  visit_count: number
+  created_at: string
+}>> {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT t.*,
+      (SELECT COUNT(*) FROM tenant_users WHERE tenant_id = t.id) as user_count,
+      (SELECT COUNT(*) FROM clients WHERE tenant_id = t.id) as client_count,
+      (SELECT COUNT(*) FROM visits WHERE tenant_id = t.id) as visit_count
+    FROM tenants t
+    ORDER BY t.created_at DESC
+  ` as any[]
+  return rows.map(r => ({
+    id: r.id,
+    slug: r.slug,
+    name: r.name,
+    plan: r.plan,
+    active: r.active,
+    max_users: r.max_users,
+    max_clients: r.max_clients,
+    subscription_status: r.subscription_status,
+    user_count: parseInt(r.user_count || '0', 10),
+    client_count: parseInt(r.client_count || '0', 10),
+    visit_count: parseInt(r.visit_count || '0', 10),
+    created_at: r.created_at,
+  }))
 }
 
 // Tenant middleware for API endpoints
