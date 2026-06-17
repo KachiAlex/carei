@@ -382,9 +382,10 @@ async function runMigrations() {
       'visit_drafts', 'agencies', 'drug_interactions'
     ]
 
+    // Add tenant_id to all existing tables (use raw SQL strings — table names cannot be parameters)
     for (const table of tables) {
       try {
-        await sql`ALTER TABLE ${(sql as any)(table)} ADD COLUMN IF NOT EXISTS tenant_id TEXT`
+        await (sql as any)(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id TEXT`)
       } catch { /* ignore if column exists */ }
     }
 
@@ -399,14 +400,14 @@ async function runMigrations() {
     // Migrate existing data to default tenant
     for (const table of tables) {
       try {
-        await sql`UPDATE ${(sql as any)(table)} SET tenant_id = ${defaultTenantId} WHERE tenant_id IS NULL`
+        await (sql as any)(`UPDATE ${table} SET tenant_id = '${defaultTenantId}' WHERE tenant_id IS NULL`)
       } catch { /* ignore if table doesn't exist or no rows */ }
     }
 
     // Add indexes for tenant queries
     for (const table of tables) {
       try {
-        await sql`CREATE INDEX IF NOT EXISTS idx_${(sql as any)(table)}_tenant ON ${(sql as any)(table)}(tenant_id)`
+        await (sql as any)(`CREATE INDEX IF NOT EXISTS idx_${table}_tenant ON ${table}(tenant_id)`)
       } catch { /* ignore */ }
     }
 
@@ -492,19 +493,48 @@ async function runMigrations() {
     ]
     for (const table of tables) {
       try {
-        await sql`ALTER TABLE ${(sql as any)(table)} ADD COLUMN IF NOT EXISTS tenant_id TEXT`
+        await (sql as any)(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id TEXT`)
       } catch { /* ignore */ }
     }
     // Backfill existing rows with default tenant
     for (const table of tables) {
       try {
-        await sql`UPDATE ${(sql as any)(table)} SET tenant_id = ${defaultTenantId} WHERE tenant_id IS NULL`
+        await (sql as any)(`UPDATE ${table} SET tenant_id = '${defaultTenantId}' WHERE tenant_id IS NULL`)
       } catch { /* ignore */ }
     }
     // Ensure indexes exist
     for (const table of tables) {
       try {
-        await sql`CREATE INDEX IF NOT EXISTS idx_${(sql as any)(table)}_tenant ON ${(sql as any)(table)}(tenant_id)`
+        await (sql as any)(`CREATE INDEX IF NOT EXISTS idx_${table}_tenant ON ${table}(tenant_id)`)
+      } catch { /* ignore */ }
+    }
+  })
+
+  await run(11, 'fix_missing_tenant_id_columns', async () => {
+    // Recovery migration: previous migrations 5 and 10 used invalid dynamic SQL
+    // (${(sql as any)(table)}) which produced broken queries. The errors were
+    // swallowed by try/catch, so tenant_id was never actually added to core tables.
+    const tables = [
+      'clients', 'users', 'visits', 'scheduled_visits', 'sos_alerts',
+      'incidents', 'voice_memos', 'caregiver_client_assignments', 'tasks',
+      'task_logs', 'medication_logs', 'body_map_marks', 'family_messages',
+      'visit_drafts', 'agencies', 'drug_interactions'
+    ]
+    for (const table of tables) {
+      try {
+        await (sql as any)(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id TEXT`)
+      } catch { /* ignore if table doesn't exist or column already exists */ }
+    }
+    // Backfill any NULL tenant_ids with default tenant
+    for (const table of tables) {
+      try {
+        await (sql as any)(`UPDATE ${table} SET tenant_id = 'default-tenant' WHERE tenant_id IS NULL`)
+      } catch { /* ignore */ }
+    }
+    // Create indexes
+    for (const table of tables) {
+      try {
+        await (sql as any)(`CREATE INDEX IF NOT EXISTS idx_${table}_tenant ON ${table}(tenant_id)`)
       } catch { /* ignore */ }
     }
   })
