@@ -107,7 +107,7 @@ export default function LoginScreen() {
       setLoading(false)
       if (res.user) {
         localStorage.setItem('carei_user', JSON.stringify(res.user))
-        setLocation(res.user.role === 'manager' ? '/manager' : '/dashboard')
+        setLocation('/select-tenant')
       } else {
         setError('Invalid email or PIN.')
         setPin(['', '', '', ''])
@@ -140,7 +140,7 @@ export default function LoginScreen() {
         if (res.user.role === 'superadmin') {
           setLocation('/super-admin')
         } else {
-          setLocation(res.user.role === 'manager' ? '/manager' : '/dashboard')
+          setLocation('/select-tenant')
         }
       } else {
         setError('Invalid email or password.')

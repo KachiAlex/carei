@@ -49,10 +49,13 @@ export default function TenantSelectScreen() {
       const data = await res.json()
       setTenants(data.tenants || [])
 
-      // If only one tenant, auto-redirect
+      // If only one tenant, auto-redirect to the appropriate dashboard
       if (data.tenants?.length === 1) {
         localStorage.setItem('carei_current_tenant', JSON.stringify(data.tenants[0]))
-        setLocation(`/tenant/${data.tenants[0].slug}/dashboard`)
+        const userJson = localStorage.getItem('carei_user')
+        const user = userJson ? JSON.parse(userJson) : null
+        const path = user?.role === 'manager' ? 'manager' : 'dashboard'
+        setLocation(`/tenant/${data.tenants[0].slug}/${path}`)
       }
     } catch (err: any) {
       setError(err.message)
@@ -63,7 +66,10 @@ export default function TenantSelectScreen() {
 
   const selectTenant = (tenant: Tenant) => {
     localStorage.setItem('carei_current_tenant', JSON.stringify(tenant))
-    setLocation(`/tenant/${tenant.slug}/dashboard`)
+    const userJson = localStorage.getItem('carei_user')
+    const user = userJson ? JSON.parse(userJson) : null
+    const path = user?.role === 'manager' ? 'manager' : 'dashboard'
+    setLocation(`/tenant/${tenant.slug}/${path}`)
   }
 
   const generateSlug = (name: string) => {

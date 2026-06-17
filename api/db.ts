@@ -10,7 +10,10 @@ let initPromise: Promise<void> | null = null
 
 export async function ensureTables() {
   if (initPromise) return initPromise
-  initPromise = runMigrations()
+  initPromise = runMigrations().catch((err) => {
+    initPromise = null
+    throw err
+  })
   return initPromise
 }
 
@@ -454,6 +457,32 @@ async function runMigrations() {
   await run(8, 'password_hash_column', async () => {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT`
   })
+
+  // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
+  await sql`
+    CREATE TABLE IF NOT EXISTS tenants (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      domain TEXT,
+      plan TEXT DEFAULT 'trial',
+      settings JSONB DEFAULT '{}',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `
+  await sql`
+    CREATE TABLE IF NOT EXISTS tenant_users (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'carer',
+      joined_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(tenant_id, user_id)
+    )
+  `
+  await sql`CREATE INDEX IF NOT EXISTS idx_tenant_users_tenant ON tenant_users(tenant_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_tenant_users_user ON tenant_users(user_id)`
 }
 
 export function setCors(req: any, res: any) {
@@ -534,19 +563,26 @@ export async function logAuditEvent(data: {
 
 export async function getUserTenants(userId: string): Promise<Array<{ tenantId: string; slug: string; name: string; role: string }>> {
   const sql = getSql()
-  const rows = await sql`
-    SELECT t.id as tenant_id, t.slug, t.name, tu.role
-    FROM tenant_users tu
-    JOIN tenants t ON t.id = tu.tenant_id
-    WHERE tu.user_id = ${userId}
-    ORDER BY tu.joined_at DESC
-  `
-  return (rows as any[]).map(r => ({
-    tenantId: r.tenant_id,
-    slug: r.slug,
-    name: r.name,
-    role: r.role
-  }))
+  try {
+    const rows = await sql`
+      SELECT t.id as tenant_id, t.slug, t.name, tu.role
+      FROM tenant_users tu
+      JOIN tenants t ON t.id = tu.tenant_id
+      WHERE tu.user_id = ${userId}
+      ORDER BY tu.joined_at DESC
+    `
+    return (rows as any[]).map(r => ({
+      tenantId: r.tenant_id,
+      slug: r.slug,
+      name: r.name,
+      role: r.role
+    }))
+  } catch (err: any) {
+    if (err.message?.includes('relation "tenant_users" does not exist') || err.message?.includes('relation "tenants" does not exist')) {
+      return []
+    }
+    throw err
+  }
 }
 
 export async function verifyTenantAccess(userId: string, tenantId: string): Promise<{ role: string; hasAccess: boolean }> {
