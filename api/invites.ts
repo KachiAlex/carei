@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, withTenant, getAuthToken, getTenantFromSlug, verifyTenantAccess, addUserToTenant } from './db.js'
+import { sendEmail } from './email.js'
 
 // Generate a secure random code
 function generateInviteCode(): string {
@@ -54,13 +55,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         VALUES (${id}, ${tenantId}, ${code}, ${email}, ${role}, ${userId}, ${expiresAt}, FALSE)
       `
 
+      const inviteUrl = `${process.env.FRONTEND_URL || 'https://carei.com'}/join?code=${code}`
+
+      // Fire-and-forget email send (don't block response)
+      const tenantRows = await sql`SELECT name FROM tenants WHERE id = ${tenantId}`
+      const tenantName = (tenantRows[0] as any)?.name || 'your organization'
+      sendEmail({
+        to: email,
+        subject: `You've been invited to join ${tenantName} on CAREi`,
+        html: `<p>You have been invited to join <strong>${tenantName}</strong> on CAREi.</p>
+               <p><a href="${inviteUrl}">Accept Invite</a></p>
+               <p>Or copy this link: ${inviteUrl}</p>`,
+      }).catch((err) => console.error('Invite email failed:', err))
+
       res.status(201).json({
         id,
         code,
         email,
         role,
         expiresAt,
-        inviteUrl: `${process.env.FRONTEND_URL || 'https://carei.com'}/join?code=${code}`
+        inviteUrl,
       })
       return
     }
