@@ -24,7 +24,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureTables()
     const sql = getSql()
     const user = await getUserFromToken(sql, token)
-    if (!user || user.role !== 'manager') {
+    const isManager = user && (user.role === 'manager' || user.role === 'admin')
+    if (!isManager) {
       res.status(403).json({ error: 'Only managers can manage tasks' })
       return
     }

@@ -17,7 +17,7 @@ export const COLORS = {
 } as const
 
 // User Roles
-export type UserRole = 'carer' | 'manager'
+export type UserRole = 'carer' | 'manager' | 'admin'
 
 // User Account
 export interface User {

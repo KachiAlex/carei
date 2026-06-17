@@ -1,5 +1,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from '../db.js'
+import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken } from '../db.js'
+
+async function safeQuery(sql: any, query: any, fallback: any[] = []) {
+  try {
+    return await query
+  } catch (err: any) {
+    if (err.message?.includes('relation') && err.message?.includes('does not exist')) {
+      return fallback
+    }
+    throw err
+  }
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -9,9 +20,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  const token = getAuthToken(req)
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized' })
+    return
+  }
+
   try {
     await ensureTables()
     const sql = getSql()
+    const user = await getUserFromToken(sql, token)
+    if (!user) {
+      res.status(401).json({ error: 'Invalid token' })
+      return
+    }
+    const isManager = user.role === 'manager' || user.role === 'admin'
+    if (!isManager) {
+      res.status(403).json({ error: 'Only managers can access this data' })
+      return
+    }
+
     const caregiverRows = await sql`SELECT id, name, email, phone, region, role, status, created_at FROM users WHERE role = 'carer' ORDER BY name` as any[]
     const carers = caregiverRows.map((u: any) => ({
       id: u.id,
@@ -24,10 +52,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       client: '—',
       since: u.created_at ? new Date(u.created_at).toLocaleDateString() : '—',
     }))
-    const visits = await sql`SELECT * FROM visits ORDER BY submitted_at DESC LIMIT 50`
-    const alerts = await sql`SELECT * FROM sos_alerts WHERE resolved = FALSE ORDER BY timestamp DESC LIMIT 20`
-    const incidents = await sql`SELECT * FROM incidents WHERE resolved = FALSE ORDER BY timestamp DESC LIMIT 50`
-    const medications = await sql`SELECT * FROM medication_logs WHERE DATE(timestamp) = CURRENT_DATE ORDER BY scheduled_time NULLS LAST LIMIT 100`
+    const visits = await safeQuery(sql, sql`SELECT * FROM visits ORDER BY submitted_at DESC LIMIT 50`)
+    const alerts = await safeQuery(sql, sql`SELECT * FROM sos_alerts WHERE resolved = FALSE ORDER BY timestamp DESC LIMIT 20`)
+    const incidents = await safeQuery(sql, sql`SELECT * FROM incidents WHERE resolved = FALSE ORDER BY timestamp DESC LIMIT 50`)
+    const medications = await safeQuery(sql, sql`SELECT * FROM medication_logs WHERE DATE(timestamp) = CURRENT_DATE ORDER BY scheduled_time NULLS LAST LIMIT 100`)
 
     res.status(200).json({
       carers,

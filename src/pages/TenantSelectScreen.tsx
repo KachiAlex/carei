@@ -54,7 +54,8 @@ export default function TenantSelectScreen() {
         localStorage.setItem('carei_current_tenant', JSON.stringify(data.tenants[0]))
         const userJson = localStorage.getItem('carei_user')
         const user = userJson ? JSON.parse(userJson) : null
-        const path = user?.role === 'manager' ? 'manager' : 'dashboard'
+        const isManager = user?.role === 'manager' || user?.role === 'admin'
+        const path = isManager ? 'manager' : 'dashboard'
         setLocation(`/tenant/${data.tenants[0].slug}/${path}`)
       }
     } catch (err: any) {
@@ -68,7 +69,8 @@ export default function TenantSelectScreen() {
     localStorage.setItem('carei_current_tenant', JSON.stringify(tenant))
     const userJson = localStorage.getItem('carei_user')
     const user = userJson ? JSON.parse(userJson) : null
-    const path = user?.role === 'manager' ? 'manager' : 'dashboard'
+    const isManager = user?.role === 'manager' || user?.role === 'admin'
+    const path = isManager ? 'manager' : 'dashboard'
     setLocation(`/tenant/${tenant.slug}/${path}`)
   }
 

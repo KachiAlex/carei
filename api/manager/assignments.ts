@@ -28,6 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(401).json({ error: 'Invalid token' })
       return
     }
+    const isManager = user.role === 'manager' || user.role === 'admin'
 
     if (req.method === 'GET') {
       const rows = await sql`
@@ -51,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') {
-      if (user.role !== 'manager') {
+      if (!isManager) {
         res.status(403).json({ error: 'Only managers can create assignments' })
         return
       }
@@ -74,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'PATCH') {
-      if (user.role !== 'manager') {
+      if (!isManager) {
         res.status(403).json({ error: 'Only managers can update assignments' })
         return
       }
@@ -96,7 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'DELETE') {
-      if (user.role !== 'manager') {
+      if (!isManager) {
         res.status(403).json({ error: 'Only managers can delete assignments' })
         return
       }

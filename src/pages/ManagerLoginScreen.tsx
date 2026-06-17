@@ -30,7 +30,8 @@ export default function ManagerLoginScreen() {
     try {
       const res = await loginUser({ email: email.trim().toLowerCase(), pin }) as any
       setLoading(false)
-      if (res?.user?.role === 'manager') {
+      const isManager = res?.user?.role === 'manager' || res?.user?.role === 'admin'
+      if (isManager) {
         localStorage.setItem('carei_user', JSON.stringify(res.user))
         setLocation('/select-tenant')
       } else {

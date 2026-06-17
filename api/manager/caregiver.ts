@@ -26,7 +26,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Verify manager
     const managers = await sql`SELECT id, role FROM users WHERE token = ${token} LIMIT 1` as any[]
     const manager = managers[0]
-    if (!manager || manager.role !== 'manager') {
+    const isManager = manager && (manager.role === 'manager' || manager.role === 'admin')
+    if (!isManager) {
       res.status(403).json({ error: 'Only managers can manage caregivers' })
       return
     }

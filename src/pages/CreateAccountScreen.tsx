@@ -123,7 +123,7 @@ export default function CreateAccountScreen() {
     
     setTimeout(() => {
       const role = selectedRole || 'carer'
-      setLocation(role === 'manager' ? '/manager' : '/dashboard')
+      setLocation('/select-tenant')
     }, 2500)
   }
 
