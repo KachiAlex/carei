@@ -574,7 +574,7 @@ async function runMigrations() {
 export function setCors(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant-Slug')
 }
 
 export function getAuthToken(req: any): string {
@@ -745,20 +745,26 @@ export async function getTenantStats(tenantId: string): Promise<{
   active_today: number
 }> {
   const sql = getSql()
-  const userRows = await sql`SELECT COUNT(*) as count FROM tenant_users WHERE tenant_id = ${tenantId}` as any[]
-  const clientRows = await sql`SELECT COUNT(*) as count FROM clients WHERE tenant_id = ${tenantId}` as any[]
-  const visitRows = await sql`SELECT COUNT(*) as count FROM visits WHERE tenant_id = ${tenantId}` as any[]
-  const today = new Date().toISOString().split('T')[0]
-  const activeRows = await sql`
-    SELECT COUNT(*) as count FROM visits
-    WHERE tenant_id = ${tenantId} AND DATE(clock_in_at) = ${today}
-  ` as any[]
-  return {
-    user_count: parseInt(userRows[0]?.count || '0', 10),
-    client_count: parseInt(clientRows[0]?.count || '0', 10),
-    visit_count: parseInt(visitRows[0]?.count || '0', 10),
-    active_today: parseInt(activeRows[0]?.count || '0', 10),
+
+  const safeCount = async (table: string, whereClause?: string): Promise<number> => {
+    try {
+      const query = whereClause
+        ? `SELECT COUNT(*) as count FROM ${table} WHERE ${whereClause}`
+        : `SELECT COUNT(*) as count FROM ${table}`
+      const rows = await (sql as any)(query) as any[]
+      return parseInt(rows[0]?.count || '0', 10)
+    } catch {
+      return 0
+    }
   }
+
+  const user_count = await safeCount('tenant_users', `tenant_id = '${tenantId}'`)
+  const client_count = await safeCount('clients', `tenant_id = '${tenantId}'`)
+  const visit_count = await safeCount('visits', `tenant_id = '${tenantId}'`)
+  const today = new Date().toISOString().split('T')[0]
+  const active_today = await safeCount('visits', `tenant_id = '${tenantId}' AND DATE(clock_in_at) = '${today}'`)
+
+  return { user_count, client_count, visit_count, active_today }
 }
 
 export async function getAllTenantsWithStats(): Promise<Array<{
@@ -776,23 +782,51 @@ export async function getAllTenantsWithStats(): Promise<Array<{
   created_at: string
 }>> {
   const sql = getSql()
-  const rows = await sql`
-    SELECT t.*,
-      (SELECT COUNT(*) FROM tenant_users WHERE tenant_id = t.id) as user_count,
-      (SELECT COUNT(*) FROM clients WHERE tenant_id = t.id) as client_count,
-      (SELECT COUNT(*) FROM visits WHERE tenant_id = t.id) as visit_count
-    FROM tenants t
-    ORDER BY t.created_at DESC
-  ` as any[]
-  return rows.map(r => ({
+
+  // Fetch tenants first; if subqueries fail due to missing tenant_id columns,
+  // fall back to basic tenant list and query counts separately.
+  let tenantRows: any[]
+  try {
+    tenantRows = await sql`
+      SELECT t.*,
+        (SELECT COUNT(*) FROM tenant_users WHERE tenant_id = t.id) as user_count,
+        (SELECT COUNT(*) FROM clients WHERE tenant_id = t.id) as client_count,
+        (SELECT COUNT(*) FROM visits WHERE tenant_id = t.id) as visit_count
+      FROM tenants t
+      ORDER BY t.created_at DESC
+    ` as any[]
+  } catch {
+    // tenant_id columns may be missing; fetch basic tenant list
+    tenantRows = await sql`SELECT * FROM tenants ORDER BY created_at DESC` as any[]
+  }
+
+  // If subqueries didn't run, fetch counts separately with safe raw SQL
+  const needsCounts = tenantRows.length > 0 && tenantRows[0].user_count === undefined
+  if (needsCounts) {
+    const safeCount = async (table: string, tenantId: string): Promise<number> => {
+      try {
+        const rows = await (sql as any)(`SELECT COUNT(*) as count FROM ${table} WHERE tenant_id = '${tenantId}'`) as any[]
+        return parseInt(rows[0]?.count || '0', 10)
+      } catch {
+        return 0
+      }
+    }
+    for (const t of tenantRows) {
+      t.user_count = await safeCount('tenant_users', t.id)
+      t.client_count = await safeCount('clients', t.id)
+      t.visit_count = await safeCount('visits', t.id)
+    }
+  }
+
+  return tenantRows.map(r => ({
     id: r.id,
     slug: r.slug,
     name: r.name,
     plan: r.plan,
-    active: r.active,
-    max_users: r.max_users,
-    max_clients: r.max_clients,
-    subscription_status: r.subscription_status,
+    active: r.active ?? true,
+    max_users: r.max_users ?? 3,
+    max_clients: r.max_clients ?? 10,
+    subscription_status: r.subscription_status ?? 'active',
     user_count: parseInt(r.user_count || '0', 10),
     client_count: parseInt(r.client_count || '0', 10),
     visit_count: parseInt(r.visit_count || '0', 10),
