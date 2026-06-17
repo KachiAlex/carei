@@ -430,6 +430,26 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_invites_code ON invites(code)`
     await sql`CREATE INDEX IF NOT EXISTS idx_invites_tenant ON invites(tenant_id)`
   })
+
+  await run(7, 'audit_logs_table', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        tenant_id TEXT,
+        action TEXT NOT NULL,
+        resource TEXT,
+        ip_address TEXT,
+        user_agent TEXT,
+        status_code INTEGER,
+        details JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_tenant ON audit_logs(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)`
+  })
 }
 
 export function setCors(req: any, res: any) {
@@ -469,6 +489,38 @@ export async function getTenantFromSlug(slug: string): Promise<{ id: string; slu
   const sql = getSql()
   const rows = await sql`SELECT id, slug, name FROM tenants WHERE slug = ${slug}`
   return rows[0] as any || null
+}
+
+export async function logAuditEvent(data: {
+  userId?: string
+  tenantId?: string
+  action: string
+  resource?: string
+  ipAddress?: string
+  userAgent?: string
+  statusCode?: number
+  details?: any
+}): Promise<void> {
+  try {
+    const sql = getSql()
+    const id = `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    await sql`
+      INSERT INTO audit_logs (id, user_id, tenant_id, action, resource, ip_address, user_agent, status_code, details)
+      VALUES (
+        ${id},
+        ${data.userId || null},
+        ${data.tenantId || null},
+        ${data.action},
+        ${data.resource || null},
+        ${data.ipAddress || null},
+        ${data.userAgent || null},
+        ${data.statusCode || null},
+        ${data.details ? JSON.stringify(data.details) : null}
+      )
+    `
+  } catch (err: any) {
+    console.error('Audit log error:', err.message)
+  }
 }
 
 export async function getUserTenants(userId: string): Promise<Array<{ tenantId: string; slug: string; name: string; role: string }>> {
@@ -559,6 +611,14 @@ export async function withTenant(
   // Get tenant by slug
   const tenant = await getTenantFromSlug(tenantSlug)
   if (!tenant) {
+    await logAuditEvent({
+      action: 'tenant_not_found',
+      resource: req.url,
+      ipAddress: req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress,
+      userAgent: req.headers?.['user-agent'],
+      statusCode: 404,
+      details: { slug: tenantSlug }
+    })
     res.status(404).json({ error: 'Tenant not found' })
     return
   }
@@ -582,6 +642,16 @@ export async function withTenant(
     // Verify user has access to this tenant
     const access = await verifyTenantAccess(userId, tenant.id)
     if (!access.hasAccess) {
+      await logAuditEvent({
+        userId,
+        tenantId: tenant.id,
+        action: 'cross_tenant_access_attempt',
+        resource: req.url,
+        ipAddress: req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress,
+        userAgent: req.headers?.['user-agent'],
+        statusCode: 403,
+        details: { method: req.method, slug: tenantSlug }
+      })
       res.status(403).json({ error: 'Access denied for this organization' })
       return
     }
