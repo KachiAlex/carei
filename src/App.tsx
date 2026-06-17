@@ -54,6 +54,11 @@ function PublicRoutes() {
       <Route path="/visit/:id" component={ActiveVisitScreen} />
       <Route path="/summary/:id" component={VisitSummaryScreen} />
       <Route path="/body-map/:visitId" component={BodyMapScreen} />
+      <Route path="/copilot" component={AICopilotScreen} />
+      <Route path="/history" component={VisitHistoryScreen} />
+      <Route path="/client/:id/overview" component={ClientOverviewScreen} />
+      <Route path="/client/:id/care-plan" component={CarePlanScreen} />
+      <Route path="/client/:id/history" component={VisitHistoryScreen} />
     </Switch>
   )
 }

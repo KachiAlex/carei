@@ -77,6 +77,18 @@ const DEMO_BRIEFINGS: Record<string, string[]> = {
   'Aisha Khan': ['🧩 Non-verbal - Use picture cards', '🏠 Familiar carer only', '⚡ PBS Red - Do not approach'],
 }
 
+// Helper to construct tenant-aware or legacy paths
+function getPath(path: string): string {
+  const saved = localStorage.getItem('carei_current_tenant')
+  if (saved) {
+    try {
+      const t = JSON.parse(saved)
+      if (t?.slug) return `/tenant/${t.slug}${path}`
+    } catch { /* ignore */ }
+  }
+  return path
+}
+
 export default function CarerDashboard() {
   const [, setLocation] = useLocation()
   const [playingBrief, setPlayingBrief] = useState<string | null>(null)
@@ -261,7 +273,7 @@ export default function CarerDashboard() {
           <div className="flex items-center gap-2">
             <motion.button
               whileTap={{ scale: 0.9 }}
-              onClick={() => setLocation('/copilot')}
+              onClick={() => setLocation(getPath('/copilot'))}
               className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
               title="AI Copilot"
             >
@@ -397,7 +409,7 @@ export default function CarerDashboard() {
               </div>
             </div>
             <button
-              onClick={() => setLocation(`/client/${nextVisit.clientId}/overview`)}
+              onClick={() => setLocation(getPath(`/client/${nextVisit.clientId}/overview`))}
               className="w-full py-2.5 rounded-xl text-xs font-semibold text-white border-none cursor-pointer transition-all hover:opacity-90 active:scale-[0.98]"
               style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
             >
@@ -526,11 +538,11 @@ export default function CarerDashboard() {
                   style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
                   onClick={() => {
                     if (visit.status === 'pending') {
-                      setLocation(`/client/${visit.clientId}/overview`)
+                      setLocation(getPath(`/client/${visit.clientId}/overview`))
                     } else if (visit.status === 'completed') {
-                      setLocation(`/summary/${visit.id}`)
+                      setLocation(getPath(`/summary/${visit.id}`))
                     } else {
-                      setLocation(`/visit/${visit.id}`)
+                      setLocation(getPath(`/visit/${visit.id}`))
                     }
                   }}
                 >
@@ -723,7 +735,7 @@ export default function CarerDashboard() {
           </button>
           
           <button 
-            onClick={() => setLocation('/copilot')}
+            onClick={() => setLocation(getPath('/copilot'))}
             className="flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-colors hover:bg-slate-50"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={COLORS.g2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -749,7 +761,7 @@ export default function CarerDashboard() {
           </div>
           
           <button 
-            onClick={() => setLocation('/history')}
+            onClick={() => setLocation(getPath('/history'))}
             className="flex flex-col items-center gap-1 py-2 px-3 rounded-xl transition-colors hover:bg-slate-50"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={COLORS.g2} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
