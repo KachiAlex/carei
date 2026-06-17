@@ -35,12 +35,22 @@ export function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = {}
 
   if (token) headers.Authorization = `Bearer ${token}`
+
+  let slug = ''
   if (tenant) {
     try {
       const parsed = JSON.parse(tenant)
-      if (parsed.slug) headers['X-Tenant-Slug'] = parsed.slug
+      if (parsed.slug) slug = parsed.slug
     } catch { /* ignore */ }
   }
+
+  // Fallback: extract tenant slug from URL path /tenant/:slug/...
+  if (!slug && typeof window !== 'undefined') {
+    const match = window.location.pathname.match(/\/tenant\/([^\/]+)/)
+    if (match) slug = match[1]
+  }
+
+  if (slug) headers['X-Tenant-Slug'] = slug
 
   return headers
 }

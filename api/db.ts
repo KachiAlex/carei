@@ -566,6 +566,42 @@ async function runMigrations() {
     }
   })
 
+  await run(13, 'link_orphaned_users_to_carei', async () => {
+    // Find or create the 'carei' tenant
+    let careiRows = await sql`SELECT id FROM tenants WHERE slug = 'carei' LIMIT 1` as any[]
+    let careiTenantId = careiRows[0]?.id
+    if (!careiTenantId) {
+      careiTenantId = 'tenant-carei'
+      await sql`
+        INSERT INTO tenants (id, slug, name, plan)
+        VALUES (${careiTenantId}, 'carei', 'Carei', 'professional')
+        ON CONFLICT (slug) DO NOTHING
+      `
+      const t = await sql`SELECT id FROM tenants WHERE slug = 'carei' LIMIT 1` as any[]
+      careiTenantId = t[0]?.id
+    }
+    if (!careiTenantId) return
+
+    // Link all users not in tenant_users to the carei tenant
+    const orphaned = await sql`
+      SELECT u.id, u.role FROM users u
+      LEFT JOIN tenant_users tu ON u.id = tu.user_id
+      WHERE tu.user_id IS NULL
+    ` as any[]
+
+    for (const user of orphaned) {
+      const tuId = 'tu-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7)
+      await sql`
+        INSERT INTO tenant_users (id, tenant_id, user_id, role)
+        VALUES (${tuId}, ${careiTenantId}, ${user.id}, ${user.role || 'carer'})
+        ON CONFLICT (tenant_id, user_id) DO NOTHING
+      `
+    }
+
+    // Backfill users.tenant_id
+    await (sql as any)(`UPDATE users SET tenant_id = '${careiTenantId}' WHERE tenant_id IS NULL OR tenant_id = ''`)
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (

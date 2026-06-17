@@ -117,8 +117,9 @@ export default function ManagerDashboard() {
   }
 
   useEffect(() => {
+    if (!tenantSlug) return
     refreshManagerData()
-  }, [])
+  }, [tenantSlug])
 
   useEffect(() => {
     const eventSource = new EventSource('/api/events')
