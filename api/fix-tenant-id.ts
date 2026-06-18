@@ -23,21 +23,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     results[table] = { added: false, backfilled: false, indexed: false }
     try {
       // Use tagged template literal (no params) — safer for DDL than function call
-      await (sql as any)(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id TEXT`)
+      await sql.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id TEXT`)
       results[table].added = true
     } catch (err: any) {
       results[table].added = false
       results[table].addError = err.message || String(err)
     }
     try {
-      await (sql as any)(`UPDATE ${table} SET tenant_id = 'default-tenant' WHERE tenant_id IS NULL`)
+      await sql.query(`UPDATE ${table} SET tenant_id = 'default-tenant' WHERE tenant_id IS NULL`)
       results[table].backfilled = true
     } catch (err: any) {
       results[table].backfilled = false
       results[table].backfillError = err.message || String(err)
     }
     try {
-      await (sql as any)(`CREATE INDEX IF NOT EXISTS idx_${table}_tenant ON ${table}(tenant_id)`)
+      await sql.query(`CREATE INDEX IF NOT EXISTS idx_${table}_tenant ON ${table}(tenant_id)`)
       results[table].indexed = true
     } catch (err: any) {
       results[table].indexed = false

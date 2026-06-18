@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const columnCheck: Record<string, boolean> = {}
     for (const table of tables) {
       try {
-        const rows = await (sql as any)(`SELECT column_name FROM information_schema.columns WHERE table_name = '${table}' AND column_name = 'tenant_id'`) as any[]
+        const rows = await sql.query(`SELECT column_name FROM information_schema.columns WHERE table_name = '${table}' AND column_name = 'tenant_id'`) as any[]
         columnCheck[table] = rows.length > 0
       } catch {
         columnCheck[table] = false
