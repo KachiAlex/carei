@@ -359,8 +359,8 @@ export default function SuperAdminScreen() {
 
         {/* Add Tenant Modal */}
         {showAddModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-slate-900 rounded-xl border border-white/10 w-full max-w-md p-6">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-slate-900 rounded-xl border border-white/10 w-full max-w-md p-4 sm:p-6 my-auto max-h-[85vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-white">Add Organization</h3>
                 <button
@@ -467,7 +467,7 @@ export default function SuperAdminScreen() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm text-white/60 mb-1">Region</label>
                         <input
