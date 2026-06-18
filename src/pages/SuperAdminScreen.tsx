@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, deleteTenant } from '../api/client'
+import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, deleteTenant, createTenant } from '../api/client'
 
 interface Tenant {
   id: string
@@ -23,6 +23,10 @@ export default function SuperAdminScreen() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addForm, setAddForm] = useState({ name: '', slug: '', domain: '', plan: 'trial' })
+  const [addLoading, setAddLoading] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
   const [stats, setStats] = useState({
     totalTenants: 0,
     totalUsers: 0,
@@ -107,6 +111,39 @@ export default function SuperAdminScreen() {
     setLocation('/login')
   }
 
+  const handleAddTenant = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAddError(null)
+    if (!addForm.name.trim() || !addForm.slug.trim()) {
+      setAddError('Name and slug are required')
+      return
+    }
+    if (!/^[a-z0-9-]+$/.test(addForm.slug)) {
+      setAddError('Slug must be lowercase alphanumeric with hyphens only')
+      return
+    }
+    setAddLoading(true)
+    try {
+      await createTenant({
+        slug: addForm.slug.trim(),
+        name: addForm.name.trim(),
+        domain: addForm.domain.trim() || undefined,
+        plan: addForm.plan,
+      })
+      setShowAddModal(false)
+      setAddForm({ name: '', slug: '', domain: '', plan: 'trial' })
+      await loadData()
+    } catch (err: any) {
+      setAddError(err.message)
+    } finally {
+      setAddLoading(false)
+    }
+  }
+
+  const autoSlug = (name: string) => {
+    return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0B1120' }}>
@@ -173,6 +210,12 @@ export default function SuperAdminScreen() {
         <div className="bg-white/5 rounded-xl border border-white/10 overflow-hidden">
           <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
             <h2 className="font-semibold text-white">Organizations</h2>
+            <button
+              onClick={() => { setShowAddModal(true); setAddError(null) }}
+              className="text-sm px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 transition-colors flex items-center gap-1.5"
+            >
+              <span>+</span> Add Organization
+            </button>
           </div>
 
           <div className="overflow-x-auto">
@@ -281,6 +324,104 @@ export default function SuperAdminScreen() {
             </div>
           </div>
         </div>
+
+        {/* Add Tenant Modal */}
+        {showAddModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 rounded-xl border border-white/10 w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-white">Add Organization</h3>
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="text-white/40 hover:text-white text-xl leading-none"
+                >
+                  &times;
+                </button>
+              </div>
+
+              <form onSubmit={handleAddTenant} className="space-y-4">
+                <div>
+                  <label className="block text-sm text-white/60 mb-1">Organization Name *</label>
+                  <input
+                    type="text"
+                    value={addForm.name}
+                    onChange={(e) => {
+                      const name = e.target.value
+                      setAddForm(prev => ({
+                        ...prev,
+                        name,
+                        slug: prev.slug || autoSlug(name),
+                      }))
+                    }}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-teal-400/50"
+                    placeholder="Acme Care"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-white/60 mb-1">Slug *</label>
+                  <input
+                    type="text"
+                    value={addForm.slug}
+                    onChange={(e) => setAddForm(prev => ({ ...prev, slug: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-teal-400/50"
+                    placeholder="acme-care"
+                    required
+                  />
+                  <p className="text-white/30 text-xs mt-1">Lowercase alphanumeric with hyphens only</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-white/60 mb-1">Domain (optional)</label>
+                  <input
+                    type="text"
+                    value={addForm.domain}
+                    onChange={(e) => setAddForm(prev => ({ ...prev, domain: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-teal-400/50"
+                    placeholder="acme-care.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-white/60 mb-1">Plan</label>
+                  <select
+                    value={addForm.plan}
+                    onChange={(e) => setAddForm(prev => ({ ...prev, plan: e.target.value }))}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-teal-400/50"
+                  >
+                    <option value="trial">Trial (3 users, 10 clients)</option>
+                    <option value="professional">Professional (15 users, 100 clients)</option>
+                    <option value="enterprise">Enterprise (100 users, 500 clients)</option>
+                  </select>
+                </div>
+
+                {addError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2">
+                    <p className="text-red-400 text-sm">{addError}</p>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="flex-1 px-4 py-2 rounded-lg bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-colors text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={addLoading}
+                    className="flex-1 px-4 py-2 rounded-lg bg-teal-500 text-slate-900 hover:bg-teal-400 transition-colors text-sm font-medium disabled:opacity-50"
+                  >
+                    {addLoading ? 'Creating...' : 'Create Organization'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

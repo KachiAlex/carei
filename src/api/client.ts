@@ -641,6 +641,20 @@ export async function verifyOtp(data: { email: string; code: string; purpose?: s
   return post('/otp', { action: 'verify', ...data })
 }
 
+export async function createTenant(data: { slug: string; name: string; domain?: string; plan?: string }) {
+  const res = await fetch(`${API_BASE}/tenants`, {
+    method: 'POST',
+    headers: { ...jsonHeaders, ...authHeaders() },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 export async function getTenantMembers(slug: string) {
   return get(`/tenants?members=${encodeURIComponent(slug)}`)
 }
