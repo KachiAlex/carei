@@ -1,9 +1,15 @@
-import { neon } from '@neondatabase/serverless'
+import { neon, Client } from '@neondatabase/serverless'
 
 export function getSql() {
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) throw new Error('DATABASE_URL not set')
   return neon(connectionString)
+}
+
+export function getClient() {
+  const connectionString = process.env.DATABASE_URL
+  if (!connectionString) throw new Error('DATABASE_URL not set')
+  return new Client(connectionString)
 }
 
 let initPromise: Promise<void> | null = null
@@ -599,7 +605,41 @@ async function runMigrations() {
     }
 
     // Backfill users.tenant_id
-    await sql.query(`UPDATE users SET tenant_id = '${careiTenantId}' WHERE tenant_id IS NULL OR tenant_id = ''`)
+    const client = getClient()
+    await client.connect()
+    try {
+      await client.query(`UPDATE users SET tenant_id = '${careiTenantId}' WHERE tenant_id IS NULL OR tenant_id = ''`)
+    } finally {
+      await client.end()
+    }
+  })
+
+  await run(14, 'create_tenant_id_columns_with_client', async () => {
+    // Previous migrations 10-12 used broken dynamic SQL that silently failed
+    // with @neondatabase/serverless v1.1.0 (neon() only supports tagged templates).
+    const client = getClient()
+    await client.connect()
+    try {
+      const tables = [
+        'clients', 'users', 'visits', 'scheduled_visits', 'sos_alerts',
+        'incidents', 'voice_memos', 'caregiver_client_assignments', 'tasks',
+        'task_logs', 'medication_logs', 'body_map_marks', 'family_messages',
+        'visit_drafts', 'agencies', 'drug_interactions'
+      ]
+      for (const table of tables) {
+        try {
+          await client.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS tenant_id TEXT`)
+        } catch { /* ignore if table doesn't exist or column already exists */ }
+        try {
+          await client.query(`UPDATE ${table} SET tenant_id = 'default-tenant' WHERE tenant_id IS NULL`)
+        } catch { /* ignore */ }
+        try {
+          await client.query(`CREATE INDEX IF NOT EXISTS idx_${table}_tenant ON ${table}(tenant_id)`)
+        } catch { /* ignore */ }
+      }
+    } finally {
+      await client.end()
+    }
   })
 
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent

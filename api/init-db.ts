@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { setCors, ensureTables, getSql } from './db.js'
+import { setCors, ensureTables, getSql, getClient } from './db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -30,14 +30,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'task_logs', 'medication_logs', 'body_map_marks', 'family_messages',
       'visit_drafts', 'agencies', 'drug_interactions'
     ]
+    const client = getClient()
+    await client.connect()
     const columnCheck: Record<string, boolean> = {}
-    for (const table of tables) {
-      try {
-        const rows = await sql.query(`SELECT column_name FROM information_schema.columns WHERE table_name = '${table}' AND column_name = 'tenant_id'`) as any[]
-        columnCheck[table] = rows.length > 0
-      } catch {
-        columnCheck[table] = false
+    try {
+      for (const table of tables) {
+        try {
+          const result = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = '${table}' AND column_name = 'tenant_id'`)
+          columnCheck[table] = (result.rows as any[]).length > 0
+        } catch {
+          columnCheck[table] = false
+        }
       }
+    } finally {
+      await client.end()
     }
     res.status(200).json({
       migrations: migrations.map(m => ({ id: m.id, name: m.name, applied_at: m.applied_at })),
