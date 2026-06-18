@@ -26,6 +26,15 @@ function moduleLogger() {
 export default defineConfig({
   plugins: [moduleLogger(), react(), tailwindcss()],
   logLevel: 'info',
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://carei-app.vercel.app',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
   resolve: {
     alias: {
       react: path.resolve(__dirname, 'node_modules/react'),
