@@ -17,7 +17,7 @@ function validateEmail(email: string): boolean {
 }
 
 // PIN digit boxes component with auto-submit
-function PinBoxes({ pin, onChange, onComplete, type = 'password' }: { pin: string[]; onChange: (i: number, val: string) => void; onComplete?: () => void; type?: 'password' | 'text' }) {
+function PinBoxes({ pin, onChange, onComplete, type = 'password' }: { pin: string[]; onChange: (i: number, val: string) => void; onComplete?: (value: string) => void; type?: 'password' | 'text' }) {
   const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
 
   const handleChange = (i: number, val: string) => {
@@ -27,7 +27,10 @@ function PinBoxes({ pin, onChange, onComplete, type = 'password' }: { pin: strin
       if (digit && i < 3) {
         refs[i + 1].current?.focus()
       } else if (digit && i === 3 && onComplete) {
-        setTimeout(onComplete, 150)
+        // Pass the completed pin value directly to avoid state batching issues
+        const next = [...pin]
+        next[i] = digit
+        setTimeout(() => onComplete(next.join('')), 150)
       }
     }
   }
@@ -105,8 +108,8 @@ export default function LoginScreen() {
     setError('')
   }
 
-  const handleVerify = async () => {
-    const pinValue = pin.join('')
+  const handleVerify = async (completedPin?: string) => {
+    const pinValue = completedPin || pin.join('')
     if (!validateEmail(email)) {
       setError('Please enter your email address.')
       return

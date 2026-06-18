@@ -137,7 +137,15 @@ export default function SplashScreen() {
   ]
 
   if (loading) {
-    return <LoadingOverlay onDone={() => setLoading(false)} />
+    return <LoadingOverlay onDone={() => {
+      const isNative = typeof (window as any).Capacitor !== 'undefined' ||
+        !['http:', 'https:'].includes(window.location.protocol)
+      if (isNative) {
+        setLocation('/login')
+      } else {
+        setLoading(false)
+      }
+    }} />
   }
 
   return (
@@ -247,7 +255,7 @@ export default function SplashScreen() {
               </p>
             </div>
 
-            {/* CTA Buttons */}
+            {/* CTA Button */}
             <div className="w-full max-w-sm flex flex-col gap-3 mb-10" data-animate>
               <button
                 onClick={() => setLocation('/login')}
@@ -262,16 +270,6 @@ export default function SplashScreen() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
                 </svg>
-              </button>
-              <button
-                onClick={() => setLocation('/login')}
-                className="w-full py-3.5 px-6 rounded-2xl border text-white font-semibold text-sm cursor-pointer flex items-center justify-center gap-2 transition-all duration-200 hover:bg-white/5"
-                style={{ borderColor: 'rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.03)' }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" x2="3" y1="12" y2="12" />
-                </svg>
-                Staff Login
               </button>
             </div>
 
