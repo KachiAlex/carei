@@ -668,6 +668,11 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_family_messages_tenant_client ON family_messages(tenant_id, client_id)`
   })
 
+  await run(17, 'add_users_biometrics_columns', async () => {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS biometrics_enabled BOOLEAN DEFAULT FALSE`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS webauthn_credential TEXT`
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (

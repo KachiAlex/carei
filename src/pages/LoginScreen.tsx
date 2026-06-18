@@ -303,6 +303,7 @@ export default function LoginScreen() {
           </div>
 
           <form
+            id="login-form"
             onSubmit={(e) => {
               e.preventDefault()
               if (isSuperAdminMode) {
@@ -339,11 +340,13 @@ export default function LoginScreen() {
               ) : (
                 <div>
                   <label className="block text-white/70 text-sm mb-4 font-medium">4-digit PIN</label>
-                  <PinBoxes
-                    pin={pin}
-                    onChange={handlePinChange}
-                    onComplete={handleVerify}
-                  />
+                  <form onSubmit={(e) => { e.preventDefault(); handleVerify() }}>
+                    <PinBoxes
+                      pin={pin}
+                      onChange={handlePinChange}
+                      onComplete={handleVerify}
+                    />
+                  </form>
                 </div>
               )}
             </div>
