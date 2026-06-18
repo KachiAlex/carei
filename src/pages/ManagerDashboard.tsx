@@ -1055,14 +1055,14 @@ export default function ManagerDashboard() {
               <div className="text-[11px] text-white/40">Operations Dashboard</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium" style={{ background: sseConnected ? 'rgba(79,209,197,0.15)' : 'rgba(255,255,255,0.06)', border: `1px solid ${sseConnected ? 'rgba(79,209,197,0.2)' : 'rgba(255,255,255,0.08)'}` }}>
+          <div className="flex items-center gap-2 overflow-x-auto -mr-6 pr-6 pl-2 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <span className="text-[10px] px-2.5 py-1 rounded-full flex items-center gap-1.5 font-medium shrink-0" style={{ background: sseConnected ? 'rgba(79,209,197,0.15)' : 'rgba(255,255,255,0.06)', border: `1px solid ${sseConnected ? 'rgba(79,209,197,0.2)' : 'rgba(255,255,255,0.08)'}` }}>
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: sseConnected ? COLORS.teal : '#94a3b8' }} />
               <span style={{ color: sseConnected ? COLORS.teal : '#94a3b8' }}>{sseConnected ? 'Live' : 'Offline'}</span>
             </span>
             <button
               onClick={() => tenantSlug && setLocation(`/tenant/${tenantSlug}/manager/clients`)}
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
+              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
               title="Client Management"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1072,7 +1072,7 @@ export default function ManagerDashboard() {
             </button>
             <button
               onClick={() => tenantSlug && setLocation(`/tenant/${tenantSlug}/manager/schedule`)}
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
+              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
               title="Visit Scheduling"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1084,7 +1084,7 @@ export default function ManagerDashboard() {
             </button>
             <button
               onClick={() => tenantSlug && setLocation(`/tenant/${tenantSlug}/settings`)}
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
+              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
               title="Settings"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1098,7 +1098,7 @@ export default function ManagerDashboard() {
                 localStorage.removeItem('carei_current_tenant')
                 setLocation('/login')
               }}
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target"
+              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
               title="Log out"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

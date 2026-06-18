@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { loginUser, loginWithPassword, sendOtp, verifyOtp, resetPin } from '../api/client'
+import { loginUser, loginWithPassword, sendOtp, verifyOtp, resetPin, getMe } from '../api/client'
+import { isBiometricAvailable, verifyBiometric, getBiometricEnabled } from '../utils/biometric'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -82,6 +83,46 @@ export default function LoginScreen() {
   const [resetSuccess, setResetSuccess] = useState(false)
   const [isSuperAdminMode, setIsSuperAdminMode] = useState(false)
   const [password, setPassword] = useState('')
+  const [bioAvailable, setBioAvailable] = useState(false)
+  const [bioEnabled, setBioEnabled] = useState(false)
+
+  // Check biometric availability on mount
+  useEffect(() => {
+    if (getBiometricEnabled()) {
+      setBioEnabled(true)
+      isBiometricAvailable().then(setBioAvailable)
+    }
+  }, [])
+
+  const handleBiometricUnlock = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      const success = await verifyBiometric()
+      if (!success) {
+        setLoading(false)
+        return
+      }
+      const token = localStorage.getItem('carei_token')
+      if (!token) {
+        setError('Session expired. Please log in with PIN.')
+        setBioEnabled(false)
+        setLoading(false)
+        return
+      }
+      const me = await getMe()
+      if (me.user) {
+        localStorage.setItem('carei_user', JSON.stringify(me.user))
+        setLocation('/select-tenant')
+      } else {
+        throw new Error('Invalid session')
+      }
+    } catch (err: any) {
+      setLoading(false)
+      setError(err.message || 'Biometric unlock failed. Please use PIN.')
+      setBioEnabled(false)
+    }
+  }
 
   // Hidden keyboard shortcut to toggle superadmin mode: Ctrl+Shift+A
   useEffect(() => {
@@ -356,6 +397,23 @@ export default function LoginScreen() {
 
             {/* Error */}
             {error && <p className="text-red-400 text-sm mb-4 text-center">{error}</p>}
+
+            {/* Biometric Unlock */}
+            {!isSuperAdminMode && bioEnabled && bioAvailable && (
+              <button
+                type="button"
+                onClick={handleBiometricUnlock}
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl font-bold text-base cursor-pointer border-none disabled:opacity-50 mb-3 flex items-center justify-center gap-2"
+                style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.15)' }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="m9 12 2 2 4-4"/>
+                </svg>
+                {loading ? 'Verifying…' : 'Unlock with Biometric'}
+              </button>
+            )}
 
             {/* Login Button */}
             <button

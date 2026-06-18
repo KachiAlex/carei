@@ -238,7 +238,7 @@ export default function CarerDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative items-center">
-      <div className="w-full max-w-3xl flex flex-col min-h-screen relative pb-safe">
+      <div className="w-full max-w-3xl flex flex-col min-h-screen relative pb-20" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}>
       {/* Header */}
       <div
         className="px-6 pt-5 pb-6 text-white shrink-0 relative overflow-hidden"
@@ -721,7 +721,7 @@ export default function CarerDashboard() {
       )}
 
       {/* Bottom Navigation - Today | Copilot | SOS | History | Profile */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-2 pt-2 pb-safe z-40">
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-2 pt-2 z-40" style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}>
         <div className="max-w-md mx-auto flex items-center justify-around">
           <button 
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}

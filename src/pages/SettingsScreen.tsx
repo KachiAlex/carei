@@ -9,6 +9,7 @@ import {
   getBiometricsStatus,
   updateBiometrics,
 } from '../api/client'
+import { isBiometricAvailable, verifyBiometric, getBiometricEnabled, setBiometricEnabled } from '../utils/biometric'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -101,9 +102,12 @@ export default function SettingsScreen() {
 
     getBiometricsStatus()
       .then((data) => {
-        setBiometricsEnabled(data.enabled || false)
+        // Prefer localStorage flag for native app biometric state
+        setBiometricsEnabled(getBiometricEnabled() || data.enabled || false)
       })
-      .catch(() => {})
+      .catch(() => {
+        setBiometricsEnabled(getBiometricEnabled())
+      })
   }, [setLocation])
 
   const handleSaveProfile = async () => {
@@ -155,11 +159,28 @@ export default function SettingsScreen() {
 
   const handleToggleBiometrics = async () => {
     setBiometricsLoading(true)
+    setError('')
     try {
       const next = !biometricsEnabled
+      if (next) {
+        // Enrolling: verify device supports biometric and user can authenticate
+        const available = await isBiometricAvailable()
+        if (!available) {
+          setError('Biometric authentication is not available on this device.')
+          setBiometricsLoading(false)
+          return
+        }
+        const verified = await verifyBiometric('Confirm your identity to enable biometric login')
+        if (!verified) {
+          setError('Biometric verification failed. Please try again.')
+          setBiometricsLoading(false)
+          return
+        }
+      }
       await updateBiometrics({ enabled: next })
+      setBiometricEnabled(next)
       setBiometricsEnabled(next)
-      setMsg(next ? 'Biometrics enabled' : 'Biometrics disabled')
+      setMsg(next ? 'Biometric login enabled' : 'Biometric login disabled')
     } catch (err: any) {
       setError(err.message || 'Failed to update biometrics')
     } finally {
