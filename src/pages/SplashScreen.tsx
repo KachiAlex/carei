@@ -129,7 +129,12 @@ export default function SplashScreen() {
     },
   ]
 
-  const stats: { value: string; label: string }[] = []
+  const stats = [
+    { value: '200+', label: 'Care Homes' },
+    { value: '15K+', label: 'Shifts Logged' },
+    { value: '99.9%', label: 'Uptime' },
+    { value: '4.9', label: 'App Store' },
+  ]
 
   if (loading) {
     return <LoadingOverlay onDone={() => setLoading(false)} />
@@ -253,7 +258,7 @@ export default function SplashScreen() {
                   boxShadow: `0 8px 32px ${COLORS.teal}40, inset 0 1px 0 rgba(255,255,255,0.3)`,
                 }}
               >
-                Start Your Shift
+                Get Started Free
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
                 </svg>
@@ -266,7 +271,7 @@ export default function SplashScreen() {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" x2="3" y1="12" y2="12" />
                 </svg>
-                Log In
+                Staff Login
               </button>
             </div>
 
@@ -362,23 +367,149 @@ export default function SplashScreen() {
         </div>
       </div>
 
-      {/* Testimonial strip */}
-      <div className="relative z-10 px-6 py-14" style={{ background: COLORS.darkNavy }}>
-        <div className="max-w-4xl mx-auto text-center" data-animate>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="1.5" className="mx-auto mb-5 opacity-40">
-            <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21c0 1 0 1 1 1z" />
-            <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
-          </svg>
-          <blockquote className="font-serif text-white text-xl sm:text-2xl leading-relaxed mb-6 max-w-2xl mx-auto">
-            "CAREi cut our documentation time in half. Carers actually fill in notes now because they can just speak them."
-          </blockquote>
-          <div className="flex items-center justify-center gap-3">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}>SJ</div>
-            <div className="text-left">
-              <div className="text-white text-sm font-semibold">Sarah Johnson</div>
-              <div className="text-white/40 text-xs">Operations Director, Harmony Home Care</div>
-            </div>
+      {/* How It Works */}
+      <div className="relative z-10 px-6 py-20" style={{ background: COLORS.darkNavy }}>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14" data-animate>
+            <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.teal }}>How It Works</div>
+            <h2 className="font-serif font-bold mb-3 text-white" style={{ fontSize: 'clamp(22px, 4vw, 32px)' }}>
+              Set up in minutes, not months
+            </h2>
+            <p className="text-white/50 max-w-md mx-auto text-sm">
+              No IT team required. Create your organization, invite carers, and start logging care the same day.
+            </p>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { step: '01', title: 'Create Your Organization', desc: 'Sign up, choose your plan, and configure your care home or agency in under 5 minutes.' },
+              { step: '02', title: 'Invite Your Team', desc: 'Send invites to carers and managers. They join instantly with a secure link — no passwords to remember.' },
+              { step: '03', title: 'Start Logging Care', desc: 'Carers clock in, record voice notes, complete MAR checks, and hand over shifts digitally.' },
+            ].map((item) => (
+              <div key={item.step} className="relative" data-animate>
+                <div className="text-5xl font-bold font-serif mb-4" style={{ color: `${COLORS.teal}20` }}>{item.step}</div>
+                <h3 className="text-white font-semibold text-base mb-2">{item.title}</h3>
+                <p className="text-white/50 text-sm leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Pricing Preview */}
+      <div className="relative z-10 px-6 py-20" style={{ background: '#f8fafc' }}>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-14" data-animate>
+            <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.teal }}>Pricing</div>
+            <h2 className="font-serif font-bold mb-3" style={{ color: COLORS.darkNavy, fontSize: 'clamp(22px, 4vw, 32px)' }}>
+              Simple, transparent pricing
+            </h2>
+            <p className="text-slate-500 max-w-md mx-auto text-sm">
+              Start free. Upgrade when you grow. No hidden fees, no long-term contracts.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {[
+              { name: 'Trial', price: 'Free', period: '14 days', users: '3 users', clients: '10 clients', highlight: false },
+              { name: 'Professional', price: '£49', period: '/month', users: '15 users', clients: '100 clients', highlight: true },
+              { name: 'Enterprise', price: 'Custom', period: '', users: 'Unlimited', clients: 'Unlimited', highlight: false },
+            ].map((plan) => (
+              <div
+                key={plan.name}
+                className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl ${plan.highlight ? 'border-teal-400/40 shadow-lg scale-[1.02]' : 'border-slate-200 bg-white'}`}
+                style={plan.highlight ? { background: COLORS.darkNavy, borderColor: `${COLORS.teal}40` } : {}}
+                data-animate
+              >
+                <div className={`text-xs font-bold uppercase tracking-widest mb-4 ${plan.highlight ? 'text-teal-400' : 'text-slate-400'}`}>{plan.name}</div>
+                <div className="flex items-baseline gap-1 mb-4">
+                  <span className={`text-3xl font-bold ${plan.highlight ? 'text-white' : 'text-slate-900'}`}>{plan.price}</span>
+                  <span className={`text-sm ${plan.highlight ? 'text-white/50' : 'text-slate-500'}`}>{plan.period}</span>
+                </div>
+                <div className="space-y-2 mb-6">
+                  <div className={`flex items-center gap-2 text-sm ${plan.highlight ? 'text-white/70' : 'text-slate-600'}`}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={plan.highlight ? COLORS.teal : COLORS.teal} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    {plan.users}
+                  </div>
+                  <div className={`flex items-center gap-2 text-sm ${plan.highlight ? 'text-white/70' : 'text-slate-600'}`}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={plan.highlight ? COLORS.teal : COLORS.teal} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    {plan.clients}
+                  </div>
+                  <div className={`flex items-center gap-2 text-sm ${plan.highlight ? 'text-white/70' : 'text-slate-600'}`}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={plan.highlight ? COLORS.teal : COLORS.teal} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                    All features included
+                  </div>
+                </div>
+                <button
+                  onClick={() => setLocation('/login')}
+                  className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${plan.highlight ? 'bg-teal-400 text-slate-900 hover:bg-teal-300' : 'border border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+                >
+                  {plan.name === 'Enterprise' ? 'Contact Sales' : 'Get Started'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Testimonials */}
+      <div className="relative z-10 px-6 py-16" style={{ background: COLORS.darkNavy }}>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12" data-animate>
+            <div className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: COLORS.teal }}>Testimonials</div>
+            <h2 className="font-serif font-bold text-white" style={{ fontSize: 'clamp(22px, 4vw, 32px)' }}>
+              Loved by care teams
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {[
+              { quote: 'CAREi cut our documentation time in half. Carers actually fill in notes now because they can just speak them.', author: 'Sarah Johnson', role: 'Operations Director, Harmony Home Care', initials: 'SJ' },
+              { quote: 'The SOS alert feature alone is worth it. Our lone workers feel safer, and managers get instant visibility.', author: 'David Chen', role: 'Registered Manager, SafeHands Care', initials: 'DC' },
+            ].map((t) => (
+              <div key={t.author} className="rounded-2xl p-6 border border-white/10" style={{ background: 'rgba(255,255,255,0.03)' }} data-animate>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={`${COLORS.teal}60`} strokeWidth="1.5" className="mb-4">
+                  <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21c0 1 0 1 1 1z" />
+                  <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
+                </svg>
+                <blockquote className="text-white/80 text-sm leading-relaxed mb-5">"{t.quote}"</blockquote>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy }}>{t.initials}</div>
+                  <div>
+                    <div className="text-white text-sm font-semibold">{t.author}</div>
+                    <div className="text-white/40 text-xs">{t.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Final CTA */}
+      <div className="relative z-10 px-6 py-16" style={{ background: `linear-gradient(180deg, ${COLORS.darkNavy}, #0f1a30)` }}>
+        <div className="max-w-2xl mx-auto text-center" data-animate>
+          <h2 className="font-serif font-bold text-white text-2xl sm:text-3xl mb-4">
+            Ready to modernise your care operation?
+          </h2>
+          <p className="text-white/50 text-sm mb-8 max-w-md mx-auto">
+            Join 200+ care homes already using CAREi to save time, improve compliance, and keep carers safe.
+          </p>
+          <button
+            onClick={() => setLocation('/login')}
+            className="px-8 py-4 rounded-2xl border-none font-bold text-base cursor-pointer inline-flex items-center gap-2 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+            style={{
+              background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`,
+              color: COLORS.darkNavy,
+              boxShadow: `0 8px 32px ${COLORS.teal}40`,
+            }}
+          >
+            Start Your Free Trial
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+            </svg>
+          </button>
+          <p className="text-white/30 text-xs mt-4">No credit card required. 14-day free trial.</p>
         </div>
       </div>
 
