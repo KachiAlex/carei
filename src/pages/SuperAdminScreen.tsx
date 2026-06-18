@@ -24,7 +24,17 @@ export default function SuperAdminScreen() {
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [addForm, setAddForm] = useState({ name: '', slug: '', domain: '', plan: 'trial' })
+  const [addForm, setAddForm] = useState({
+    name: '',
+    slug: '',
+    domain: '',
+    plan: 'trial',
+    managerName: '',
+    managerEmail: '',
+    managerPhone: '',
+    managerRegion: '',
+    managerPin: '',
+  })
   const [addLoading, setAddLoading] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
   const [stats, setStats] = useState({
@@ -115,11 +125,15 @@ export default function SuperAdminScreen() {
     e.preventDefault()
     setAddError(null)
     if (!addForm.name.trim() || !addForm.slug.trim()) {
-      setAddError('Name and slug are required')
+      setAddError('Organization name and slug are required')
       return
     }
     if (!/^[a-z0-9-]+$/.test(addForm.slug)) {
       setAddError('Slug must be lowercase alphanumeric with hyphens only')
+      return
+    }
+    if (!addForm.managerName.trim() || !addForm.managerEmail.trim()) {
+      setAddError('Manager name and email are required')
       return
     }
     setAddLoading(true)
@@ -129,9 +143,27 @@ export default function SuperAdminScreen() {
         name: addForm.name.trim(),
         domain: addForm.domain.trim() || undefined,
         plan: addForm.plan,
+        manager: {
+          name: addForm.managerName.trim(),
+          email: addForm.managerEmail.trim(),
+          phone: addForm.managerPhone.trim() || undefined,
+          region: addForm.managerRegion.trim() || undefined,
+          pin: addForm.managerPin.trim() || undefined,
+          role: 'admin',
+        },
       })
       setShowAddModal(false)
-      setAddForm({ name: '', slug: '', domain: '', plan: 'trial' })
+      setAddForm({
+        name: '',
+        slug: '',
+        domain: '',
+        plan: 'trial',
+        managerName: '',
+        managerEmail: '',
+        managerPhone: '',
+        managerRegion: '',
+        managerPin: '',
+      })
       await loadData()
     } catch (err: any) {
       setAddError(err.message)
@@ -394,6 +426,70 @@ export default function SuperAdminScreen() {
                     <option value="professional">Professional (15 users, 100 clients)</option>
                     <option value="enterprise">Enterprise (100 users, 500 clients)</option>
                   </select>
+                </div>
+
+                <div className="border-t border-white/10 pt-4">
+                  <h4 className="text-sm font-medium text-teal-400 mb-3">Manager Account</h4>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm text-white/60 mb-1">Manager Name *</label>
+                      <input
+                        type="text"
+                        value={addForm.managerName}
+                        onChange={(e) => setAddForm(prev => ({ ...prev, managerName: e.target.value }))}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-teal-400/50"
+                        placeholder="John Doe"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-white/60 mb-1">Manager Email *</label>
+                      <input
+                        type="email"
+                        value={addForm.managerEmail}
+                        onChange={(e) => setAddForm(prev => ({ ...prev, managerEmail: e.target.value }))}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-teal-400/50"
+                        placeholder="john@example.com"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-white/60 mb-1">Phone</label>
+                      <input
+                        type="text"
+                        value={addForm.managerPhone}
+                        onChange={(e) => setAddForm(prev => ({ ...prev, managerPhone: e.target.value }))}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-teal-400/50"
+                        placeholder="+1 234 567 8900"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm text-white/60 mb-1">Region</label>
+                        <input
+                          type="text"
+                          value={addForm.managerRegion}
+                          onChange={(e) => setAddForm(prev => ({ ...prev, managerRegion: e.target.value }))}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-teal-400/50"
+                          placeholder="London"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-white/60 mb-1">PIN</label>
+                        <input
+                          type="text"
+                          value={addForm.managerPin}
+                          onChange={(e) => setAddForm(prev => ({ ...prev, managerPin: e.target.value }))}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-teal-400/50"
+                          placeholder="1234"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {addError && (

@@ -13,6 +13,10 @@ const PLAN_DEFAULTS: Record<string, { max_users: number; max_clients: number }> 
   enterprise: { max_users: 100, max_clients: 500 },
 }
 
+function generateToken(): string {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
@@ -121,7 +125,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      const { slug, name, domain, plan } = req.body || {}
+      const { slug, name, domain, plan, manager } = req.body || {}
 
       if (!slug || !name) {
         res.status(400).json({ error: 'slug and name are required' })
@@ -146,8 +150,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               max_clients = ${defaults.max_clients}
           WHERE id = ${tenant.id}
         `
-        // Add creator as admin
-        await addUserToTenant(user.id, tenant.id, 'admin')
+
+        let managerUser: { id: string; name: string; email: string; token: string } | null = null
+
+        if (manager && manager.name && manager.email) {
+          const managerId = 'u-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7)
+          const managerToken = generateToken()
+          await sql`
+            INSERT INTO users (id, name, email, phone, region, pin, role, token)
+            VALUES (
+              ${managerId},
+              ${manager.name},
+              ${manager.email.toLowerCase()},
+              ${manager.phone || ''},
+              ${manager.region || ''},
+              ${manager.pin || ''},
+              ${manager.role || 'admin'},
+              ${managerToken}
+            )
+          `
+          await addUserToTenant(managerId, tenant.id, manager.role || 'admin')
+          managerUser = {
+            id: managerId,
+            name: manager.name,
+            email: manager.email.toLowerCase(),
+            token: managerToken,
+          }
+        } else {
+          // Fallback: add creator as admin if no manager provided
+          await addUserToTenant(user.id, tenant.id, 'admin')
+        }
+
         res.status(201).json({
           id: tenant.id,
           slug,
@@ -155,11 +188,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           plan: resolvedPlan,
           max_users: defaults.max_users,
           max_clients: defaults.max_clients,
+          manager: managerUser,
           message: 'Tenant created successfully',
         })
       } catch (err: any) {
-        if (err.message?.includes('unique constraint')) {
-          res.status(409).json({ error: 'Tenant slug already exists' })
+        if (err.message?.includes('unique constraint') || err.message?.includes('duplicate')) {
+          if (err.message?.includes('users_email')) {
+            res.status(409).json({ error: 'Manager email already registered' })
+          } else {
+            res.status(409).json({ error: 'Tenant slug already exists' })
+          }
           return
         }
         throw err

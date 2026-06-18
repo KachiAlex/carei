@@ -642,6 +642,18 @@ async function runMigrations() {
     }
   })
 
+  await run(15, 'fix_clients_missing_columns', async () => {
+    // Some columns were missing from clients table causing 500 on create
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS allergies TEXT`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS dysphagia_protocol TEXT`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS support_framework TEXT`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS communication_guidance TEXT`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS mobility TEXT`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS care_cues JSONB`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS bp_baseline_systolic INTEGER`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS bp_baseline_diastolic INTEGER`
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (

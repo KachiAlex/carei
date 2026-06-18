@@ -641,7 +641,13 @@ export async function verifyOtp(data: { email: string; code: string; purpose?: s
   return post('/otp', { action: 'verify', ...data })
 }
 
-export async function createTenant(data: { slug: string; name: string; domain?: string; plan?: string }) {
+export async function createTenant(data: {
+  slug: string
+  name: string
+  domain?: string
+  plan?: string
+  manager?: { name: string; email: string; phone?: string; region?: string; pin?: string; role?: string }
+}) {
   const res = await fetch(`${API_BASE}/tenants`, {
     method: 'POST',
     headers: { ...jsonHeaders, ...authHeaders() },
