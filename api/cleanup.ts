@@ -10,7 +10,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const sql = getSql()
-  const body = req.body || {}
+  let body = req.body || {}
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body) } catch { body = {} }
+  }
   const email = (body.email || '').toLowerCase().trim()
   const clientName = (body.clientName || '').trim()
 
