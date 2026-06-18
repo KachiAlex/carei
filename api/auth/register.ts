@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from '../db.js'
+import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug } from '../db.js'
 
 function generateToken(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
@@ -30,6 +30,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       INSERT INTO users (id, name, email, phone, region, pin, role, token)
       VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role}, ${token})
     `
+
+    // Auto-link user to the carei tenant so they can access tenant-scoped endpoints
+    let careiTenant = await getTenantFromSlug('carei')
+    if (!careiTenant) {
+      const tenantId = 'tenant-carei'
+      await sql`
+        INSERT INTO tenants (id, slug, name, plan)
+        VALUES (${tenantId}, 'carei', 'Carei', 'professional')
+        ON CONFLICT (slug) DO NOTHING
+      `
+      careiTenant = await getTenantFromSlug('carei')
+    }
+    if (careiTenant) {
+      await addUserToTenant(id, careiTenant.id, role)
+    }
+
     res.setHeader('Set-Cookie', `carei_token=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`)
     res.status(201).json({
       token,

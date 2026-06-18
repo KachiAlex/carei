@@ -1,10 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, getAuthToken } from '../db.js'
-
-async function getUserFromToken(sql: any, token: string) {
-  const rows = await sql`SELECT id, name, role FROM users WHERE token = ${token} LIMIT 1` as any[]
-  return rows[0] || null
-}
+import { getSql, setCors, ensureTables, withTenant, getTenantSlug } from '../db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -14,17 +9,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const token = getAuthToken(req)
-  if (!token) {
-    res.status(401).json({ error: 'Unauthorized' })
-    return
-  }
+  const tenantSlug = getTenantSlug(req)
 
   try {
     await ensureTables()
     const sql = getSql()
-    const user = await getUserFromToken(sql, token)
-    if (!user) {
+
+    // If tenant slug provided, use tenant-aware filtering
+    if (tenantSlug) {
+      await withTenant(req, res, async ({ tenantId, userId, sql: tenantSql }) => {
+        const { clientId } = req.query as { clientId?: string }
+
+        if (clientId) {
+          const assignment = await tenantSql`
+            SELECT 1 FROM caregiver_client_assignments
+            WHERE caregiver_id = ${userId} AND client_id = ${clientId} AND tenant_id = ${tenantId}
+            LIMIT 1
+          ` as any[]
+
+          if (assignment.length === 0) {
+            res.status(403).json({ error: 'Not assigned to this client' })
+            return
+          }
+
+          const rows = await tenantSql`
+            SELECT id, client_id AS "clientId", name, description, frequency, created_at AS "createdAt"
+            FROM tasks WHERE client_id = ${clientId} AND tenant_id = ${tenantId} ORDER BY name
+          ` as any[]
+
+          res.status(200).json({ tasks: rows })
+          return
+        }
+
+        const rows = await tenantSql`
+          SELECT t.id, t.client_id AS "clientId", t.name, t.description, t.frequency, c.name AS "clientName"
+          FROM tasks t
+          JOIN clients c ON t.client_id = c.id AND c.tenant_id = ${tenantId}
+          WHERE t.tenant_id = ${tenantId}
+            AND c.id IN (
+              SELECT client_id FROM caregiver_client_assignments WHERE caregiver_id = ${userId} AND tenant_id = ${tenantId}
+            )
+          ORDER BY c.name, t.name
+        ` as any[]
+
+        res.status(200).json({ tasks: rows })
+      })
+      return
+    }
+
+    // Legacy non-tenant handler
+    const token = req.headers.authorization?.replace('Bearer ', '') || ''
+    const userRows = await sql`SELECT id FROM users WHERE token = ${token} LIMIT 1` as any[]
+    const userId = userRows[0]?.id
+    if (!userId) {
       res.status(401).json({ error: 'Invalid token' })
       return
     }
@@ -32,10 +69,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { clientId } = req.query as { clientId?: string }
 
     if (clientId) {
-      // Verify the caregiver is assigned to this client
       const assignment = await sql`
         SELECT 1 FROM caregiver_client_assignments
-        WHERE caregiver_id = ${user.id} AND client_id = ${clientId}
+        WHERE caregiver_id = ${userId} AND client_id = ${clientId}
         LIMIT 1
       ` as any[]
 
@@ -53,13 +89,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    // Return tasks for all assigned clients
     const rows = await sql`
       SELECT t.id, t.client_id AS "clientId", t.name, t.description, t.frequency, c.name AS "clientName"
       FROM tasks t
       JOIN clients c ON t.client_id = c.id
       WHERE c.id IN (
-        SELECT client_id FROM caregiver_client_assignments WHERE caregiver_id = ${user.id}
+        SELECT client_id FROM caregiver_client_assignments WHERE caregiver_id = ${userId}
       )
       ORDER BY c.name, t.name
     ` as any[]
