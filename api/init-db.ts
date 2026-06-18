@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { setCors, ensureTables, getSql, getClient } from './db.js'
+import { setCors, ensureTables, getSql, getClient, getAuthToken } from './db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -12,6 +12,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const sql = getSql()
 
   if (req.method === 'POST') {
+    const token = getAuthToken(req)
+    if (!token) {
+      res.status(401).json({ error: 'Authentication required' })
+      return
+    }
+    const userRows = await sql`SELECT id, role FROM users WHERE token = ${token} LIMIT 1` as any[]
+    if (!userRows[0] || userRows[0].role !== 'superadmin') {
+      res.status(403).json({ error: 'Superadmin access required' })
+      return
+    }
     try {
       await ensureTables()
       res.status(200).json({ status: 'initialized' })
@@ -21,7 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  // GET: diagnostic report
+  // GET: diagnostic report (public - read only)
   try {
     const migrations = await sql`SELECT id, name, applied_at FROM _migrations ORDER BY id` as any[]
     const tables = [
@@ -36,7 +46,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
       for (const table of tables) {
         try {
-          const result = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = '${table}' AND column_name = 'tenant_id'`)
+          const result = await client.query(
+            'SELECT column_name FROM information_schema.columns WHERE table_name = $1 AND column_name = $2',
+            [table, 'tenant_id']
+          )
           columnCheck[table] = (result.rows as any[]).length > 0
         } catch {
           columnCheck[table] = false
