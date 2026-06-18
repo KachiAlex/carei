@@ -23,6 +23,7 @@ import {
 } from '../api/client'
 import { sendSOSAlert, sendSOSResolved, requestNotificationPermission } from '../utils/notifications'
 import { exportVisits, exportCarers, exportClients } from '../utils/exportCsv'
+import BiometricsPrompt from '../components/BiometricsPrompt'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -1153,6 +1154,8 @@ export default function ManagerDashboard() {
         {!loading && tab === 'schedule' && renderSchedule()}
         {!loading && tab === 'logs' && renderLogs()}
       </motion.div>
+
+      <BiometricsPrompt />
       </div>
     </div>
   )

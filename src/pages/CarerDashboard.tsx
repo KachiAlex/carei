@@ -15,6 +15,7 @@ import {
   getClientLogs,
 } from '../api/client'
 import { enqueue } from '../utils/offlineQueue'
+import BiometricsPrompt from '../components/BiometricsPrompt'
 import { sendVisitStartReminder, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
@@ -870,6 +871,8 @@ export default function CarerDashboard() {
           </div>
         </div>
       )}
+
+      <BiometricsPrompt />
       </div>
     </div>
   )
