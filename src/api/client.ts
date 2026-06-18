@@ -340,6 +340,24 @@ export async function updateBiometrics(data: { credential?: unknown; enabled: bo
   return post('/auth/biometrics', data)
 }
 
+export async function changePassword(data: { currentPassword: string; newPassword: string }) {
+  return post('/auth/change-password', data)
+}
+
+export async function updateProfile(data: { name?: string; phone?: string; region?: string }) {
+  const res = await fetch(`${API_BASE}/auth/update-profile`, {
+    method: 'PATCH',
+    headers: { ...jsonHeaders, ...authHeaders() },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 export async function biometricLogin(data: { email: string; credentialId: string }) {
   const res = await post('/auth/biometric-login', data) as any
   if (res.token) localStorage.setItem('carei_token', res.token)

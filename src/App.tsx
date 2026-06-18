@@ -29,6 +29,7 @@ const AdminTeaserScreen = lazy(() => import('./pages/AdminTeaserScreen'))
 const SuperAdminScreen = lazy(() => import('./pages/SuperAdminScreen'))
 const AcceptInviteScreen = lazy(() => import('./pages/AcceptInviteScreen'))
 const TenantMembersScreen = lazy(() => import('./pages/TenantMembersScreen'))
+const SettingsScreen = lazy(() => import('./pages/SettingsScreen'))
 
 function LoadingFallback() {
   return (
@@ -59,6 +60,7 @@ function PublicRoutes() {
       <Route path="/client/:id/overview" component={ClientOverviewScreen} />
       <Route path="/client/:id/care-plan" component={CarePlanScreen} />
       <Route path="/client/:id/history" component={VisitHistoryScreen} />
+      <Route path="/settings" component={SettingsScreen} />
     </Switch>
   )
 }
@@ -90,6 +92,7 @@ function TenantRoutes() {
         <Route path="/tenant/:slug/manager/approvals" component={ManagerApprovalsScreen} />
         <Route path="/tenant/:slug/manager/add-carer" component={CreateAccountScreen} />
         <Route path="/tenant/:slug/manager/members" component={TenantMembersScreen} />
+        <Route path="/tenant/:slug/settings" component={SettingsScreen} />
       </Switch>
     </TenantProvider>
   )
