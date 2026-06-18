@@ -32,8 +32,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   // Extract tenant slug from URL
   const urlTenantSlug = matchTenant ? paramsTenant?.slug : null
 
-  // Load user's tenants
-  const refreshTenants = async () => {
+  // Load user's tenants — prefer /auth/me (returns user + tenants in one call)
+  // and fall back to /tenants for explicit refresh or if /auth/me fails
+  const refreshTenants = async (forceFresh = false) => {
     const token = localStorage.getItem('carei_token')
     if (!token) {
       setTenants([])
@@ -43,21 +44,40 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
     try {
       setIsLoading(true)
-      const res = await fetch(`${API_URL}/tenants`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      let userTenants: Tenant[] = []
 
-      if (!res.ok) {
-        if (res.status === 401) {
-          localStorage.removeItem('carei_token')
-          setTenants([])
-          setCurrentTenantState(null)
-        }
-        throw new Error('Failed to fetch tenants')
+      if (!forceFresh) {
+        // Try /auth/me first — it returns tenants along with user profile
+        try {
+          const meRes = await fetch(`${API_URL}/auth/me`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+          if (meRes.ok) {
+            const meData = await meRes.json()
+            userTenants = meData.tenants || []
+          }
+        } catch { /* fall through to /tenants */ }
       }
 
-      const data = await res.json()
-      const userTenants: Tenant[] = data.tenants || []
+      // If /auth/me didn't return tenants or forceFresh is true, call /tenants
+      if (userTenants.length === 0) {
+        const res = await fetch(`${API_URL}/tenants`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            localStorage.removeItem('carei_token')
+            setTenants([])
+            setCurrentTenantState(null)
+          }
+          throw new Error('Failed to fetch tenants')
+        }
+
+        const data = await res.json()
+        userTenants = data.tenants || []
+      }
+
       setTenants(userTenants)
 
       // If URL has tenant slug, validate and set it
