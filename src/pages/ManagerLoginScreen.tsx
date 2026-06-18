@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useLocation } from 'wouter'
 import { loginUser } from '../api/client'
+import { secureSet } from '../utils/secureStorage'
+import { setUser as setTokenCacheUser } from '../utils/tokenCache'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -32,7 +34,9 @@ export default function ManagerLoginScreen() {
       setLoading(false)
       const isManager = res?.user?.role === 'manager' || res?.user?.role === 'admin'
       if (isManager) {
-        localStorage.setItem('carei_user', JSON.stringify(res.user))
+        const userJson = JSON.stringify(res.user)
+        secureSet('user', userJson).catch(() => {})
+        setTokenCacheUser(userJson)
         setLocation('/select-tenant')
       } else {
         setError('Not a manager account')

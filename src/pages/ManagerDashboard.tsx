@@ -20,7 +20,9 @@ import {
   getClientLogs,
   updateCaregiverStatus,
   deleteCaregiver,
+  logoutUser,
 } from '../api/client'
+import { clearAuthCache } from '../utils/tokenCache'
 import { sendSOSAlert, sendSOSResolved, requestNotificationPermission } from '../utils/notifications'
 import { exportVisits, exportCarers, exportClients } from '../utils/exportCsv'
 import BiometricsPrompt from '../components/BiometricsPrompt'
@@ -1092,9 +1094,9 @@ export default function ManagerDashboard() {
               </svg>
             </button>
             <button
-              onClick={() => {
-                localStorage.removeItem('carei_token')
-                localStorage.removeItem('carei_user')
+              onClick={async () => {
+                try { await logoutUser() } catch (err: any) { console.error('logout failed', err.message) }
+                clearAuthCache()
                 localStorage.removeItem('carei_current_tenant')
                 setLocation('/login')
               }}

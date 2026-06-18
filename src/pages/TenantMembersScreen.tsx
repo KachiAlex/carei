@@ -3,6 +3,7 @@ import { useLocation, useSearch } from 'wouter'
 import { motion } from 'framer-motion'
 import { useTenant } from '../contexts/TenantContext'
 import { API_BASE } from '../api/client'
+import { getToken } from '../utils/tokenCache'
 
 interface Member {
   id: string
@@ -53,7 +54,7 @@ export default function TenantMembersScreen() {
   }, [tenantLoading, tenantSlug])
 
   const fetchMembers = async () => {
-    const token = localStorage.getItem('carei_token')
+    const token = getToken()
     if (!token || !tenantSlug) return
 
     try {
@@ -80,7 +81,7 @@ export default function TenantMembersScreen() {
   }
 
   const fetchInvites = async () => {
-    const token = localStorage.getItem('carei_token')
+    const token = getToken()
     if (!token || currentUserRole !== 'admin') return
 
     try {
@@ -104,7 +105,7 @@ export default function TenantMembersScreen() {
     setInviteSuccess(null)
 
     try {
-      const token = localStorage.getItem('carei_token')
+      const token = getToken()
       const res = await fetch(`${API_BASE}/invites`, {
         method: 'POST',
         headers: {
@@ -136,7 +137,7 @@ export default function TenantMembersScreen() {
   }
 
   const cancelInvite = async (inviteId: string) => {
-    const token = localStorage.getItem('carei_token')
+    const token = getToken()
     try {
       const res = await fetch(`${API_BASE}/invites?id=${inviteId}`, {
         method: 'DELETE',

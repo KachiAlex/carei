@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import { useRoute, useLocation } from 'wouter'
 import { API_BASE } from '../api/client'
+import { getToken, clearAuthCache } from '../utils/tokenCache'
 
 interface Tenant {
   id: string
@@ -34,7 +35,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   // Load user's tenants — prefer /auth/me (returns user + tenants in one call)
   // and fall back to /tenants for explicit refresh or if /auth/me fails
   const refreshTenants = async (forceFresh = false) => {
-    const token = localStorage.getItem('carei_token')
+    const token = getToken()
     if (!token) {
       setTenants([])
       setIsLoading(false)
@@ -66,7 +67,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
         if (!res.ok) {
           if (res.status === 401) {
-            localStorage.removeItem('carei_token')
+            clearAuthCache()
             setTenants([])
             setCurrentTenantState(null)
           }

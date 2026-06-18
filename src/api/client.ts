@@ -1,16 +1,19 @@
+import { getToken, setToken, clearAuthCache } from '../utils/tokenCache'
+import { secureSet, secureRemove } from '../utils/secureStorage'
+
 function getApiBase(): string {
   // Priority: 1. Environment variable, 2. Local dev, 3. Production
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
-  
+
   // Capacitor / native webview uses file:// or capacitor:// protocol
   const isNative = typeof (window as any).Capacitor !== 'undefined' ||
     !['http:', 'https:'].includes(window.location.protocol)
-  
+
   if (isNative) {
     // Use production API for native apps
     return 'https://carei-app.vercel.app/api'
   }
-  
+
   // For web: use relative path (same origin) in production, or localhost in dev
   return '/api'
 }
@@ -18,11 +21,13 @@ function getApiBase(): string {
 export const API_BASE = getApiBase()
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
-function handleAuthError(status: number) {
+async function handleAuthError(status: number) {
   if (status === 401) {
-    localStorage.removeItem('carei_token')
-    localStorage.removeItem('carei_user')
+    clearAuthCache()
+    await secureRemove('token')
+    await secureRemove('user')
     localStorage.removeItem('carei_current_tenant')
+    localStorage.removeItem('carei_biometric_enabled')
     if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/join')) {
       window.location.href = '/login'
     }
@@ -30,7 +35,7 @@ function handleAuthError(status: number) {
 }
 
 export function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('carei_token')
+  const token = getToken()
   const tenant = localStorage.getItem('carei_current_tenant')
   const headers: Record<string, string> = {}
 
@@ -298,19 +303,28 @@ export async function registerUser(data: {
   role?: string
 }) {
   const res = await post('/auth/register', data) as any
-  if (res.token) localStorage.setItem('carei_token', res.token)
+  if (res.token) {
+    setToken(res.token)
+    await secureSet('token', res.token)
+  }
   return res
 }
 
 export async function loginUser(data: { email: string; pin: string }) {
   const res = await post('/auth/login', data) as any
-  if (res.token) localStorage.setItem('carei_token', res.token)
+  if (res.token) {
+    setToken(res.token)
+    await secureSet('token', res.token)
+  }
   return res
 }
 
 export async function loginWithPassword(data: { email: string; password: string }) {
   const res = await post('/auth/login-password', data) as any
-  if (res.token) localStorage.setItem('carei_token', res.token)
+  if (res.token) {
+    setToken(res.token)
+    await secureSet('token', res.token)
+  }
   return res
 }
 
@@ -324,7 +338,9 @@ export async function resetPin(data: { email: string; newPin: string; otp: strin
 }
 
 export async function logoutUser() {
-  localStorage.removeItem('carei_token')
+  clearAuthCache()
+  await secureRemove('token')
+  await secureRemove('user')
   return post('/auth/logout', {})
 }
 
@@ -360,7 +376,10 @@ export async function updateProfile(data: { name?: string; phone?: string; regio
 
 export async function biometricLogin(data: { email: string; credentialId: string }) {
   const res = await post('/auth/biometric-login', data) as any
-  if (res.token) localStorage.setItem('carei_token', res.token)
+  if (res.token) {
+    setToken(res.token)
+    await secureSet('token', res.token)
+  }
   return res
 }
 

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, deleteTenant, createTenant } from '../api/client'
+import { getToken, clearAuthCache } from '../utils/tokenCache'
+import { secureRemove } from '../utils/secureStorage'
 
 interface Tenant {
   id: string
@@ -50,7 +52,7 @@ export default function SuperAdminScreen() {
   }, [])
 
   const loadData = async () => {
-    const token = localStorage.getItem('carei_token')
+    const token = getToken()
     if (!token) {
       setLocation('/login')
       return
@@ -115,8 +117,10 @@ export default function SuperAdminScreen() {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('carei_token')
+  const handleLogout = async () => {
+    clearAuthCache()
+    await secureRemove('token')
+    await secureRemove('user')
     localStorage.removeItem('carei_current_tenant')
     setLocation('/login')
   }

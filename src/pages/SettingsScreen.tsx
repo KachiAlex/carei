@@ -10,6 +10,8 @@ import {
   updateBiometrics,
 } from '../api/client'
 import { isBiometricAvailable, verifyBiometric, getBiometricEnabled, setBiometricEnabled } from '../utils/biometric'
+import { getToken } from '../utils/tokenCache'
+import { secureSet } from '../utils/secureStorage'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -83,7 +85,7 @@ export default function SettingsScreen() {
   })
 
   useEffect(() => {
-    const token = localStorage.getItem('carei_token')
+    const token = getToken()
     if (!token) {
       setLocation('/login')
       return
@@ -122,7 +124,8 @@ export default function SettingsScreen() {
       })
       if (res.user) {
         setUser(res.user)
-        localStorage.setItem('carei_user', JSON.stringify(res.user))
+        const userJson = JSON.stringify(res.user)
+        secureSet('user', userJson).catch(() => {})
       }
       setMsg('Profile updated successfully')
     } catch (err: any) {

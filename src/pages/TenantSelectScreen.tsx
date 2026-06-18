@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { motion } from 'framer-motion'
 import { API_BASE } from '../api/client'
+import { getToken, getUser, clearAuthCache } from '../utils/tokenCache'
+import { secureRemove } from '../utils/secureStorage'
 
 interface Tenant {
   id: string
@@ -25,7 +27,7 @@ export default function TenantSelectScreen() {
   }, [])
 
   const loadTenants = async () => {
-    const token = localStorage.getItem('carei_token')
+    const token = getToken()
     if (!token) {
       setLocation('/login')
       return
@@ -38,7 +40,8 @@ export default function TenantSelectScreen() {
       })
 
       if (res.status === 401) {
-        localStorage.removeItem('carei_token')
+        clearAuthCache()
+        secureRemove('token').catch(() => {})
         setLocation('/login')
         return
       }
@@ -51,7 +54,7 @@ export default function TenantSelectScreen() {
       // If only one tenant, auto-redirect to the appropriate dashboard
       if (data.tenants?.length === 1) {
         localStorage.setItem('carei_current_tenant', JSON.stringify(data.tenants[0]))
-        const userJson = localStorage.getItem('carei_user')
+        const userJson = getUser()
         const user = userJson ? JSON.parse(userJson) : null
         const isManager = user?.role === 'manager' || user?.role === 'admin'
         const path = isManager ? 'manager' : 'dashboard'
@@ -66,7 +69,7 @@ export default function TenantSelectScreen() {
 
   const selectTenant = (tenant: Tenant) => {
     localStorage.setItem('carei_current_tenant', JSON.stringify(tenant))
-    const userJson = localStorage.getItem('carei_user')
+    const userJson = getUser()
     const user = userJson ? JSON.parse(userJson) : null
     const isManager = user?.role === 'manager' || user?.role === 'admin'
     const path = isManager ? 'manager' : 'dashboard'
@@ -90,7 +93,7 @@ export default function TenantSelectScreen() {
   const createTenant = async () => {
     if (!newTenantName.trim() || !newTenantSlug.trim()) return
 
-    const token = localStorage.getItem('carei_token')
+    const token = getToken()
     if (!token) return
 
     try {
@@ -129,8 +132,10 @@ export default function TenantSelectScreen() {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('carei_token')
+  const handleLogout = async () => {
+    clearAuthCache()
+    await secureRemove('token')
+    await secureRemove('user')
     localStorage.removeItem('carei_current_tenant')
     setLocation('/login')
   }

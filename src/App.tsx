@@ -1,7 +1,10 @@
-import { lazy, Suspense, useEffect } from 'react'
-import { Route, Router, Switch } from 'wouter'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { Route, Router, Switch, useLocation } from 'wouter'
 import { useOnlineSync } from './hooks/useOnlineSync'
 import { TenantProvider } from './contexts/TenantContext'
+import { secureGet, secureWipe } from './utils/secureStorage'
+import { setToken, setUser, clearAuthCache } from './utils/tokenCache'
+import { useAutoLock } from './hooks/useAutoLock'
 
 function useReducedMotion() {
   useEffect(() => {
@@ -12,6 +15,57 @@ function useReducedMotion() {
     apply()
     mq.addEventListener('change', apply)
     return () => mq.removeEventListener('change', apply)
+  }, [])
+}
+
+// Decode JWT payload without verification (for expiry check)
+function decodeJwtPayload(token: string): { exp?: number } | null {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=')
+    const json = atob(padded)
+    return JSON.parse(json)
+  } catch {
+    return null
+  }
+}
+
+function useSecureBoot() {
+  useEffect(() => {
+    // Load encrypted auth data into memory cache on boot
+    secureGet('token').then((token) => {
+      if (token) {
+        // Check expiry before accepting token
+        const payload = decodeJwtPayload(token)
+        if (payload?.exp && payload.exp * 1000 < Date.now()) {
+          // Token expired — wipe it
+          secureWipe()
+          clearAuthCache()
+          return
+        }
+        setToken(token)
+      }
+    })
+    secureGet('user').then((user) => {
+      if (user) setUser(user)
+    })
+  }, [])
+}
+
+function useClipboardGuard() {
+  useEffect(() => {
+    const handler = () => {
+      if (document.hidden) {
+        // Clear clipboard when app goes to background
+        try {
+          if ('clipboard' in navigator) {
+            navigator.clipboard.writeText('').catch(() => {})
+          }
+        } catch {}
+      }
+    }
+    document.addEventListener('visibilitychange', handler)
+    return () => document.removeEventListener('visibilitychange', handler)
   }, [])
 }
 
@@ -110,15 +164,33 @@ function TenantRoutes() {
   )
 }
 
+function AutoLockGuard({ children }: { children: React.ReactNode }) {
+  const [, setLocation] = useLocation()
+  useAutoLock({
+    onLock: () => {
+      clearAuthCache()
+      secureWipe().catch(() => {})
+      if (!window.location.pathname.includes('/login')) {
+        setLocation('/login')
+      }
+    },
+  })
+  return <>{children}</>
+}
+
 function App() {
   useReducedMotion()
+  useSecureBoot()
+  useClipboardGuard()
   useOnlineSync()
   return (
     <Router>
-      <Suspense fallback={<LoadingFallback />}>
-        <PublicRoutes />
-        <TenantRoutes />
-      </Suspense>
+      <AutoLockGuard>
+        <Suspense fallback={<LoadingFallback />}>
+          <PublicRoutes />
+          <TenantRoutes />
+        </Suspense>
+      </AutoLockGuard>
     </Router>
   )
 }

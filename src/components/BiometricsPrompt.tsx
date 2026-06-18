@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getBiometricsStatus, updateBiometrics } from '../api/client'
+import { getToken } from '../utils/tokenCache'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -22,7 +23,7 @@ export default function BiometricsPrompt() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    const token = localStorage.getItem('carei_token')
+    const token = getToken()
     if (!token) return
     if (!supportsWebAuthn()) return
     // Don't show if user dismissed in this session

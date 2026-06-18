@@ -3,6 +3,8 @@ import { useLocation } from 'wouter'
 import { loginUser, loginWithPassword, sendOtp, verifyOtp, resetPin, getMe } from '../api/client'
 import { isBiometricAvailable, verifyBiometric, getBiometricEnabled } from '../utils/biometric'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
+import { secureSet } from '../utils/secureStorage'
+import { getToken, setToken, setUser as setTokenCacheUser } from '../utils/tokenCache'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -53,11 +55,13 @@ function PinBoxes({ pin, onChange, onComplete }: { pin: string[]; onChange: (i: 
         <input
           key={i}
           ref={refs[i]}
-          type="tel"
+          type="password"
           inputMode="numeric"
           pattern="[0-9]*"
           maxLength={1}
           value={digit}
+          autoComplete="off"
+          aria-label={`PIN digit ${i + 1}`}
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           className="w-14 h-16 rounded-xl text-center text-2xl font-bold outline-none transition-all"
@@ -91,6 +95,17 @@ export default function LoginScreen() {
   const [bioAvailable, setBioAvailable] = useState(false)
   const [bioEnabled, setBioEnabled] = useState(false)
 
+  // Brute force protection
+  const [failedAttempts, setFailedAttempts] = useState(() => {
+    return parseInt(localStorage.getItem('carei_pin_fails') || '0', 10)
+  })
+  const [lockoutUntil, setLockoutUntil] = useState<number | null>(() => {
+    const raw = localStorage.getItem('carei_lockout')
+    return raw ? parseInt(raw, 10) : null
+  })
+
+  const isLockedOut = lockoutUntil ? Date.now() < lockoutUntil : false
+
   // Check biometric availability on mount
   useEffect(() => {
     if (getBiometricEnabled()) {
@@ -110,7 +125,7 @@ export default function LoginScreen() {
         return
       }
       triggerHaptic(HAPTIC_PATTERNS.success)
-      const token = localStorage.getItem('carei_token')
+      const token = getToken()
       if (!token) {
         setError('Session expired. Please log in with PIN.')
         setBioEnabled(false)
@@ -120,7 +135,9 @@ export default function LoginScreen() {
       const me = await getMe()
       if (me.user) {
         triggerHaptic(HAPTIC_PATTERNS.success)
-        localStorage.setItem('carei_user', JSON.stringify(me.user))
+        const userJson = JSON.stringify(me.user)
+        await secureSet('user', userJson)
+        setTokenCacheUser(userJson)
         setLocation('/select-tenant')
       } else {
         throw new Error('Invalid session')
@@ -159,6 +176,11 @@ export default function LoginScreen() {
   }
 
   const handleVerify = async (completedPin?: string) => {
+    if (isLockedOut) {
+      const mins = Math.ceil((lockoutUntil! - Date.now()) / 60000)
+      setError(`Too many failed attempts. Try again in ${mins} minute${mins > 1 ? 's' : ''}.`)
+      return
+    }
     const pinValue = completedPin || pin.join('')
     if (!validateEmail(email)) {
       setError('Please enter your email address.')
@@ -168,27 +190,52 @@ export default function LoginScreen() {
       setError('Please enter all 4 digits.')
       return
     }
-    
+
     setError('')
     setLoading(true)
-    
+
     try {
       const res = await loginUser({ email: email.trim().toLowerCase(), pin: pinValue })
       setLoading(false)
       if (res.user) {
         triggerHaptic(HAPTIC_PATTERNS.success)
-        localStorage.setItem('carei_user', JSON.stringify(res.user))
+        // Clear brute force counter on success
+        setFailedAttempts(0)
+        localStorage.removeItem('carei_pin_fails')
+        localStorage.removeItem('carei_lockout')
+        setLockoutUntil(null)
+        // Store user securely + cache
+        const userJson = JSON.stringify(res.user)
+        await secureSet('user', userJson)
+        setTokenCacheUser(userJson)
+        // Bind biometric to this login session
+        const sessionKey = crypto.randomUUID()
+        await secureSet('bio_session', sessionKey)
         setLocation('/select-tenant')
       } else {
         triggerHaptic(HAPTIC_PATTERNS.error)
+        recordFailedAttempt()
         setError('Invalid email or PIN.')
         setPin(['', '', '', ''])
       }
     } catch (err: any) {
       setLoading(false)
       triggerHaptic(HAPTIC_PATTERNS.error)
+      recordFailedAttempt()
       setError(err.message || 'Login failed. Please try again.')
       setPin(['', '', '', ''])
+    }
+  }
+
+  const recordFailedAttempt = () => {
+    const next = failedAttempts + 1
+    setFailedAttempts(next)
+    localStorage.setItem('carei_pin_fails', String(next))
+    if (next >= 5) {
+      const until = Date.now() + 15 * 60 * 1000
+      setLockoutUntil(until)
+      localStorage.setItem('carei_lockout', String(until))
+      setError('Too many failed attempts. Locked for 15 minutes.')
     }
   }
 
@@ -202,6 +249,12 @@ export default function LoginScreen() {
       return
     }
 
+    if (isLockedOut) {
+      const mins = Math.ceil((lockoutUntil! - Date.now()) / 60000)
+      setError(`Too many failed attempts. Try again in ${mins} minute${mins > 1 ? 's' : ''}.`)
+      return
+    }
+
     setError('')
     setLoading(true)
 
@@ -210,7 +263,11 @@ export default function LoginScreen() {
       setLoading(false)
       if (res.user) {
         triggerHaptic(HAPTIC_PATTERNS.success)
-        localStorage.setItem('carei_user', JSON.stringify(res.user))
+        const userJson = JSON.stringify(res.user)
+        await secureSet('user', userJson)
+        setTokenCacheUser(userJson)
+        const sessionKey = crypto.randomUUID()
+        await secureSet('bio_session', sessionKey)
         if (res.user.role === 'superadmin') {
           setLocation('/super-admin')
         } else {
@@ -218,12 +275,14 @@ export default function LoginScreen() {
         }
       } else {
         triggerHaptic(HAPTIC_PATTERNS.error)
+        recordFailedAttempt()
         setError('Invalid email or password.')
         setPassword('')
       }
     } catch (err: any) {
       setLoading(false)
       triggerHaptic(HAPTIC_PATTERNS.error)
+      recordFailedAttempt()
       setError(err.message || 'Login failed. Please try again.')
       setPassword('')
     }
@@ -320,12 +379,15 @@ export default function LoginScreen() {
         throw new Error(res?.message || 'Failed to reset PIN')
       }
       
-      // Store user data from response
+      // Store user data securely from response
       if (res?.token) {
-        localStorage.setItem('carei_token', res.token)
+        setToken(res.token)
+        await secureSet('token', res.token)
       }
       if (res?.user) {
-        localStorage.setItem('carei_user', JSON.stringify(res.user))
+        const userJson = JSON.stringify(res.user)
+        await secureSet('user', userJson)
+        setTokenCacheUser(userJson)
       }
       
       setLoading(false)
