@@ -41,10 +41,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         client: '—',
         since: u.created_at ? new Date(u.created_at).toLocaleDateString() : '—',
       }))
-      const visits = await safeQuery(sql, sql`SELECT * FROM visits WHERE tenant_id = ${tenantId} ORDER BY submitted_at DESC LIMIT 50`)
-      const alerts = await safeQuery(sql, sql`SELECT * FROM sos_alerts WHERE tenant_id = ${tenantId} AND resolved = FALSE ORDER BY timestamp DESC LIMIT 20`)
-      const incidents = await safeQuery(sql, sql`SELECT * FROM incidents WHERE tenant_id = ${tenantId} AND resolved = FALSE ORDER BY timestamp DESC LIMIT 50`)
-      const medications = await safeQuery(sql, sql`SELECT * FROM medication_logs WHERE tenant_id = ${tenantId} AND DATE(administered_at) = CURRENT_DATE ORDER BY administered_at DESC LIMIT 100`)
+
+      // Run independent queries in parallel for better performance
+      const [visits, alerts, incidents, medications] = await Promise.all([
+        safeQuery(sql, sql`SELECT * FROM visits WHERE tenant_id = ${tenantId} ORDER BY submitted_at DESC LIMIT 50`),
+        safeQuery(sql, sql`SELECT * FROM sos_alerts WHERE tenant_id = ${tenantId} AND resolved = FALSE ORDER BY timestamp DESC LIMIT 20`),
+        safeQuery(sql, sql`SELECT * FROM incidents WHERE tenant_id = ${tenantId} AND resolved = FALSE ORDER BY timestamp DESC LIMIT 50`),
+        safeQuery(sql, sql`SELECT * FROM medication_logs WHERE tenant_id = ${tenantId} AND DATE(administered_at) = CURRENT_DATE ORDER BY administered_at DESC LIMIT 100`),
+      ])
 
       res.status(200).json({
         carers,

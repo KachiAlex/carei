@@ -654,6 +654,20 @@ async function runMigrations() {
     await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS bp_baseline_diastolic INTEGER`
   })
 
+  await run(16, 'composite_indexes_for_tenant_queries', async () => {
+    // Composite indexes for the most common tenant-scoped queries
+    await sql`CREATE INDEX IF NOT EXISTS idx_visits_tenant_status ON visits(tenant_id, status)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_visits_tenant_submitted ON visits(tenant_id, submitted_at DESC)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_scheduled_visits_tenant_carer_date ON scheduled_visits(tenant_id, carer_id, visit_date)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_caregiver_assignments_tenant_caregiver ON caregiver_client_assignments(tenant_id, caregiver_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_incidents_tenant_resolved ON incidents(tenant_id, resolved)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_sos_alerts_tenant_resolved ON sos_alerts(tenant_id, resolved)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_task_logs_tenant_client ON task_logs(tenant_id, client_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_medication_logs_tenant_client ON medication_logs(tenant_id, client_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_body_map_marks_tenant_visit ON body_map_marks(tenant_id, visit_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_family_messages_tenant_client ON family_messages(tenant_id, client_id)`
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (

@@ -31,13 +31,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    const updates: string[] = []
-    if (name !== undefined) updates.push(`name = '${name.replace(/'/g, "''")}'`)
-    if (phone !== undefined) updates.push(`phone = '${phone.replace(/'/g, "''")}'`)
-    if (region !== undefined) updates.push(`region = '${region.replace(/'/g, "''")}'`)
-
-    // Use raw query since we need dynamic column updates — but sanitize inputs
-    await sql.query(`UPDATE users SET ${updates.join(', ')}, updated_at = NOW() WHERE id = '${user.id}'`)
+    // Use separate parameterized updates for each field to avoid raw SQL
+    if (name !== undefined) {
+      await sql`UPDATE users SET name = ${name}, updated_at = NOW() WHERE id = ${user.id}`
+    }
+    if (phone !== undefined) {
+      await sql`UPDATE users SET phone = ${phone}, updated_at = NOW() WHERE id = ${user.id}`
+    }
+    if (region !== undefined) {
+      await sql`UPDATE users SET region = ${region}, updated_at = NOW() WHERE id = ${user.id}`
+    }
 
     res.status(200).json({
       status: 'updated',
