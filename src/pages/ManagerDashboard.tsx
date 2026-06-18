@@ -84,14 +84,12 @@ export default function ManagerDashboard() {
   const [scheduleInstructions, setScheduleInstructions] = useState('')
   const [scheduleMsg, setScheduleMsg] = useState('')
   const [assignmentsList, setAssignmentsList] = useState<any[]>([])
-  const [scheduleClients, setScheduleClients] = useState<any[]>([])
   const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null)
   const [editAssignDate, setEditAssignDate] = useState('')
   const [editAssignTime, setEditAssignTime] = useState('')
   const [editAssignInstructions, setEditAssignInstructions] = useState('')
 
   // Logs tab state
-  const [logsClients, setLogsClients] = useState<any[]>([])
   const [logsList, setLogsList] = useState<any[]>([])
   const [logsSelectedClient, setLogsSelectedClient] = useState('')
 
@@ -155,11 +153,10 @@ export default function ManagerDashboard() {
 
   useEffect(() => {
     getAssignments().then((res) => setAssignmentsList(res.assignments || [])).catch((err: any) => { console.error(err.message) })
-    getClients().then((rows) => setScheduleClients(rows)).catch((err: any) => { console.error(err.message) })
   }, [scheduleMsg])
 
   useEffect(() => {
-    getClients().then((rows) => setLogsClients(rows)).catch((err: any) => { console.error(err.message) })
+    // logs tab uses shared clientsList
   }, [])
 
   const allIncidents = [
@@ -888,7 +885,7 @@ export default function ManagerDashboard() {
           </select>
           <select value={scheduleClientId} onChange={(e) => setScheduleClientId(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
             <option value="">Select client</option>
-            {scheduleClients.map((c: any) => (
+            {clientsList.map((c: any) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
@@ -1006,7 +1003,7 @@ export default function ManagerDashboard() {
           className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white"
         >
           <option value="">Select a client to view logs</option>
-          {logsClients.map((c: any) => (
+          {clientsList.map((c: any) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
