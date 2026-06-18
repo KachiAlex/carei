@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useSearch } from 'wouter'
 import { motion } from 'framer-motion'
+import { API_BASE } from '../api/client'
 
 interface InviteDetails {
   valid: boolean
@@ -9,8 +10,6 @@ interface InviteDetails {
   role: string
   email: string
 }
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 export default function AcceptInviteScreen() {
   const [, setLocation] = useLocation()
@@ -39,7 +38,7 @@ export default function AcceptInviteScreen() {
       setIsVerifying(true)
       setError(null)
 
-      const res = await fetch(`${API_URL}/invites?code=${code}`)
+      const res = await fetch(`${API_BASE}/invites?code=${code}`)
       const data = await res.json()
 
       if (!res.ok) {
@@ -67,7 +66,7 @@ export default function AcceptInviteScreen() {
       setIsLoading(true)
       setError(null)
 
-      const res = await fetch(`${API_URL}/invites`, {
+      const res = await fetch(`${API_BASE}/invites`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useLocation, useSearch } from 'wouter'
 import { motion } from 'framer-motion'
 import { useTenant } from '../contexts/TenantContext'
+import { API_BASE } from '../api/client'
 
 interface Member {
   id: string
@@ -22,8 +23,6 @@ interface Invite {
   used: boolean
   createdAt: string
 }
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 export default function TenantMembersScreen() {
   const [, setLocation] = useLocation()
@@ -58,7 +57,7 @@ export default function TenantMembersScreen() {
     if (!token || !tenantSlug) return
 
     try {
-      const res = await fetch(`${API_URL}/tenants?members=${encodeURIComponent(tenantSlug)}`, {
+      const res = await fetch(`${API_BASE}/tenants?members=${encodeURIComponent(tenantSlug)}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to fetch members')
@@ -85,7 +84,7 @@ export default function TenantMembersScreen() {
     if (!token || currentUserRole !== 'admin') return
 
     try {
-      const res = await fetch(`${API_URL}/invites?tenantSlug=${tenantSlug}`, {
+      const res = await fetch(`${API_BASE}/invites?tenantSlug=${tenantSlug}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       })
       if (!res.ok) throw new Error('Failed to fetch invites')
@@ -106,7 +105,7 @@ export default function TenantMembersScreen() {
 
     try {
       const token = localStorage.getItem('carei_token')
-      const res = await fetch(`${API_URL}/invites`, {
+      const res = await fetch(`${API_BASE}/invites`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -139,7 +138,7 @@ export default function TenantMembersScreen() {
   const cancelInvite = async (inviteId: string) => {
     const token = localStorage.getItem('carei_token')
     try {
-      const res = await fetch(`${API_URL}/invites?id=${inviteId}`, {
+      const res = await fetch(`${API_BASE}/invites?id=${inviteId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       })

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import { useRoute, useLocation } from 'wouter'
+import { API_BASE } from '../api/client'
 
 interface Tenant {
   id: string
@@ -18,8 +19,6 @@ interface TenantContextType {
 }
 
 const TenantContext = createContext<TenantContextType | undefined>(undefined)
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 export function TenantProvider({ children }: { children: ReactNode }) {
   const [currentTenant, setCurrentTenantState] = useState<Tenant | null>(null)
@@ -49,7 +48,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       if (!forceFresh) {
         // Try /auth/me first — it returns tenants along with user profile
         try {
-          const meRes = await fetch(`${API_URL}/auth/me`, {
+          const meRes = await fetch(`${API_BASE}/auth/me`, {
             headers: { 'Authorization': `Bearer ${token}` }
           })
           if (meRes.ok) {
@@ -61,7 +60,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
       // If /auth/me didn't return tenants or forceFresh is true, call /tenants
       if (userTenants.length === 0) {
-        const res = await fetch(`${API_URL}/tenants`, {
+        const res = await fetch(`${API_BASE}/tenants`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
 

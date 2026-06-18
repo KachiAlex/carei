@@ -15,7 +15,7 @@ function getApiBase(): string {
   return '/api'
 }
 
-const API_BASE = getApiBase()
+export const API_BASE = getApiBase()
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
 function handleAuthError(status: number) {

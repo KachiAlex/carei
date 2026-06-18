@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { motion } from 'framer-motion'
+import { API_BASE } from '../api/client'
 
 interface Tenant {
   id: string
@@ -8,8 +9,6 @@ interface Tenant {
   name: string
   role: string
 }
-
-const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 export default function TenantSelectScreen() {
   const [, setLocation] = useLocation()
@@ -34,7 +33,7 @@ export default function TenantSelectScreen() {
 
     try {
       setIsLoading(true)
-      const res = await fetch(`${API_URL}/tenants`, {
+      const res = await fetch(`${API_BASE}/tenants`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
 
@@ -96,7 +95,7 @@ export default function TenantSelectScreen() {
 
     try {
       setIsCreating(true)
-      const res = await fetch(`${API_URL}/tenants`, {
+      const res = await fetch(`${API_BASE}/tenants`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
