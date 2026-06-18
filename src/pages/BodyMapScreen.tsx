@@ -87,6 +87,8 @@ export default function BodyMapScreen() {
   const [comparisonMode, setComparisonMode] = useState(false)
   const [compareVisitId, setCompareVisitId] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [savingMark, setSavingMark] = useState(false)
+  const [markError, setMarkError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadMarks() {
@@ -146,7 +148,9 @@ export default function BodyMapScreen() {
   }
 
   const addMark = async () => {
-    if (!selectedZone) return
+    if (!selectedZone || savingMark) return
+    setSavingMark(true)
+    setMarkError(null)
     try {
       const zone = BODY_ZONES[side].find(z => z.id === selectedZone)
       const res = await saveBodyMapMark({
@@ -174,9 +178,14 @@ export default function BodyMapScreen() {
         setShowMarkForm(false)
         setSelectedZone(null)
         setPhotoPreview(null)
+        setMarkNote('')
+      } else {
+        setMarkError('Failed to save mark. Please try again.')
       }
-    } catch (err) {
-      console.error('Failed to save body map mark:', err)
+    } catch (err: any) {
+      setMarkError(err.message || 'Failed to save mark. Check your connection and try again.')
+    } finally {
+      setSavingMark(false)
     }
   }
 
@@ -366,12 +375,16 @@ export default function BodyMapScreen() {
 
       {/* Phase 5: Enhanced Mark Form Modal with category selector and photo capture */}
       {showMarkForm && (
-        <div className="absolute inset-0 bg-black/40 flex items-end justify-center z-50" onClick={() => setShowMarkForm(false)}>
+        <div
+          className="absolute inset-0 bg-black/40 flex items-end justify-center z-50"
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) setShowMarkForm(false)
+          }}
+        >
           <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
             className="bg-white rounded-t-2xl p-5 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
           >
             <h3 className="font-bold text-sm text-slate-800 mb-3">Add Body Mark</h3>
             
@@ -403,6 +416,13 @@ export default function BodyMapScreen() {
               className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors mb-3"
               rows={2}
             />
+
+            {/* Error message */}
+            {markError && (
+              <div className="mb-3 p-3 rounded-xl text-xs font-semibold" style={{ background: 'rgba(255,90,95,0.1)', color: COLORS.red }}>
+                {markError}
+              </div>
+            )}
 
             {/* Photo Capture */}
             <div className="mb-3">
@@ -438,11 +458,13 @@ export default function BodyMapScreen() {
             </div>
 
             <button
+              type="button"
               onClick={addMark}
-              className="w-full py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+              disabled={savingMark}
+              className="w-full py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
             >
-              Save Mark
+              {savingMark ? 'Saving...' : 'Save Mark'}
             </button>
           </motion.div>
         </div>
@@ -450,12 +472,16 @@ export default function BodyMapScreen() {
 
       {/* Phase 5: Enhanced Selected Mark Detail with photo */}
       {selectedMark && (
-        <div className="absolute inset-0 bg-black/40 flex items-end justify-center z-50" onClick={() => setSelectedMark(null)}>
+        <div
+          className="absolute inset-0 bg-black/40 flex items-end justify-center z-50"
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) setSelectedMark(null)
+          }}
+        >
           <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
             className="bg-white rounded-t-2xl p-5 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-2 mb-3">
               <span className="text-lg">{MARK_CATEGORIES[selectedMark.type]?.icon || '🔴'}</span>
@@ -493,12 +519,16 @@ export default function BodyMapScreen() {
 
       {/* History Timeline Modal */}
       {showHistory && (
-        <div className="absolute inset-0 bg-black/40 flex items-end justify-center z-50" onClick={() => setShowHistory(false)}>
+        <div
+          className="absolute inset-0 bg-black/40 flex items-end justify-center z-50"
+          onPointerDown={(e) => {
+            if (e.target === e.currentTarget) setShowHistory(false)
+          }}
+        >
           <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
             className="bg-white rounded-t-2xl p-5 w-full max-w-md max-h-[80vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-sm text-slate-800">Mark History</h3>
