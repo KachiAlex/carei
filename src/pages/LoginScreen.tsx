@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { loginUser, loginWithPassword, sendOtp, verifyOtp, resetPin } from '../api/client'
 
@@ -79,6 +79,24 @@ export default function LoginScreen() {
   const [resetSuccess, setResetSuccess] = useState(false)
   const [isSuperAdminMode, setIsSuperAdminMode] = useState(false)
   const [password, setPassword] = useState('')
+
+  // Hidden keyboard shortcut to toggle superadmin mode: Ctrl+Shift+A
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault()
+        setIsSuperAdminMode(prev => {
+          const next = !prev
+          setError('')
+          setPassword('')
+          setPin(['', '', '', ''])
+          return next
+        })
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   const handlePinChange = (idx: number, val: string) => {
     const next = [...pin]
@@ -282,30 +300,6 @@ export default function LoginScreen() {
             <h1 className="font-serif text-white text-2xl mb-2">CARE<span style={{ color: COLORS.teal }}>i</span></h1>
             <h2 className="font-serif text-white text-xl">Welcome back</h2>
             <p className="text-white/50 text-sm mt-2">{isSuperAdminMode ? 'Super Admin Login' : 'Carer Login'}</p>
-          </div>
-
-          {/* Mode Toggle */}
-          <div className="flex mb-6 bg-white/5 rounded-xl p-1">
-            <button
-              onClick={() => { setIsSuperAdminMode(false); setError(''); setPassword(''); setPin(['', '', '', '']) }}
-              className="flex-1 py-2 rounded-lg text-sm font-medium border-none cursor-pointer transition-all"
-              style={{
-                background: !isSuperAdminMode ? COLORS.teal : 'transparent',
-                color: !isSuperAdminMode ? COLORS.darkNavy : 'rgba(255,255,255,0.5)',
-              }}
-            >
-              Carer
-            </button>
-            <button
-              onClick={() => { setIsSuperAdminMode(true); setError(''); setPassword(''); setPin(['', '', '', '']) }}
-              className="flex-1 py-2 rounded-lg text-sm font-medium border-none cursor-pointer transition-all"
-              style={{
-                background: isSuperAdminMode ? COLORS.teal : 'transparent',
-                color: isSuperAdminMode ? COLORS.darkNavy : 'rgba(255,255,255,0.5)',
-              }}
-            >
-              Super Admin
-            </button>
           </div>
 
           <form
