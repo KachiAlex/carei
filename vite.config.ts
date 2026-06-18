@@ -3,6 +3,7 @@ import { fileURLToPath } from 'url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { VitePWA } from 'vite-plugin-pwa'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -24,7 +25,25 @@ function moduleLogger() {
 }
 
 export default defineConfig({
-  plugins: [moduleLogger(), react(), tailwindcss()],
+  plugins: [
+    moduleLogger(),
+    react(),
+    tailwindcss(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/carei-app\.vercel\.app\/api\//,
+            handler: 'NetworkFirst',
+            options: { cacheName: 'api-cache', expiration: { maxEntries: 100, maxAgeSeconds: 86400 } },
+          },
+        ],
+      },
+      manifest: false, // Use existing public/manifest.json
+    }),
+  ],
   logLevel: 'info',
   server: {
     proxy: {

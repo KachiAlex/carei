@@ -16,7 +16,9 @@ import {
 } from '../api/client'
 import { enqueue } from '../utils/offlineQueue'
 import BiometricsPrompt from '../components/BiometricsPrompt'
+import PullToRefresh from '../components/PullToRefresh'
 import { sendVisitStartReminder, requestNotificationPermission } from '../utils/notifications'
+import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -104,13 +106,14 @@ export default function CarerDashboard() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
+  const refreshData = async () => {
+    setLoading(true)
     const token = localStorage.getItem('carei_token')
     if (!token) {
       setLocation('/login')
       return
     }
-    Promise.all([
+    await Promise.all([
       getVisits().then((data) => {
         setVisits(data.visits || [])
         requestNotificationPermission().then(() => {
@@ -123,7 +126,6 @@ export default function CarerDashboard() {
       getCaregiverClients().then((data) => {
         const clients = data.clients || []
         setAssignedClients(clients)
-        // Load tasks for each client
         clients.forEach((client: any) => {
           getCaregiverTasks(client.id)
             .then((res) => {
@@ -133,6 +135,10 @@ export default function CarerDashboard() {
         })
       }).catch(() => {}),
     ]).finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    refreshData()
   }, [])
 
   const stats = useMemo(() => {
@@ -170,6 +176,7 @@ export default function CarerDashboard() {
   }
 
   const handleSOS = () => {
+    triggerHaptic(HAPTIC_PATTERNS.sos)
     setShowSOSConfirm(true)
     setTimeout(() => setShowSOSConfirm(false), 15000)
   }
@@ -340,12 +347,13 @@ export default function CarerDashboard() {
       </div>
 
       {/* Visit List */}
-      <div className="flex-1 px-4 py-5 overflow-auto">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-sm font-bold text-slate-800">Scheduled Visits</h2>
-            <p className="text-[11px] text-slate-400">{visits.length} visits today</p>
-          </div>
+      <PullToRefresh onRefresh={refreshData}>
+        <div className="flex-1 px-4 py-5 overflow-auto">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">Scheduled Visits</h2>
+              <p className="text-[11px] text-slate-400">{visits.length} visits today</p>
+            </div>
           <div className="flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>
             <span className="w-1.5 h-1.5 rounded-full" style={{ background: COLORS.teal }} />
             Live
@@ -552,6 +560,7 @@ export default function CarerDashboard() {
           ))}
         </motion.div>
       </div>
+      </PullToRefresh>
 
       {/* My Clients Section */}
       <div className="flex-1 px-4 py-5 overflow-auto border-t border-slate-100">
@@ -697,7 +706,7 @@ export default function CarerDashboard() {
       {/* Log Note Modal */}
       {showLogModal && selectedClient && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-5 max-w-sm w-full">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-2xl p-5 max-w-sm w-full overscroll-y-contain" style={{ overscrollBehavior: 'contain' }}>
             <h3 className="font-bold text-slate-800 mb-3">Add Log Note</h3>
             <input
               value={logTaskName}
@@ -784,7 +793,7 @@ export default function CarerDashboard() {
       {/* Profile Modal */}
       {showProfile && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6" onClick={() => setShowProfile(false)}>
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full overscroll-y-contain" style={{ overscrollBehavior: 'contain' }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-4 mb-5">
               <div className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
                 {user ? getInitials(user.name) : 'C'}
@@ -836,7 +845,7 @@ export default function CarerDashboard() {
       {/* SOS Confirmation Modal */}
       {showSOSConfirm && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center overscroll-y-contain" style={{ overscrollBehavior: 'contain' }}>
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
               style={{ background: 'rgba(255,90,95,0.1)' }}

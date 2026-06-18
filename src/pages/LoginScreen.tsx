@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { loginUser, loginWithPassword, sendOtp, verifyOtp, resetPin, getMe } from '../api/client'
 import { isBiometricAvailable, verifyBiometric, getBiometricEnabled } from '../utils/biometric'
+import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -18,13 +19,16 @@ function validateEmail(email: string): boolean {
 }
 
 // PIN digit boxes component with auto-submit
-function PinBoxes({ pin, onChange, onComplete, type = 'password' }: { pin: string[]; onChange: (i: number, val: string) => void; onComplete?: (value: string) => void; type?: 'password' | 'text' }) {
+function PinBoxes({ pin, onChange, onComplete }: { pin: string[]; onChange: (i: number, val: string) => void; onComplete?: (value: string) => void }) {
   const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)]
 
   const handleChange = (i: number, val: string) => {
     const digit = val.replace(/\D/g, '').slice(0, 1)
     if (digit || val === '') {
       onChange(i, digit)
+      if (digit) {
+        triggerHaptic(HAPTIC_PATTERNS.tap)
+      }
       if (digit && i < 3) {
         refs[i + 1].current?.focus()
       } else if (digit && i === 3 && onComplete) {
@@ -49,10 +53,11 @@ function PinBoxes({ pin, onChange, onComplete, type = 'password' }: { pin: strin
         <input
           key={i}
           ref={refs[i]}
-          type={type === 'password' ? 'password' : 'text'}
+          type="tel"
           inputMode="numeric"
+          pattern="[0-9]*"
           maxLength={1}
-          value={type === 'password' ? (digit ? '●' : '') : digit}
+          value={digit}
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           className="w-14 h-16 rounded-xl text-center text-2xl font-bold outline-none transition-all"
@@ -100,9 +105,11 @@ export default function LoginScreen() {
     try {
       const success = await verifyBiometric()
       if (!success) {
+        triggerHaptic(HAPTIC_PATTERNS.error)
         setLoading(false)
         return
       }
+      triggerHaptic(HAPTIC_PATTERNS.success)
       const token = localStorage.getItem('carei_token')
       if (!token) {
         setError('Session expired. Please log in with PIN.')
@@ -112,6 +119,7 @@ export default function LoginScreen() {
       }
       const me = await getMe()
       if (me.user) {
+        triggerHaptic(HAPTIC_PATTERNS.success)
         localStorage.setItem('carei_user', JSON.stringify(me.user))
         setLocation('/select-tenant')
       } else {
@@ -119,6 +127,7 @@ export default function LoginScreen() {
       }
     } catch (err: any) {
       setLoading(false)
+      triggerHaptic(HAPTIC_PATTERNS.error)
       setError(err.message || 'Biometric unlock failed. Please use PIN.')
       setBioEnabled(false)
     }
@@ -167,14 +176,17 @@ export default function LoginScreen() {
       const res = await loginUser({ email: email.trim().toLowerCase(), pin: pinValue })
       setLoading(false)
       if (res.user) {
+        triggerHaptic(HAPTIC_PATTERNS.success)
         localStorage.setItem('carei_user', JSON.stringify(res.user))
         setLocation('/select-tenant')
       } else {
+        triggerHaptic(HAPTIC_PATTERNS.error)
         setError('Invalid email or PIN.')
         setPin(['', '', '', ''])
       }
     } catch (err: any) {
       setLoading(false)
+      triggerHaptic(HAPTIC_PATTERNS.error)
       setError(err.message || 'Login failed. Please try again.')
       setPin(['', '', '', ''])
     }
@@ -197,6 +209,7 @@ export default function LoginScreen() {
       const res = await loginWithPassword({ email: email.trim().toLowerCase(), password })
       setLoading(false)
       if (res.user) {
+        triggerHaptic(HAPTIC_PATTERNS.success)
         localStorage.setItem('carei_user', JSON.stringify(res.user))
         if (res.user.role === 'superadmin') {
           setLocation('/super-admin')
@@ -204,11 +217,13 @@ export default function LoginScreen() {
           setLocation('/select-tenant')
         }
       } else {
+        triggerHaptic(HAPTIC_PATTERNS.error)
         setError('Invalid email or password.')
         setPassword('')
       }
     } catch (err: any) {
       setLoading(false)
+      triggerHaptic(HAPTIC_PATTERNS.error)
       setError(err.message || 'Login failed. Please try again.')
       setPassword('')
     }
@@ -594,30 +609,28 @@ export default function LoginScreen() {
               {/* New PIN */}
               <div className="mb-4">
                 <label className="block text-white/70 text-sm mb-4 font-medium">New 4-digit PIN</label>
-                <PinBoxes 
-                  pin={newPin} 
+                <PinBoxes
+                  pin={newPin}
                   onChange={(i, val) => {
                     const next = [...newPin]
                     next[i] = val
                     setNewPin(next)
                     setError('')
                   }}
-                  type="text"
                 />
               </div>
 
               {/* Confirm PIN */}
               <div className="mb-6">
                 <label className="block text-white/70 text-sm mb-4 font-medium">Confirm new PIN</label>
-                <PinBoxes 
-                  pin={confirmNewPin} 
+                <PinBoxes
+                  pin={confirmNewPin}
                   onChange={(i, val) => {
                     const next = [...confirmNewPin]
                     next[i] = val
                     setConfirmNewPin(next)
                     setError('')
                   }}
-                  type="text"
                 />
               </div>
 

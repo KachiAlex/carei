@@ -1,7 +1,19 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Route, Router, Switch } from 'wouter'
 import { useOnlineSync } from './hooks/useOnlineSync'
 import { TenantProvider } from './contexts/TenantContext'
+
+function useReducedMotion() {
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const apply = () => {
+      document.documentElement.classList.toggle('reduce-motion', mq.matches)
+    }
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
+}
 
 const SplashScreen = lazy(() => import('./pages/SplashScreen'))
 const LoginScreen = lazy(() => import('./pages/LoginScreen'))
@@ -99,6 +111,7 @@ function TenantRoutes() {
 }
 
 function App() {
+  useReducedMotion()
   useOnlineSync()
   return (
     <Router>

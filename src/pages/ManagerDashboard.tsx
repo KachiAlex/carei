@@ -1062,7 +1062,7 @@ export default function ManagerDashboard() {
             </span>
             <button
               onClick={() => tenantSlug && setLocation(`/tenant/${tenantSlug}/manager/clients`)}
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
+              className="w-12 h-12 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
               title="Client Management"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1072,7 +1072,7 @@ export default function ManagerDashboard() {
             </button>
             <button
               onClick={() => tenantSlug && setLocation(`/tenant/${tenantSlug}/manager/schedule`)}
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
+              className="w-12 h-12 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
               title="Visit Scheduling"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1084,7 +1084,7 @@ export default function ManagerDashboard() {
             </button>
             <button
               onClick={() => tenantSlug && setLocation(`/tenant/${tenantSlug}/settings`)}
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
+              className="w-12 h-12 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
               title="Settings"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1098,7 +1098,7 @@ export default function ManagerDashboard() {
                 localStorage.removeItem('carei_current_tenant')
                 setLocation('/login')
               }}
-              className="w-11 h-11 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
+              className="w-12 h-12 rounded-xl flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all bg-transparent border-none cursor-pointer touch-target shrink-0"
               title="Log out"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
