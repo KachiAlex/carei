@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useRoute } from 'wouter'
+import { getFamilyVisits } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -12,13 +13,13 @@ const COLORS = {
 
 interface VisitSummary {
   id: string
-  submitted_at: string
+  submittedAt: string
   clientName: string
   elapsed: number
   mood?: string
   nutritionNote?: string
   notes?: string
-  approval_status?: string
+  approvalStatus?: string
 }
 
 export default function FamilySummaryScreen() {
@@ -26,19 +27,26 @@ export default function FamilySummaryScreen() {
   const [match, params] = useRoute('/family-summary/:id')
   const clientId = params?.id || ''
   const [visits, setVisits] = useState<VisitSummary[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const saved = localStorage.getItem('carei_visits')
-    if (saved) {
-      try {
-        const all = JSON.parse(saved)
-        const filtered = (Array.isArray(all) ? all : []).filter((v: any) =>
-          v.clientId === clientId && (v.approval_status === 'released' || v.approval_status === 'approved')
-        )
-        setVisits(filtered)
-      } catch { /* ignore */ }
-    }
+    if (!clientId) return
+    loadVisits()
   }, [clientId])
+
+  const loadVisits = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getFamilyVisits(clientId)
+      setVisits(Array.isArray(data) ? data : (data.visits || []))
+    } catch (err: any) {
+      setError(err.message || 'Failed to load visit summaries')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -51,17 +59,27 @@ export default function FamilySummaryScreen() {
         <p className="text-white/50 text-sm">Approved visit reports</p>
       </div>
 
+      {error && (
+        <div className="mx-4 mt-3 p-3 rounded-xl text-xs font-semibold" style={{ background: 'rgba(255,90,95,0.1)', color: COLORS.red }}>
+          {error}
+        </div>
+      )}
       <div className="flex-1 px-4 py-4 overflow-auto flex flex-col gap-3">
-        {visits.length === 0 && (
+        {loading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-8 h-8 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        {!loading && visits.length === 0 && (
           <div className="text-center text-sm text-slate-400 py-8">No approved visits available for this client.</div>
         )}
         {visits.map((v) => {
-          const date = v.submitted_at ? new Date(v.submitted_at) : new Date()
+          const date = v.submittedAt ? new Date(v.submittedAt) : new Date()
           return (
             <div key={v.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-bold text-slate-800">{date.toLocaleDateString('en-GB')}</span>
-                {v.approval_status === 'released' && (
+                {v.approvalStatus === 'released' && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Released</span>
                 )}
               </div>

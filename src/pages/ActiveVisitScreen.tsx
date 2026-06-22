@@ -5,6 +5,7 @@ import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
 import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft, getDrugInteractions, logMedication, getMedicationLogs, reportIncident, saveVoiceMemo } from '../api/client'
+import { checkAllergy, checkMedicationOnList, checkDuplicateDose, checkTimeWindow, SAFETY_RULE_VERSION } from '../utils/safetyRules'
 import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
 
 const COLORS = {
@@ -128,6 +129,8 @@ export default function ActiveVisitScreen() {
 
   // Phase 4: Privacy Overlay
   const [privacyMode, setPrivacyMode] = useState(false)
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null)
+  const SYNC_STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000 // 24 hours
 
   // Phase 4: Post-Medication Monitoring Timer (e.g., for Metformin nausea monitoring)
   const [postMedTimers, setPostMedTimers] = useState<Record<string, number>>({})
@@ -151,7 +154,10 @@ export default function ActiveVisitScreen() {
 
         if (!mounted) return
         if (v && v.id) setVisit(v)
-        if (c) setClient(c)
+        if (c) {
+          setClient(c)
+          setLastSyncedAt(Date.now())
+        }
 
         // Initialize tasks and meds from scheduled visit / client
         if (v?.tasks && Array.isArray(v.tasks)) {
@@ -421,7 +427,57 @@ export default function ActiveVisitScreen() {
   const confirmMedAdmin = async () => {
     if (!selectedMedForAdmin || !client?.id) return
 
-    // Overdose safeguard: check if already given today
+    const med = meds.find((m) => m.name === selectedMedForAdmin)
+    const [hours, minutes] = adminTime.split(':').map(Number)
+    const administeredAt = new Date()
+    administeredAt.setHours(hours, minutes, 0, 0)
+
+    // ─── Offline Safety Checks (warn-do-not-decide) ───
+
+    // 1. Allergy check
+    const allergyResult = checkAllergy(selectedMedForAdmin, client.allergies)
+    if (!allergyResult.hasAllergyInfo) {
+      if (!window.confirm(`No allergy information recorded for this client. Proceed with caution?`)) {
+        setShowMedAdmin(false)
+        return
+      }
+    } else if (allergyResult.matches.length > 0) {
+      if (!window.confirm(`${allergyResult.message}\n\nDo you want to proceed?`)) {
+        setShowMedAdmin(false)
+        return
+      }
+    }
+
+    // 2. Medication on client's list check
+    const medList = client.medications as Array<{ name: string }> | undefined
+    const onListResult = checkMedicationOnList(selectedMedForAdmin, medList)
+    if (!onListResult.onList) {
+      if (!window.confirm(`${onListResult.message}\n\nDo you want to proceed?`)) {
+        setShowMedAdmin(false)
+        return
+      }
+    }
+
+    // 3. Duplicate dose check (uses precise time window from safety rules)
+    const lastAdminTime = med?.administeredAt
+    const dupResult = checkDuplicateDose(selectedMedForAdmin, lastAdminTime)
+    if (dupResult.isDuplicate) {
+      if (!window.confirm(`${dupResult.message}\n\nDo you want to proceed?`)) {
+        setShowMedAdmin(false)
+        return
+      }
+    }
+
+    // 4. Time window check
+    const timeResult = checkTimeWindow(selectedMedForAdmin, med?.dueTime)
+    if (timeResult.outsideWindow) {
+      if (!window.confirm(`${timeResult.message}\n\nDo you want to proceed?`)) {
+        setShowMedAdmin(false)
+        return
+      }
+    }
+
+    // 5. Overdose safeguard: check if already given today
     if (medsGivenToday.has(selectedMedForAdmin)) {
       if (!window.confirm(`⚠️ ${selectedMedForAdmin} has already been logged as given today. Confirm you want to log it again?`)) {
         setShowMedAdmin(false)
@@ -429,12 +485,7 @@ export default function ActiveVisitScreen() {
       }
     }
 
-    const [hours, minutes] = adminTime.split(':').map(Number)
-    const administeredAt = new Date()
-    administeredAt.setHours(hours, minutes, 0, 0)
-
     // Two-person sign-off for controlled meds
-    const med = meds.find((m) => m.name === selectedMedForAdmin)
     if (med?.isControlled && !witnessName.trim()) {
       alert('Controlled medication requires a witness name. Please enter the witness name.')
       return
@@ -1064,9 +1115,54 @@ export default function ActiveVisitScreen() {
             <span>Red</span>
           </div>
         </div>
+
+        {/* Sync Freshness Indicator */}
+        {lastSyncedAt && (
+          <div className="relative z-10 mt-2">
+            <div className="flex items-center gap-1.5 text-[10px]"
+              style={{
+                color: Date.now() - lastSyncedAt > SYNC_STALE_THRESHOLD_MS ? COLORS.amber : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/>
+              </svg>
+              <span>
+                Information last updated: {new Date(lastSyncedAt).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}
+              </span>
+              {Date.now() - lastSyncedAt > SYNC_STALE_THRESHOLD_MS && (
+                <span className="ml-1 font-semibold">· Sync recommended</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 px-4 py-4 overflow-auto">
+        {/* Missing Information Prompts */}
+        {client && (
+          <div className="mb-3 space-y-2">
+            {(!client.allergies || client.allergies.trim() === '') && (
+              <div className="flex items-center gap-2 p-3 rounded-xl text-xs" style={{ background: 'rgba(246,183,60,0.08)', color: COLORS.amber, border: `1px solid ${COLORS.amber}25` }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                <span className="font-semibold">No allergy information recorded</span>
+              </div>
+            )}
+            {(!client.medications || client.medications.length === 0) && (
+              <div className="flex items-center gap-2 p-3 rounded-xl text-xs" style={{ background: 'rgba(246,183,60,0.08)', color: COLORS.amber, border: `1px solid ${COLORS.amber}25` }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                <span className="font-semibold">No care plan / medications downloaded</span>
+              </div>
+            )}
+            {(!client.conditions || client.conditions.length === 0) && (
+              <div className="flex items-center gap-2 p-3 rounded-xl text-xs" style={{ background: 'rgba(148,163,184,0.08)', color: '#64748b', border: '1px solid rgba(148,163,184,0.2)' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>
+                <span className="font-semibold">Key client information incomplete (no conditions recorded)</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Phase 4: Drug Interaction Alert */}
         {drugInteractions.length > 0 && (
           <motion.div

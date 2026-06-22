@@ -662,6 +662,19 @@ export async function getVisitApprovals(status?: string) {
   return get(`/visit-approvals${qs}`)
 }
 
+export async function getFamilyVisits(clientId: string) {
+  return get(`/family-visits?clientId=${clientId}`)
+}
+
+export function exportAuditLogsUrl(params: { from?: string; to?: string; action?: string }) {
+  const qs = new URLSearchParams()
+  qs.append('format', 'csv')
+  if (params.from) qs.append('from', params.from)
+  if (params.to) qs.append('to', params.to)
+  if (params.action) qs.append('action', params.action)
+  return `/api/audit-logs?${qs.toString()}`
+}
+
 export async function updateVisitApproval(data: {
   visitId: string
   approvalStatus?: string

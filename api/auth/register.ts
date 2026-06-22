@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug } from '../db.js'
+import { hashCredential } from '../hash.js'
 
 function generateToken(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
@@ -22,13 +23,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const token = generateToken()
+  const pinHash = await hashCredential(pin)
 
   try {
     await ensureTables()
     const sql = getSql()
     await sql`
-      INSERT INTO users (id, name, email, phone, region, pin, role, token)
-      VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role}, ${token})
+      INSERT INTO users (id, name, email, phone, region, pin, pin_hash, role, token)
+      VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${pinHash}, ${role}, ${token})
     `
 
     // Auto-link user to the carei tenant so they can access tenant-scoped endpoints

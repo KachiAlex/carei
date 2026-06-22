@@ -1,6 +1,24 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, withTenant, getTenantSlug } from './db.js'
 
+async function carerCanAccessClient(sql: any, tenantId: string, carerId: string, clientId: string): Promise<boolean> {
+  // Check scheduled visits (today or future)
+  const visits = await sql`
+    SELECT 1 FROM scheduled_visits
+    WHERE tenant_id = ${tenantId} AND carer_id = ${carerId} AND client_id = ${clientId} AND visit_date >= CURRENT_DATE
+    LIMIT 1
+  ` as any[]
+  if (visits.length > 0) return true
+
+  // Check caregiver-client assignments
+  const assignments = await sql`
+    SELECT 1 FROM caregiver_client_assignments
+    WHERE tenant_id = ${tenantId} AND caregiver_id = ${carerId} AND client_id = ${clientId}
+    LIMIT 1
+  ` as any[]
+  return assignments.length > 0
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
@@ -10,9 +28,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // If tenant slug is provided, use tenant-aware filtering
   if (tenantSlug) {
-    await withTenant(req, res, async ({ tenantId, sql }) => {
+    await withTenant(req, res, async ({ tenantId, userId, role, sql }) => {
+      const isManager = role === 'manager' || role === 'admin'
+
       if (req.method === 'GET') {
         if (id) {
+          // Need-to-know: carer can only access clients they are assigned to
+          if (!isManager) {
+            const allowed = await carerCanAccessClient(sql, tenantId, userId, id)
+            if (!allowed) {
+              res.status(403).json({ error: 'You are not assigned to this client' })
+              return
+            }
+          }
+
           const rows = await sql`SELECT * FROM clients WHERE id = ${id} AND tenant_id = ${tenantId}`
           if (!rows[0]) {
             res.status(404).json({ error: 'Client not found' })
@@ -38,7 +67,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return
         }
         // List all clients for this tenant
-        const rows = await sql`SELECT * FROM clients WHERE tenant_id = ${tenantId} ORDER BY name`
+        let rows: any[]
+        if (isManager) {
+          rows = await sql`SELECT * FROM clients WHERE tenant_id = ${tenantId} ORDER BY name`
+        } else {
+          // Carer: only clients they are assigned to
+          rows = await sql`
+            SELECT c.* FROM clients c
+            WHERE c.tenant_id = ${tenantId} AND c.id IN (
+              SELECT client_id FROM scheduled_visits
+              WHERE tenant_id = ${tenantId} AND carer_id = ${userId} AND visit_date >= CURRENT_DATE
+              UNION
+              SELECT client_id FROM caregiver_client_assignments
+              WHERE tenant_id = ${tenantId} AND caregiver_id = ${userId}
+            )
+            ORDER BY c.name
+          ` as any[]
+        }
         const parsed = (rows as any[]).map((r) => ({
           ...r,
           conditions: typeof r.conditions === 'string' ? JSON.parse(r.conditions) : (r.conditions || []),

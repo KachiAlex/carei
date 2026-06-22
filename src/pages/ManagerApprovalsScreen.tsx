@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { useTenant } from '../contexts/TenantContext'
+import { getVisitApprovals, updateVisitApproval } from '../api/client'
 import { exportVisits } from '../utils/exportCsv'
 
 const COLORS = {
@@ -26,33 +27,32 @@ export default function ManagerApprovalsScreen() {
   const { currentTenant } = useTenant()
   const [visits, setVisits] = useState<VisitApproval[]>([])
   const [filter, setFilter] = useState<'pending' | 'approved' | 'released'>('pending')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load from localStorage for demo
-    const saved = localStorage.getItem('carei_visits')
-    let allVisits: VisitApproval[] = []
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        allVisits = Array.isArray(parsed) ? parsed : []
-      } catch { /* ignore */ }
-    }
-    setVisits(allVisits)
-  }, [])
+    loadApprovals()
+  }, [filter])
 
-  const updateStatus = (visitId: string, newStatus: string) => {
-    const updated = visits.map((v) => v.id === visitId ? { ...v, approval_status: newStatus } : v)
-    setVisits(updated)
-    // Also update stored visits
-    const saved = localStorage.getItem('carei_visits')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        const arr = Array.isArray(parsed) ? parsed : []
-        const idx = arr.findIndex((v: any) => v.id === visitId)
-        if (idx >= 0) { arr[idx].approval_status = newStatus }
-        localStorage.setItem('carei_visits', JSON.stringify(arr))
-      } catch { /* ignore */ }
+  const loadApprovals = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getVisitApprovals(filter === 'pending' ? 'pending' : filter)
+      setVisits(Array.isArray(data) ? data : (data.visits || []))
+    } catch (err: any) {
+      setError(err.message || 'Failed to load approvals')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const updateStatus = async (visitId: string, newStatus: string) => {
+    try {
+      await updateVisitApproval({ visitId, approvalStatus: newStatus })
+      setVisits((prev) => prev.map((v) => v.id === visitId ? { ...v, approval_status: newStatus } : v))
+    } catch (err: any) {
+      setError(err.message || 'Failed to update status')
     }
   }
 
@@ -94,8 +94,18 @@ export default function ManagerApprovalsScreen() {
         </button>
       </div>
 
+      {error && (
+        <div className="mx-4 mt-3 p-3 rounded-xl text-xs font-semibold" style={{ background: 'rgba(255,90,95,0.1)', color: COLORS.red }}>
+          {error}
+        </div>
+      )}
       <div className="flex-1 px-4 py-4 overflow-auto">
-        {filtered.length === 0 && (
+        {loading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-8 h-8 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+        {!loading && filtered.length === 0 && (
           <div className="text-center text-sm text-slate-400 py-8">No visits in this category.</div>
         )}
         {filtered.map((v) => {

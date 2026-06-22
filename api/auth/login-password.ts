@@ -1,12 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug } from '../db.js'
 import crypto from 'crypto'
+import { verifyCredential } from '../hash.js'
 
 function generateToken(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
-function hashPassword(password: string): string {
+function legacyHashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex')
 }
 
@@ -30,20 +31,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureTables()
     const sql = getSql()
     const rows = await sql`
-      SELECT id, name, email, phone, region, pin, role, password_hash
+      SELECT id, name, email, phone, region, pin, role, password_hash, password_hash_scrypt
       FROM users
       WHERE LOWER(email) = ${email.toLowerCase()}
       LIMIT 1
     ` as any[]
 
     const user = rows[0]
-    if (!user || !user.password_hash) {
+    if (!user || (!user.password_hash && !user.password_hash_scrypt)) {
       res.status(401).json({ error: 'Invalid email or password' })
       return
     }
 
-    const hashed = hashPassword(password)
-    if (user.password_hash !== hashed) {
+    let valid = false
+    if (user.password_hash_scrypt) {
+      valid = await verifyCredential(password, user.password_hash_scrypt)
+    } else if (user.password_hash) {
+      // Legacy SHA-256 fallback during transition
+      valid = user.password_hash === legacyHashPassword(password)
+    }
+    if (!valid) {
       res.status(401).json({ error: 'Invalid email or password' })
       return
     }

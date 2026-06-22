@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug } from '../db.js'
+import { verifyCredential } from '../hash.js'
 
 function generateToken(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
@@ -25,14 +26,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureTables()
     const sql = getSql()
     const rows = await sql`
-      SELECT id, name, email, phone, region, pin, role
+      SELECT id, name, email, phone, region, pin, pin_hash, role
       FROM users
       WHERE LOWER(email) = ${email.toLowerCase()}
       LIMIT 1
     ` as any[]
 
     const user = rows[0]
-    if (!user || user.pin !== pin) {
+    let pinValid = false
+    if (user?.pin_hash) {
+      pinValid = await verifyCredential(pin, user.pin_hash)
+    } else if (user?.pin) {
+      // Fallback to plaintext during transition (migration 18 will backfill)
+      pinValid = user.pin === pin
+    }
+    if (!user || !pinValid) {
       res.status(401).json({ error: 'Invalid email or PIN' })
       return
     }

@@ -673,6 +673,23 @@ async function runMigrations() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS webauthn_credential TEXT`
   })
 
+  await run(18, 'hash_plaintext_pins', async () => {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS pin_hash TEXT`
+    // Hash existing plaintext 4-digit PINs
+    const { hashCredential } = await import('./hash.js')
+    const usersWithPin = await sql`SELECT id, pin FROM users WHERE pin IS NOT NULL AND pin <> ''` as any[]
+    for (const u of usersWithPin) {
+      if (u.pin && /^\d{4}$/.test(u.pin)) {
+        const hashed = await hashCredential(u.pin)
+        await sql`UPDATE users SET pin_hash = ${hashed} WHERE id = ${u.id}`
+      }
+    }
+  })
+
+  await run(19, 'add_password_hash_scrypt_column', async () => {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash_scrypt TEXT`
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (

@@ -1,8 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, getAuthToken } from '../db.js'
 import crypto from 'crypto'
+import { hashCredential, verifyCredential } from '../hash.js'
 
-function hashPassword(password: string): string {
+function legacyHashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex')
 }
 
@@ -33,27 +34,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureTables()
     const sql = getSql()
-    const rows = await sql`SELECT id, password_hash FROM users WHERE token = ${token} LIMIT 1` as any[]
+    const rows = await sql`SELECT id, password_hash, password_hash_scrypt FROM users WHERE token = ${token} LIMIT 1` as any[]
     const user = rows[0]
     if (!user) {
       res.status(401).json({ error: 'Invalid token' })
       return
     }
 
-    // If user has no password_hash, they registered with PIN only
-    if (!user.password_hash) {
-      res.status(400).json({ error: 'No password set. Use PIN login or set a password first.' })
-      return
+    // Verify current password
+    let currentValid = false
+    if (user.password_hash_scrypt) {
+      currentValid = await verifyCredential(currentPassword, user.password_hash_scrypt)
+    } else if (user.password_hash) {
+      currentValid = user.password_hash === legacyHashPassword(currentPassword)
     }
-
-    const hashedCurrent = hashPassword(currentPassword)
-    if (user.password_hash !== hashedCurrent) {
+    if (!currentValid) {
       res.status(401).json({ error: 'Current password is incorrect' })
       return
     }
 
-    const hashedNew = hashPassword(newPassword)
-    await sql`UPDATE users SET password_hash = ${hashedNew} WHERE id = ${user.id}`
+    // Store new password with scrypt
+    const hashedNew = await hashCredential(newPassword)
+    await sql`UPDATE users SET password_hash_scrypt = ${hashedNew}, password_hash = NULL WHERE id = ${user.id}`
 
     res.status(200).json({ status: 'updated', message: 'Password changed successfully' })
   } catch (err: any) {

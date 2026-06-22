@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables } from '../db.js'
+import { hashCredential } from '../hash.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -54,8 +55,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const user = users[0]
 
-      // Update the user's PIN
-      await sql`UPDATE users SET pin = ${newPin} WHERE id = ${user.id}`
+      // Hash and update the user's PIN
+      const pinHash = await hashCredential(newPin)
+      await sql`UPDATE users SET pin = ${newPin}, pin_hash = ${pinHash} WHERE id = ${user.id}`
 
       // Generate new token
       const token = 'tok-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
