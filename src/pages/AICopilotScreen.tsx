@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { chatWithAI } from '../api/client'
+import { enqueue } from '../utils/offlineQueue'
 
 const COLORS = {
   darkNavy: '#0f1a2e',
@@ -8,12 +9,14 @@ const COLORS = {
   teal: '#4FD1C5',
   teal2: '#40E0D0',
   red: '#FF5A5F',
+  amber: '#F6B73C',
 }
 
 interface Message {
   role: 'user' | 'ai'
   text: string
   timestamp: Date
+  pending?: boolean
 }
 
 export default function AICopilotScreen() {
@@ -36,8 +39,17 @@ export default function AICopilotScreen() {
     const userMsg: Message = { role: 'user', text: input.trim(), timestamp: new Date() }
     setMessages((prev) => [...prev, userMsg])
     setInput('')
-    setLoading(true)
 
+    if (!navigator.onLine) {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'ai', text: "You are currently offline. Your question has been queued and will be sent when you are back in signal.", timestamp: new Date(), pending: true },
+      ])
+      await enqueue({ type: 'ai-copilot', payload: { text: userMsg.text, context: 'General care context.' } })
+      return
+    }
+
+    setLoading(true)
     try {
       const data = await chatWithAI(userMsg.text, 'General care context.')
       const aiMsg: Message = { role: 'ai', text: data.reply, timestamp: new Date() }
@@ -108,13 +120,18 @@ export default function AICopilotScreen() {
             <div
               className="max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
               style={{
-                background: msg.role === 'user' ? COLORS.teal : 'white',
-                color: msg.role === 'user' ? COLORS.darkNavy : '#475569',
-                border: msg.role === 'user' ? 'none' : '1px solid rgba(0,0,0,0.06)',
+                background: msg.role === 'user' ? COLORS.teal : msg.pending ? 'rgba(246,183,60,0.08)' : 'white',
+                color: msg.role === 'user' ? COLORS.darkNavy : msg.pending ? COLORS.amber : '#475569',
+                border: msg.role === 'user' ? 'none' : msg.pending ? `1px solid ${COLORS.amber}30` : '1px solid rgba(0,0,0,0.06)',
                 borderBottomRightRadius: msg.role === 'user' ? '4px' : undefined,
                 borderBottomLeftRadius: msg.role === 'ai' ? '4px' : undefined,
               }}
             >
+              {msg.pending && (
+                <span className="inline-flex items-center gap-1 mr-1">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={COLORS.amber} strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                </span>
+              )}
               {msg.text}
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { useLocation } from 'wouter'
+import { useTenant } from '../contexts/TenantContext'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -17,14 +18,19 @@ interface EmergencyContact {
 
 export default function EmergencyScreen() {
   const [, setLocation] = useLocation()
+  const { currentTenant } = useTenant()
+  const agencyPhone = (currentTenant?.settings as any)?.emergencyPhone || ''
 
   const contacts: EmergencyContact[] = [
     { name: '999 Emergency', number: '999', subtitle: 'Ambulance, Fire, Police', urgent: true },
     { name: 'NHS 111', number: '111', subtitle: 'Non-emergency medical advice', urgent: true },
-    { name: 'GP Surgery', number: '02079460123', subtitle: 'Dr. Patel — Elm Grove Surgery' },
-    { name: 'Agency Office', number: '08001234567', subtitle: '24hr on-call coordinator' },
-    { name: 'Poison Control', number: '03448920111', subtitle: 'National Poisons Information Service' },
   ]
+
+  if (agencyPhone) {
+    contacts.push({ name: 'Agency Office', number: agencyPhone, subtitle: '24hr on-call coordinator' })
+  }
+
+  contacts.push({ name: 'Poison Control', number: '03448920111', subtitle: 'National Poisons Information Service' })
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -38,6 +44,12 @@ export default function EmergencyScreen() {
       </div>
 
       <div className="flex-1 px-4 py-4 flex flex-col gap-3 overflow-auto">
+        {!agencyPhone && (
+          <div className="p-3 rounded-xl text-xs" style={{ background: 'rgba(246,183,60,0.08)', color: COLORS.amber, border: `1px solid ${COLORS.amber}25` }}>
+            Agency emergency number not configured. Ask your manager to add it in agency settings.
+          </div>
+        )}
+
         {contacts.map((c) => (
           <a
             key={c.name}
@@ -59,6 +71,11 @@ export default function EmergencyScreen() {
             <span className="text-sm font-bold shrink-0" style={{ color: c.urgent ? COLORS.red : COLORS.teal }}>{c.number}</span>
           </a>
         ))}
+
+        {/* Client-specific notice */}
+        <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+          <div className="text-xs text-slate-500 mb-1">Client-specific emergency contacts and GP details are available on the client overview page.</div>
+        </div>
 
         {/* DNAR Notice */}
         <div className="bg-white rounded-2xl p-4 border border-red-100 shadow-sm mt-2">

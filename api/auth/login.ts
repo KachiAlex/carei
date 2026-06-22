@@ -1,16 +1,18 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug } from '../db.js'
-import { verifyCredential } from '../hash.js'
-
-function generateToken(): string {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
-}
+import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug, checkRateLimit } from '../db.js'
+import { verifyCredential, generateSecureToken, hashToken } from '../hash.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' })
+    return
+  }
+
+  const limit = checkRateLimit(req, 'login-pin', 10, 60000)
+  if (!limit.allowed) {
+    res.status(429).json({ error: 'Too many login attempts', retryAfter: limit.retryAfter })
     return
   }
 
@@ -45,8 +47,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    const token = generateToken()
-    await sql`UPDATE users SET token = ${token} WHERE id = ${user.id}`
+    const token = generateSecureToken()
+    const tokenHash = await hashToken(token)
+    const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+    await sql`UPDATE users SET token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
 
     // Auto-link orphaned users to carei tenant so they can access tenant-scoped endpoints
     const tenantRows = await sql`

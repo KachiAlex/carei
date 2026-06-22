@@ -35,3 +35,22 @@ export async function verifyCredential(credential: string, storedHash: string): 
 export function isLegacySHA256(hash: string): boolean {
   return /^[a-f0-9]{64}$/i.test(hash)
 }
+
+// ─── Secure session token utilities ───
+
+export function generateSecureToken(): string {
+  return crypto.randomBytes(32).toString('base64')
+}
+
+export async function hashToken(token: string): Promise<string> {
+  const salt = crypto.randomBytes(16).toString('hex')
+  const derivedKey = await scryptAsync(token, salt)
+  return `${salt}:${derivedKey.toString('hex')}`
+}
+
+export async function verifyToken(token: string, storedHash: string): Promise<boolean> {
+  const [salt, hash] = storedHash.split(':')
+  if (!salt || !hash) return false
+  const derivedKey = await scryptAsync(token, salt)
+  return derivedKey.toString('hex') === hash
+}

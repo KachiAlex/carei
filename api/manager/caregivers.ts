@@ -1,12 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, withTenant, getTenantSlug, addUserToTenant } from '../db.js'
+import { generateSecureToken, hashToken } from '../hash.js'
 
 function generateId(): string {
   return 'cg-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
-}
-
-function generateToken(): string {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -40,11 +37,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const id = generateId()
-      const caregiverToken = generateToken()
+      const caregiverToken = generateSecureToken()
+      const tokenHash = await hashToken(caregiverToken)
+      const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
 
       const result = await sql`
-        INSERT INTO users (id, tenant_id, name, email, phone, region, pin, role, token)
-        VALUES (${id}, ${tenantId}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role}, ${caregiverToken})
+        INSERT INTO users (id, tenant_id, name, email, phone, region, pin, role, token_hash, token_expires_at)
+        VALUES (${id}, ${tenantId}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role}, ${tokenHash}, ${tokenExpiresAt})
         ON CONFLICT (email) DO NOTHING
         RETURNING id
       ` as any[]

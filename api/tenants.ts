@@ -5,16 +5,13 @@ import {
   getTenantSlug, getUserFromToken, getTenantMembers, getTenantStats,
   getTenantMemberCount, getAllTenantsWithStats, getTenantClientCount,
 } from './db.js'
+import { generateSecureToken, hashToken } from './hash.js'
 
 // Plan defaults for new tenants
 const PLAN_DEFAULTS: Record<string, { max_users: number; max_clients: number }> = {
   trial: { max_users: 3, max_clients: 10 },
   professional: { max_users: 15, max_clients: 100 },
   enterprise: { max_users: 100, max_clients: 500 },
-}
-
-function generateToken(): string {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -155,9 +152,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (manager && manager.name && manager.email) {
           const managerId = 'u-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7)
-          const managerToken = generateToken()
+          const managerToken = generateSecureToken()
+          const tokenHash = await hashToken(managerToken)
+          const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
           await sql`
-            INSERT INTO users (id, name, email, phone, region, pin, role, token)
+            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_expires_at)
             VALUES (
               ${managerId},
               ${manager.name},
@@ -166,7 +165,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               ${manager.region || ''},
               ${manager.pin || ''},
               ${manager.role || 'admin'},
-              ${managerToken}
+              ${tokenHash},
+              ${tokenExpiresAt}
             )
           `
           await addUserToTenant(managerId, tenant.id, manager.role || 'admin')

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, checkRateLimit } from './db.js'
+import { generateSecureToken, hashToken } from './hash.js'
 
 function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
@@ -78,7 +79,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // If this is a registration, create the user
         if (purpose === 'register' && userData) {
           const { id, name, phone, region, pin, role } = userData
-          const token = 'tok-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
+          const token = generateSecureToken()
+          const tokenHash = await hashToken(token)
+          const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
 
           // Check if user already exists (case-insensitive)
           const existing = await sql`SELECT id FROM users WHERE LOWER(email) = ${email.toLowerCase()}` as any[]
@@ -88,8 +91,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
 
           await sql`
-            INSERT INTO users (id, name, email, phone, region, pin, role, token)
-            VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role || 'carer'}, ${token})
+            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_expires_at)
+            VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role || 'carer'}, ${tokenHash}, ${tokenExpiresAt})
           `
           res.status(200).json({ status: 'verified', token, user: { id, name, email: email.toLowerCase(), role: role || 'carer' } })
           return
@@ -103,8 +106,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return
           }
           const user = users[0]
-          const token = 'tok-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
-          await sql`UPDATE users SET token = ${token} WHERE id = ${user.id}`
+          const token = generateSecureToken()
+          const tokenHash = await hashToken(token)
+          const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+          await sql`UPDATE users SET token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
           res.status(200).json({ status: 'verified', token, user: { id: user.id, name: user.name, email: user.email, role: user.role } })
           return
         }

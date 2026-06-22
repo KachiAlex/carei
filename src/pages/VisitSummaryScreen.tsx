@@ -117,6 +117,13 @@ export default function VisitSummaryScreen() {
       `Notes: ${snapshot.notes || 'None'}`,
     ].join('\n')
 
+    if (!navigator.onLine) {
+      setHandoverNote(`Handover for ${snapshot.clientName}: Visit completed in ${formatTime(snapshot.elapsed)}. ${snapshot.tasks.filter((t) => t.done).length} of ${snapshot.tasks.length} tasks done. Fluid: ${snapshot.fluid}ml. Medications: ${snapshot.medications.filter((m) => m.status === 'confirmed').length} confirmed.`)
+      await enqueue({ type: 'ai-summary', payload: { context, visitId } })
+      setGenerating(false)
+      return
+    }
+
     try {
       const data = await summarizeTranscript(context)
       setHandoverNote(data.summary)

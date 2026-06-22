@@ -17,12 +17,12 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 // Extended queue types to support all backend sync operations
-type QueueItemType = 
-  | 'visit' 
-  | 'sos' 
-  | 'medication' 
-  | 'handover' 
-  | 'medication-log' 
+type QueueItemType =
+  | 'visit'
+  | 'sos'
+  | 'medication'
+  | 'handover'
+  | 'medication-log'
   | 'voice-memo'
   | 'incident'
   | 'body-map'
@@ -36,6 +36,8 @@ type QueueItemType =
   | 'client-create'
   | 'caregiver-update'
   | 'caregiver-create'
+  | 'ai-copilot'
+  | 'ai-summary'
 
 interface QueueItem {
   id?: number

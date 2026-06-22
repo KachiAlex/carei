@@ -1,4 +1,5 @@
 import { neon, Client } from '@neondatabase/serverless'
+import { verifyToken } from './hash.js'
 
 export function getSql() {
   const connectionString = process.env.DATABASE_URL
@@ -690,6 +691,11 @@ async function runMigrations() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash_scrypt TEXT`
   })
 
+  await run(20, 'add_token_hash_and_expiry', async () => {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_hash TEXT`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_expires_at TIMESTAMPTZ`
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (
@@ -726,6 +732,11 @@ export function setCors(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant-Slug')
+  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://carei-app.vercel.app; img-src 'self' data: blob:; font-src 'self';")
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
 }
 
 export function getAuthToken(req: any): string {
@@ -738,6 +749,24 @@ export function getAuthToken(req: any): string {
 }
 
 export async function getUserFromToken(sql: any, token: string): Promise<{ id: string; name: string; role: string } | null> {
+  // Primary: verify against hashed token + expiry
+  const hashedUsers = await sql`
+    SELECT id, name, role, token_hash, token_expires_at
+    FROM users
+    WHERE token_hash IS NOT NULL
+  ` as any[]
+
+  for (const u of hashedUsers) {
+    const valid = await verifyToken(token, u.token_hash)
+    if (valid) {
+      if (u.token_expires_at && new Date(u.token_expires_at) < new Date()) {
+        continue // expired
+      }
+      return { id: u.id, name: u.name, role: u.role }
+    }
+  }
+
+  // Fallback: plaintext token during transition (migration 20 will backfill)
   const rows = await sql`SELECT id, name, role FROM users WHERE token = ${token} LIMIT 1` as any[]
   return rows[0] || null
 }
