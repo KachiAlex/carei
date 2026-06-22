@@ -728,10 +728,20 @@ async function runMigrations() {
   await sql`CREATE INDEX IF NOT EXISTS idx_tenant_users_user ON tenant_users(user_id)`
 }
 
+const ALLOWED_ORIGINS = [
+  'https://carei-app.vercel.app',
+  'https://carei.co.uk',
+  'http://localhost:5173',
+  'http://localhost:3000',
+]
+
 export function setCors(req: any, res: any) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  const origin = req.headers?.origin || ''
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0]
+  res.setHeader('Access-Control-Allow-Origin', allowed)
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant-Slug')
+  res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
   res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://carei-app.vercel.app; img-src 'self' data: blob:; font-src 'self';")
   res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -926,23 +936,24 @@ export async function getTenantStats(tenantId: string): Promise<{
 }> {
   const sql = getSql()
 
-  const safeCount = async (table: string, whereClause?: string): Promise<number> => {
-    try {
-      const query = whereClause
-        ? `SELECT COUNT(*) as count FROM ${table} WHERE ${whereClause}`
-        : `SELECT COUNT(*) as count FROM ${table}`
-      const rows = await sql.query(query) as any[]
-      return parseInt(rows[0]?.count || '0', 10)
-    } catch {
-      return 0
-    }
-  }
-
-  const user_count = await safeCount('tenant_users', `tenant_id = '${tenantId}'`)
-  const client_count = await safeCount('clients', `tenant_id = '${tenantId}'`)
-  const visit_count = await safeCount('visits', `tenant_id = '${tenantId}'`)
   const today = new Date().toISOString().split('T')[0]
-  const active_today = await safeCount('visits', `tenant_id = '${tenantId}' AND DATE(clock_in_at) = '${today}'`)
+  let user_count = 0, client_count = 0, visit_count = 0, active_today = 0
+  try {
+    const u = await sql`SELECT COUNT(*) as count FROM tenant_users WHERE tenant_id = ${tenantId}` as any[]
+    user_count = parseInt(u[0]?.count || '0', 10)
+  } catch { user_count = 0 }
+  try {
+    const c = await sql`SELECT COUNT(*) as count FROM clients WHERE tenant_id = ${tenantId}` as any[]
+    client_count = parseInt(c[0]?.count || '0', 10)
+  } catch { client_count = 0 }
+  try {
+    const v = await sql`SELECT COUNT(*) as count FROM visits WHERE tenant_id = ${tenantId}` as any[]
+    visit_count = parseInt(v[0]?.count || '0', 10)
+  } catch { visit_count = 0 }
+  try {
+    const a = await sql`SELECT COUNT(*) as count FROM visits WHERE tenant_id = ${tenantId} AND DATE(clock_in_at) = ${today}` as any[]
+    active_today = parseInt(a[0]?.count || '0', 10)
+  } catch { active_today = 0 }
 
   return { user_count, client_count, visit_count, active_today }
 }
@@ -980,21 +991,22 @@ export async function getAllTenantsWithStats(): Promise<Array<{
     tenantRows = await sql`SELECT * FROM tenants ORDER BY created_at DESC` as any[]
   }
 
-  // If subqueries didn't run, fetch counts separately with safe raw SQL
+  // If subqueries didn't run, fetch counts separately with parameterized queries
   const needsCounts = tenantRows.length > 0 && tenantRows[0].user_count === undefined
   if (needsCounts) {
-    const safeCount = async (table: string, tenantId: string): Promise<number> => {
-      try {
-        const rows = await sql.query(`SELECT COUNT(*) as count FROM ${table} WHERE tenant_id = '${tenantId}'`) as any[]
-        return parseInt(rows[0]?.count || '0', 10)
-      } catch {
-        return 0
-      }
-    }
     for (const t of tenantRows) {
-      t.user_count = await safeCount('tenant_users', t.id)
-      t.client_count = await safeCount('clients', t.id)
-      t.visit_count = await safeCount('visits', t.id)
+      try {
+        const u = await sql`SELECT COUNT(*) as count FROM tenant_users WHERE tenant_id = ${t.id}` as any[]
+        t.user_count = parseInt(u[0]?.count || '0', 10)
+      } catch { t.user_count = 0 }
+      try {
+        const c = await sql`SELECT COUNT(*) as count FROM clients WHERE tenant_id = ${t.id}` as any[]
+        t.client_count = parseInt(c[0]?.count || '0', 10)
+      } catch { t.client_count = 0 }
+      try {
+        const v = await sql`SELECT COUNT(*) as count FROM visits WHERE tenant_id = ${t.id}` as any[]
+        t.visit_count = parseInt(v[0]?.count || '0', 10)
+      } catch { t.visit_count = 0 }
     }
   }
 

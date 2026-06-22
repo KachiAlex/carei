@@ -50,7 +50,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const token = generateSecureToken()
     const tokenHash = await hashToken(token)
     const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-    await sql`UPDATE users SET token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
+    // Also clear plaintext pin if hash exists (migration cleanup)
+    const shouldClearPlaintextPin = user.pin_hash ? true : false
+    if (shouldClearPlaintextPin) {
+      await sql`UPDATE users SET pin = NULL, token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
+    } else {
+      await sql`UPDATE users SET token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
+    }
 
     // Auto-link orphaned users to carei tenant so they can access tenant-scoped endpoints
     const tenantRows = await sql`

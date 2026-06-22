@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables } from '../db.js'
-import { hashCredential } from '../hash.js'
+import { getSql, setCors, ensureTables, checkRateLimit } from '../db.js'
+import { hashCredential, generateSecureToken, hashToken } from '../hash.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -11,6 +11,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sql = getSql()
 
     if (req.method === 'POST') {
+      const limit = checkRateLimit(req, 'reset-pin', 5, 60000)
+      if (!limit.allowed) {
+        res.status(429).json({ error: 'Too many reset attempts', retryAfter: limit.retryAfter })
+        return
+      }
+
       const { email, newPin, otp } = req.body || {}
 
       // Validate input
@@ -55,13 +61,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const user = users[0]
 
-      // Hash and update the user's PIN
+      // Hash and update the user's PIN (clear plaintext pin)
       const pinHash = await hashCredential(newPin)
-      await sql`UPDATE users SET pin = ${newPin}, pin_hash = ${pinHash} WHERE id = ${user.id}`
+      await sql`UPDATE users SET pin = NULL, pin_hash = ${pinHash} WHERE id = ${user.id}`
 
-      // Generate new token
-      const token = 'tok-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10)
-      await sql`UPDATE users SET token = ${token} WHERE id = ${user.id}`
+      // Generate secure token
+      const token = generateSecureToken()
+      const tokenHash = await hashToken(token)
+      const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+      await sql`UPDATE users SET token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
 
       console.log(`[PIN Reset] User ${email} PIN updated successfully`)
 

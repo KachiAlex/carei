@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sql = getSql()
     await sql`
       INSERT INTO users (id, name, email, phone, region, pin, pin_hash, role, token_hash, token_expires_at)
-      VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${pinHash}, ${role}, ${tokenHash}, ${tokenExpiresAt})
+      VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, NULL, ${pinHash}, ${role}, ${tokenHash}, ${tokenExpiresAt})
     `
 
     // Auto-link user to the carei tenant so they can access tenant-scoped endpoints

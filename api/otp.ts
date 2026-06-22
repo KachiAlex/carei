@@ -1,9 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, checkRateLimit } from './db.js'
 import { generateSecureToken, hashToken } from './hash.js'
+import crypto from 'crypto'
 
 function generateCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString()
+  return crypto.randomInt(100000, 1000000).toString().padStart(6, '0')
 }
 
 // OTP sender — integrate with Twilio/SendGrid/Email provider in production
