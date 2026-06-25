@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, getAuthToken, ensureTables, withTenant, getTenantSlug } from './db.js'
+import { getSql, setCors, getAuthToken, getUserFromToken, ensureTables, withTenant, getTenantSlug } from './db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -16,12 +16,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureTables()
     const sql = getSql()
-    const users = await sql`SELECT id, name, role FROM users WHERE token = ${token}`
-    if (!users[0]) {
+    const user = await getUserFromToken(sql, token)
+    if (!user) {
       res.status(401).json({ error: 'Invalid token' })
       return
     }
-    const user = users[0] as any
 
     // If tenant slug provided, use tenant-aware filtering
     if (tenantSlug) {

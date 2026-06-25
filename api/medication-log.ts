@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, withTenant, getTenantSlug } from './db.js'
+import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken, withTenant, getTenantSlug } from './db.js'
 
 function generateId(): string {
   return 'ml-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
@@ -8,6 +8,12 @@ function generateId(): string {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
+
+  const token = getAuthToken(req)
+  if (!token) {
+    res.status(401).json({ error: 'Authentication required' })
+    return
+  }
 
   const tenantSlug = getTenantSlug(req)
 
@@ -75,13 +81,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Legacy non-tenant handler
-    const token = req.headers.authorization?.replace('Bearer ', '') || ''
-    const userRows = await sql`SELECT id FROM users WHERE token = ${token} LIMIT 1` as any[]
-    const userId = userRows[0]?.id
-    if (!userId) {
+    const user = await getUserFromToken(sql, token)
+    if (!user) {
       res.status(401).json({ error: 'Invalid token' })
       return
     }
+    const userId = user.id
 
     if (req.method === 'POST') {
       const body = req.body || {}

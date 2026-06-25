@@ -1,9 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, withTenant, getTenantSlug } from './db.js'
+import { getSql, setCors, getAuthToken, getUserFromToken, withTenant, getTenantSlug } from './db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
+
+  const token = getAuthToken(req)
+  if (!token) {
+    res.status(401).json({ error: 'Authentication required' })
+    return
+  }
 
   const tenantSlug = getTenantSlug(req)
 
@@ -31,9 +37,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Legacy non-tenant handler
-    const token = req.headers.authorization?.replace('Bearer ', '') || ''
-    const users = await sql`SELECT id, role FROM users WHERE token = ${token}`
-    if (!users[0]) {
+    const user = await getUserFromToken(sql, token)
+    if (!user) {
       res.status(401).json({ error: 'Invalid token' })
       return
     }

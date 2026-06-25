@@ -1,13 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, getAuthToken, withTenant, getTenantSlug } from '../db.js'
+import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken, withTenant, getTenantSlug } from '../db.js'
 
 function generateId(): string {
   return 'tl-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
-}
-
-async function getUserFromToken(sql: any, token: string) {
-  const rows = await sql`SELECT id, name, role FROM users WHERE token = ${token} LIMIT 1` as any[]
-  return rows[0] || null
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

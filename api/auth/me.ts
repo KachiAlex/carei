@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, getAuthToken } from '../db.js'
+import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken } from '../db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -19,14 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureTables()
     const sql = getSql()
-    const rows = await sql`
-      SELECT id, name, email, phone, region, role
-      FROM users
-      WHERE token = ${token}
-      LIMIT 1
-    ` as any[]
-
-    const user = rows[0]
+    const user = await getUserFromToken(sql, token)
     if (!user) {
       res.status(401).json({ error: 'Invalid token' })
       return

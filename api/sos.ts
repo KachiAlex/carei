@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, checkRateLimit, getAuthToken, withTenant, getTenantSlug } from './db.js'
+import { getSql, setCors, ensureTables, checkRateLimit, getAuthToken, getUserFromToken, withTenant, getTenantSlug } from './db.js'
 import { broadcast } from './events.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -69,8 +69,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Legacy non-tenant handler
-    const userRows = await sql`SELECT id FROM users WHERE token = ${token} LIMIT 1` as any[]
-    if (!userRows[0]) {
+    const user = await getUserFromToken(sql, token)
+    if (!user) {
       res.status(401).json({ error: 'Invalid token' })
       return
     }

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { setCors, ensureTables, getSql, getClient, getAuthToken } from './db.js'
+import { setCors, ensureTables, getSql, getClient, getAuthToken, getUserFromToken } from './db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -17,8 +17,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(401).json({ error: 'Authentication required' })
       return
     }
-    const userRows = await sql`SELECT id, role FROM users WHERE token = ${token} LIMIT 1` as any[]
-    if (!userRows[0] || userRows[0].role !== 'superadmin') {
+    const user = await getUserFromToken(sql, token)
+    if (!user || user.role !== 'superadmin') {
       res.status(403).json({ error: 'Superadmin access required' })
       return
     }

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, getAuthToken } from '../db.js'
+import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken } from '../db.js'
 import crypto from 'crypto'
 import { hashCredential, verifyCredential } from '../hash.js'
 
@@ -34,7 +34,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureTables()
     const sql = getSql()
-    const rows = await sql`SELECT id, password_hash, password_hash_scrypt FROM users WHERE token = ${token} LIMIT 1` as any[]
+    const baseUser = await getUserFromToken(sql, token)
+    if (!baseUser) {
+      res.status(401).json({ error: 'Invalid token' })
+      return
+    }
+    const rows = await sql`SELECT id, password_hash, password_hash_scrypt FROM users WHERE id = ${baseUser.id} LIMIT 1` as any[]
     const user = rows[0]
     if (!user) {
       res.status(401).json({ error: 'Invalid token' })

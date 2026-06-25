@@ -16,18 +16,22 @@ function LoadingOverlay({ onDone }: { onDone: () => void }) {
     const duration = 3000
     const interval = 30
     const step = 100 / (duration / interval)
+    let doneTimeout: ReturnType<typeof setTimeout> | null = null
     const timer = setInterval(() => {
       setProgress((prev) => {
         const next = prev + step
         if (next >= 100) {
           clearInterval(timer)
-          setTimeout(onDone, 200)
+          doneTimeout = setTimeout(onDone, 200)
           return 100
         }
         return next
       })
     }, interval)
-    return () => clearInterval(timer)
+    return () => {
+      clearInterval(timer)
+      if (doneTimeout) clearTimeout(doneTimeout)
+    }
   }, [onDone])
 
   return (

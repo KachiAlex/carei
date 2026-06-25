@@ -73,7 +73,7 @@ const CONDITION_TASKS: Record<string, { title: string; icon: string; tasks: stri
 
 export default function FamilyPortalScreen() {
   const [, setLocation] = useLocation()
-  const [match, params] = useRoute('/family/:id')
+  const [match, params] = useRoute('/tenant/:slug/family/:id')
   const clientId = params?.id || ''
   const [messages, setMessages] = useState<FamilyMessage[]>([])
   const [newMessage, setNewMessage] = useState('')

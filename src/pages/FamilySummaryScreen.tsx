@@ -24,7 +24,7 @@ interface VisitSummary {
 
 export default function FamilySummaryScreen() {
   const [, setLocation] = useLocation()
-  const [match, params] = useRoute('/family-summary/:id')
+  const [match, params] = useRoute('/tenant/:slug/family-summary/:id')
   const clientId = params?.id || ''
   const [visits, setVisits] = useState<VisitSummary[]>([])
   const [loading, setLoading] = useState(false)
