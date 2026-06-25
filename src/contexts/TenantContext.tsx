@@ -8,6 +8,7 @@ interface Tenant {
   slug: string
   name: string
   role: string
+  settings?: Record<string, unknown>
 }
 
 interface TenantContextType {

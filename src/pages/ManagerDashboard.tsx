@@ -21,6 +21,8 @@ import {
   updateCaregiverStatus,
   deleteCaregiver,
   logoutUser,
+  exportAgencyDataUrl,
+  deleteAgencyData,
 } from '../api/client'
 import { clearAuthCache } from '../utils/tokenCache'
 import { sendSOSAlert, sendSOSResolved, requestNotificationPermission } from '../utils/notifications'
@@ -338,6 +340,39 @@ export default function ManagerDashboard() {
         <button onClick={() => exportCarers(dbCarers)} className="flex-1 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-white border border-slate-200 cursor-pointer hover:border-teal transition-colors">
           Export Carers
         </button>
+      </motion.div>
+
+      {/* Data & Privacy (DPA controls) */}
+      <motion.div custom={6} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+        <h3 className="font-bold text-sm text-slate-800 mb-3">Data & Privacy</h3>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => window.open(exportAgencyDataUrl(), '_blank')}
+            className="text-left text-sm text-slate-600 py-2 px-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer bg-transparent border border-slate-200"
+          >
+            Export all agency data (JSON)
+          </button>
+          <button
+            onClick={async () => {
+              const confirmed = window.confirm('WARNING: This will permanently delete all client records, visits, medications, and carer data for your agency. Managers and the agency record remain for audit purposes.\n\nType "DELETE ALL DATA" in the next prompt to confirm.')
+              if (!confirmed) return
+              const text = window.prompt('Type "DELETE ALL DATA" to confirm permanent deletion:')
+              if (text !== 'DELETE ALL DATA') {
+                alert('Deletion cancelled.')
+                return
+              }
+              try {
+                const res = await deleteAgencyData('DELETE ALL DATA')
+                alert(`Agency data deleted. ${res.totalDeleted || 0} records removed.`)
+              } catch (err: any) {
+                alert(err.message || 'Deletion failed.')
+              }
+            }}
+            className="text-left text-sm text-red-600 py-2 px-3 rounded-xl hover:bg-red-50 transition-colors cursor-pointer bg-transparent border border-red-200"
+          >
+            Delete all agency data
+          </button>
+        </div>
       </motion.div>
 
       {/* Live Carer Status */}
@@ -1138,6 +1173,14 @@ export default function ManagerDashboard() {
               )}
             </motion.button>
           ))}
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => tenantSlug && setLocation(`/tenant/${tenantSlug}/manager/audit`)}
+            className="px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer border-none transition-all duration-200"
+            style={{ background: 'transparent', color: '#64748b' }}
+          >
+            Audit
+          </motion.button>
         </div>
       </div>
 

@@ -184,16 +184,33 @@ export default function CarerDashboard() {
 
   const confirmSOS = async () => {
     setShowSOSConfirm(false)
-    const payload = { visitId: 'dashboard', location: 'Carer Dashboard', timestamp: new Date().toISOString() }
+    triggerHaptic(HAPTIC_PATTERNS.sos)
+
+    const getLocation = (): Promise<{ lat?: number; lng?: number }> => new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve({}); return }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve({}),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      )
+    })
+
+    const loc = await getLocation()
+    const locationStr = loc.lat !== undefined
+      ? `https://maps.google.com/?q=${loc.lat},${loc.lng} (lat: ${loc.lat.toFixed(5)}, lng: ${loc.lng?.toFixed(5)})`
+      : 'Carer Dashboard — location unavailable'
+
+    const payload = { visitId: 'dashboard', location: locationStr, timestamp: new Date().toISOString(), coordinates: loc.lat !== undefined ? { lat: loc.lat, lng: loc.lng } : undefined }
     try {
       if (!navigator.onLine) {
         await enqueue({ type: 'sos', payload })
+        alert('SOS Alert queued — will send when back online.')
       } else {
         await sendSOS(payload)
+        alert('SOS Alert Sent! Supervisor notified.')
       }
-      alert('SOS Alert Sent! Supervisor notified.')
     } catch {
-      alert('SOS Alert queued. Will send when online.')
+      alert('Failed to send SOS. Please retry.')
     }
   }
 

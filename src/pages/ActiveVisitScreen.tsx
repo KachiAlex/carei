@@ -818,7 +818,22 @@ export default function ActiveVisitScreen() {
   const confirmSOS = async () => {
     setShowSOSConfirm(false)
     triggerHaptic(HAPTIC_PATTERNS.sos)
-    const payload = { visitId, location: client?.address, timestamp: new Date().toISOString() }
+
+    const getLocation = (): Promise<{ lat?: number; lng?: number }> => new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve({}); return }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve({}),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      )
+    })
+
+    const loc = await getLocation()
+    const locationStr = loc.lat !== undefined
+      ? `https://maps.google.com/?q=${loc.lat},${loc.lng} (lat: ${loc.lat.toFixed(5)}, lng: ${loc.lng?.toFixed(5)})`
+      : (client?.address || 'Location unavailable')
+
+    const payload = { visitId, location: locationStr, timestamp: new Date().toISOString(), coordinates: loc.lat !== undefined ? { lat: loc.lat, lng: loc.lng } : undefined }
     if (!navigator.onLine) {
       await enqueue({ type: 'sos', payload })
       alert('SOS queued — will send when back online.')

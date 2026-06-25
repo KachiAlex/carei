@@ -127,7 +127,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tenantId: tenant.id,
       action: 'audit_logs_export',
       resource: req.url,
-      ipAddress: req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress,
+      ipAddress: (req.headers?.['x-forwarded-for'] || req.socket?.remoteAddress) as string | undefined,
       statusCode: 200,
       details: { format, limit: mapped.length, from, to },
     })

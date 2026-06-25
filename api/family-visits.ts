@@ -36,7 +36,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             mood,
             wellbeing_note AS "wellbeingNote",
             meal_status AS "mealStatus",
-            fluid_glasses AS "fluidGlasses"
+            fluid_glasses AS "fluidGlasses",
+            handover_note AS "handoverNote"
           FROM visits
           WHERE tenant_id = ${tenantId}
             AND client_id = ${clientId}
@@ -63,7 +64,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         mood,
         wellbeing_note AS "wellbeingNote",
         meal_status AS "mealStatus",
-        fluid_glasses AS "fluidGlasses"
+        fluid_glasses AS "fluidGlasses",
+        handover_note AS "handoverNote"
       FROM visits
       WHERE client_id = ${clientId}
         AND approval_status IN ('approved', 'released')

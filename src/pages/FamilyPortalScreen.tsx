@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useRoute } from 'wouter'
 import { motion } from 'framer-motion'
-import { getClient } from '../api/client'
+import { getClient, getFamilyVisits } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -80,6 +80,7 @@ export default function FamilyPortalScreen() {
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'messages'>('overview')
   const [tasks, setTasks] = useState<TaskItem[]>([])
   const [client, setClient] = useState<any>(null)
+  const [visits, setVisits] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const clientCondition = client?.condition || 'General'
 
@@ -89,6 +90,10 @@ export default function FamilyPortalScreen() {
     getClient(clientId)
       .then((data) => { setClient(data) })
       .catch(() => { setClient(null) })
+
+    getFamilyVisits(clientId)
+      .then((data) => { setVisits(data.visits || []) })
+      .catch(() => { setVisits([]) })
       .finally(() => { setLoading(false) })
 
     const saved = localStorage.getItem(`family-messages-${clientId}`)
@@ -188,18 +193,50 @@ export default function FamilyPortalScreen() {
                 <h3 className="font-bold text-sm text-slate-800">Latest Visit</h3>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-50 text-green-600 border border-green-100">Completed</span>
               </div>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(79,209,197,0.08)' }}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-slate-800">Last Visit</div>
-                  <div className="text-[10px] text-slate-500">No recent visits</div>
-                </div>
-              </div>
-              <div className="text-xs text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3">
-                No recent visit data available.
-              </div>
+              {visits.length > 0 ? (
+                <>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(79,209,197,0.08)' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-slate-800">{visits[0].carerName || 'Carer'}</div>
+                      <div className="text-[10px] text-slate-500">{visits[0].submittedAt ? new Date(visits[0].submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Unknown date'}</div>
+                    </div>
+                  </div>
+                  {visits[0].handoverNote ? (
+                    <div className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3">
+                      {visits[0].handoverNote}
+                    </div>
+                  ) : visits[0].notes ? (
+                    <div className="text-xs text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3">
+                      {visits[0].notes}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3">
+                      Visit completed. No detailed notes recorded.
+                    </div>
+                  )}
+                  {visits[0].mood && (
+                    <div className="mt-2 text-[10px] text-slate-400">Mood: {visits[0].mood}</div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(79,209,197,0.08)' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-slate-800">Last Visit</div>
+                      <div className="text-[10px] text-slate-500">No recent visits</div>
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500 leading-relaxed bg-slate-50 rounded-xl p-3">
+                    No recent visit data available.
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Medication Schedule */}
@@ -227,7 +264,7 @@ export default function FamilyPortalScreen() {
             <div className="grid grid-cols-3 gap-2">
               {[
                 { label: 'Tasks Done', value: `${completedCount}/${tasks.length}`, color: COLORS.teal },
-                { label: 'This Week', value: '5 visits', color: COLORS.lavender },
+                { label: 'This Week', value: `${visits.length} visit${visits.length !== 1 ? 's' : ''}`, color: COLORS.lavender },
                 { label: 'Next Visit', value: 'Tomorrow', color: COLORS.amber },
               ].map((stat) => (
                 <div key={stat.label} className="bg-white rounded-xl p-3 border border-slate-100 text-center">

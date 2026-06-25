@@ -675,12 +675,30 @@ export function exportAuditLogsUrl(params: { from?: string; to?: string; action?
   return `/api/audit-logs?${qs.toString()}`
 }
 
+export async function getAuditLogs(params: { from?: string; to?: string; action?: string; limit?: number } = {}) {
+  const qs = new URLSearchParams()
+  qs.append('format', 'json')
+  if (params.from) qs.append('from', params.from)
+  if (params.to) qs.append('to', params.to)
+  if (params.action) qs.append('action', params.action)
+  if (params.limit) qs.append('limit', String(params.limit))
+  return get(`/audit-logs?${qs.toString()}`)
+}
+
 export async function updateVisitApproval(data: {
   visitId: string
   approvalStatus?: string
   familyRead?: boolean
 }) {
   return post('/visit-approvals', data)
+}
+
+export function exportAgencyDataUrl(): string {
+  return `/api/data-export`
+}
+
+export async function deleteAgencyData(confirmText: string) {
+  return post('/data-delete', { confirmText })
 }
 
 export async function sendOtp(data: { email: string; purpose?: string }) {

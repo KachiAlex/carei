@@ -90,6 +90,7 @@ const RotaScreen = lazy(() => import('./pages/RotaScreen'))
 const OperationsScreen = lazy(() => import('./pages/OperationsScreen'))
 const FamilyPortalScreen = lazy(() => import('./pages/FamilyPortalScreen'))
 const ManagerApprovalsScreen = lazy(() => import('./pages/ManagerApprovalsScreen'))
+const ManagerAuditScreen = lazy(() => import('./pages/ManagerAuditScreen'))
 const FamilySummaryScreen = lazy(() => import('./pages/FamilySummaryScreen'))
 const AdminTeaserScreen = lazy(() => import('./pages/AdminTeaserScreen'))
 const SuperAdminScreen = lazy(() => import('./pages/SuperAdminScreen'))
@@ -156,6 +157,7 @@ function TenantRoutes() {
         <Route path="/tenant/:slug/manager/clients" component={ClientManagement} />
         <Route path="/tenant/:slug/manager/schedule" component={VisitScheduling} />
         <Route path="/tenant/:slug/manager/approvals" component={ManagerApprovalsScreen} />
+        <Route path="/tenant/:slug/manager/audit" component={ManagerAuditScreen} />
         <Route path="/tenant/:slug/manager/add-carer" component={CreateAccountScreen} />
         <Route path="/tenant/:slug/manager/members" component={TenantMembersScreen} />
         <Route path="/tenant/:slug/settings" component={SettingsScreen} />
