@@ -696,6 +696,12 @@ async function runMigrations() {
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_expires_at TIMESTAMPTZ`
   })
 
+  await run(21, 'drop_pin_not_null', async () => {
+    // pin_hash is now the canonical hashed column; plaintext pin column
+    // must be nullable so login can clear it and register can omit it.
+    await sql`ALTER TABLE users ALTER COLUMN pin DROP NOT NULL`
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (
