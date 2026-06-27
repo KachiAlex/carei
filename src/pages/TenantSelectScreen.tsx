@@ -33,7 +33,7 @@ export default function TenantSelectScreen() {
       if (token) setToken(token)
     }
     if (!token) {
-      setLocation('/login')
+      setLocation('/login?redirect=/select-tenant')
       return
     }
 

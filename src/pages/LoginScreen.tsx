@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useLocation } from 'wouter'
+import { useLocation, useSearch } from 'wouter'
 import { loginUser, loginWithPassword, sendOtp, verifyOtp, resetPin, getMe } from '../api/client'
 import { isBiometricAvailable, verifyBiometric, getBiometricEnabled } from '../utils/biometric'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
@@ -81,6 +81,11 @@ type LoginView = 'login' | 'reset-request' | 'reset-verify' | 'reset-newpin'
 
 export default function LoginScreen() {
   const [, setLocation] = useLocation()
+  const search = useSearch()
+  const redirectPath = (() => {
+    const params = new URLSearchParams(search)
+    return params.get('redirect') || ''
+  })()
   const [view, setView] = useState<LoginView>('login')
   const [email, setEmail] = useState('')
   const [pin, setPin] = useState(['', '', '', ''])
@@ -211,7 +216,11 @@ export default function LoginScreen() {
         // Bind biometric to this login session
         const sessionKey = crypto.randomUUID()
         await secureSet('bio_session', sessionKey)
-        setLocation('/select-tenant')
+        if (res.user.role === 'superadmin') {
+          setLocation(redirectPath || '/super-admin')
+        } else {
+          setLocation(redirectPath || '/select-tenant')
+        }
       } else {
         triggerHaptic(HAPTIC_PATTERNS.error)
         recordFailedAttempt()
@@ -269,9 +278,9 @@ export default function LoginScreen() {
         const sessionKey = crypto.randomUUID()
         await secureSet('bio_session', sessionKey)
         if (res.user.role === 'superadmin') {
-          setLocation('/super-admin')
+          setLocation(redirectPath || '/super-admin')
         } else {
-          setLocation('/select-tenant')
+          setLocation(redirectPath || '/select-tenant')
         }
       } else {
         triggerHaptic(HAPTIC_PATTERNS.error)
@@ -516,6 +525,21 @@ export default function LoginScreen() {
               Forgot PIN? Reset here
             </button>
           )}
+
+          {/* Super Admin toggle */}
+          <button
+            onClick={() => {
+              setIsSuperAdminMode(prev => {
+                const next = !prev
+                setError('')
+                setPassword('')
+                return next
+              })
+            }}
+            className="w-full mt-3 text-sm text-white/40 bg-transparent border-none cursor-pointer hover:text-teal-400 transition-colors"
+          >
+            {isSuperAdminMode ? '← Back to Carer Login' : 'Super Admin Login →'}
+          </button>
         </div>
       </div>
     )

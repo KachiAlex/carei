@@ -105,7 +105,7 @@ export default function CarerDashboard() {
         if (token) setToken(token)
       }
       if (!token) {
-        setLocation('/login')
+        setLocation('/login?redirect=/dashboard')
         return
       }
       getMe()
@@ -122,7 +122,7 @@ export default function CarerDashboard() {
       if (token) setToken(token)
     }
     if (!token) {
-      setLocation('/login')
+      setLocation('/login?redirect=/dashboard')
       return
     }
     await Promise.all([

@@ -58,7 +58,7 @@ export default function SuperAdminScreen() {
       if (token) setToken(token)
     }
     if (!token) {
-      setLocation('/login')
+      setLocation('/login?redirect=/super-admin')
       return
     }
 
@@ -68,7 +68,7 @@ export default function SuperAdminScreen() {
 
       const meRes = await getMe() as any
       if (!meRes?.user || meRes.user.role !== 'superadmin') {
-        setLocation('/login')
+        setLocation('/login?redirect=/super-admin')
         return
       }
 
