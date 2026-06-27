@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
 import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, deleteTenant, createTenant } from '../api/client'
-import { getToken, clearAuthCache } from '../utils/tokenCache'
-import { secureRemove } from '../utils/secureStorage'
+import { getToken, setToken, clearAuthCache } from '../utils/tokenCache'
+import { secureGet, secureRemove } from '../utils/secureStorage'
 
 interface Tenant {
   id: string
@@ -52,7 +52,11 @@ export default function SuperAdminScreen() {
   }, [])
 
   const loadData = async () => {
-    const token = getToken()
+    let token = getToken()
+    if (!token) {
+      token = await secureGet('token')
+      if (token) setToken(token)
+    }
     if (!token) {
       setLocation('/login')
       return

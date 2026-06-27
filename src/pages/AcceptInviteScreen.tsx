@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useLocation, useSearch } from 'wouter'
 import { motion } from 'framer-motion'
 import { API_BASE } from '../api/client'
-import { getToken } from '../utils/tokenCache'
+import { getToken, setToken } from '../utils/tokenCache'
+import { secureGet } from '../utils/secureStorage'
 
 interface InviteDetails {
   valid: boolean
@@ -55,7 +56,11 @@ export default function AcceptInviteScreen() {
   }
 
   const acceptInvite = async () => {
-    const token = getToken()
+    let token = getToken()
+    if (!token) {
+      token = await secureGet('token')
+      if (token) setToken(token)
+    }
     if (!token) {
       // Redirect to login with return URL
       localStorage.setItem('carei_pending_invite', inviteCode)

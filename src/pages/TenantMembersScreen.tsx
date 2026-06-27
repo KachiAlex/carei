@@ -3,7 +3,8 @@ import { useLocation, useSearch } from 'wouter'
 import { motion } from 'framer-motion'
 import { useTenant } from '../contexts/TenantContext'
 import { API_BASE } from '../api/client'
-import { getToken } from '../utils/tokenCache'
+import { getToken, setToken } from '../utils/tokenCache'
+import { secureGet } from '../utils/secureStorage'
 
 interface Member {
   id: string
@@ -54,7 +55,11 @@ export default function TenantMembersScreen() {
   }, [tenantLoading, tenantSlug])
 
   const fetchMembers = async () => {
-    const token = getToken()
+    let token = getToken()
+    if (!token) {
+      token = await secureGet('token')
+      if (token) setToken(token)
+    }
     if (!token || !tenantSlug) return
 
     try {
@@ -81,7 +86,11 @@ export default function TenantMembersScreen() {
   }
 
   const fetchInvites = async () => {
-    const token = getToken()
+    let token = getToken()
+    if (!token) {
+      token = await secureGet('token')
+      if (token) setToken(token)
+    }
     if (!token || currentUserRole !== 'admin') return
 
     try {
@@ -105,7 +114,11 @@ export default function TenantMembersScreen() {
     setInviteSuccess(null)
 
     try {
-      const token = getToken()
+      let token = getToken()
+      if (!token) {
+        token = await secureGet('token')
+        if (token) setToken(token)
+      }
       const res = await fetch(`${API_BASE}/invites`, {
         method: 'POST',
         headers: {

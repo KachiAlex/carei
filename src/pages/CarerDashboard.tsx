@@ -19,7 +19,8 @@ import BiometricsPrompt from '../components/BiometricsPrompt'
 import PullToRefresh from '../components/PullToRefresh'
 import { sendVisitStartReminder, requestNotificationPermission } from '../utils/notifications'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
-import { getToken } from '../utils/tokenCache'
+import { getToken, setToken } from '../utils/tokenCache'
+import { secureGet } from '../utils/secureStorage'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -97,19 +98,29 @@ export default function CarerDashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = getToken()
-    if (!token) {
-      setLocation('/login')
-      return
-    }
-    getMe()
+    (async () => {
+      let token = getToken()
+      if (!token) {
+        token = await secureGet('token')
+        if (token) setToken(token)
+      }
+      if (!token) {
+        setLocation('/login')
+        return
+      }
+      getMe()
       .then((data) => { if (data.user) setUser(data.user) })
       .catch(() => {})
+    })()
   }, [])
 
   const refreshData = async () => {
     setLoading(true)
-    const token = getToken()
+    let token = getToken()
+    if (!token) {
+      token = await secureGet('token')
+      if (token) setToken(token)
+    }
     if (!token) {
       setLocation('/login')
       return

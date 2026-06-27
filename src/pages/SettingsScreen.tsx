@@ -10,8 +10,8 @@ import {
   updateBiometrics,
 } from '../api/client'
 import { isBiometricAvailable, verifyBiometric, getBiometricEnabled, setBiometricEnabled } from '../utils/biometric'
-import { getToken } from '../utils/tokenCache'
-import { secureSet } from '../utils/secureStorage'
+import { getToken, setToken } from '../utils/tokenCache'
+import { secureGet, secureSet } from '../utils/secureStorage'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -85,12 +85,17 @@ export default function SettingsScreen() {
   })
 
   useEffect(() => {
-    const token = getToken()
-    if (!token) {
-      setLocation('/login')
-      return
-    }
-    getMe()
+    (async () => {
+      let token = getToken()
+      if (!token) {
+        token = await secureGet('token')
+        if (token) setToken(token)
+      }
+      if (!token) {
+        setLocation('/login')
+        return
+      }
+      getMe()
       .then((data) => {
         if (data.user) {
           setUser(data.user)
@@ -110,7 +115,8 @@ export default function SettingsScreen() {
       .catch(() => {
         setBiometricsEnabled(getBiometricEnabled())
       })
-  }, [setLocation])
+    })()
+  }, [])
 
   const handleSaveProfile = async () => {
     setError('')
