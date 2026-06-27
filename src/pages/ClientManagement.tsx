@@ -230,6 +230,16 @@ export default function ClientManagement() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        const slug = window.location.pathname.match(/\/tenant\/([^\/]+)/)?.[1]
+                        if (slug) window.location.href = `/tenant/${slug}/manager/clients/${client.id}/care-plan/edit`
+                      }}
+                      className="w-11 h-11 rounded-lg flex items-center justify-center text-slate-400 hover:text-teal hover:bg-teal/5 transition-all bg-transparent border-none cursor-pointer touch-target"
+                      title="Edit Care Plan"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    </button>
                     <button onClick={() => openEdit(client)} className="w-11 h-11 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 transition-all bg-transparent border-none cursor-pointer touch-target">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                     </button>

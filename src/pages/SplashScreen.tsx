@@ -41,17 +41,7 @@ function LoadingOverlay({ onDone }: { onDone: () => void }) {
     >
       {/* Logo */}
       <div className="mb-8 animate-bounce">
-        <svg width="72" height="72" viewBox="0 0 32 32" fill="none">
-          <path d="M16 28C16 28 6 21 6 13C6 9.5 8.5 7 11.5 7C13.6 7 15.3 8.1 16 9.8C16.7 8.1 18.4 7 20.5 7C23.5 7 26 9.5 26 13C26 21 16 28 16 28Z" fill="url(#tealGradLoad)" />
-          <rect x="14" y="4" width="4" height="10" rx="1" fill="#fff" />
-          <rect x="10" y="8" width="12" height="4" rx="1" fill="#fff" />
-          <defs>
-            <linearGradient id="tealGradLoad" x1="6" y1="7" x2="26" y2="28" gradientUnits="userSpaceOnUse">
-              <stop stopColor={COLORS.teal} />
-              <stop offset="1" stopColor={COLORS.teal2} />
-            </linearGradient>
-          </defs>
-        </svg>
+        <img src="/logo.jpg" alt="CAREi" width="72" height="72" className="rounded-2xl" style={{ objectFit: 'cover' }} />
       </div>
       <h1 className="font-serif text-2xl text-white font-bold tracking-wide mb-1">CAREi</h1>
       <p className="text-white/40 text-xs mb-8">Loading your care environment…</p>
@@ -196,17 +186,7 @@ export default function SplashScreen() {
       {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-6xl mx-auto w-full" data-animate>
         <div className="flex items-center gap-2.5">
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-            <path d="M16 28C16 28 6 21 6 13C6 9.5 8.5 7 11.5 7C13.6 7 15.3 8.1 16 9.8C16.7 8.1 18.4 7 20.5 7C23.5 7 26 9.5 26 13C26 21 16 28 16 28Z" fill="url(#tealGrad2)" />
-            <rect x="14" y="4" width="4" height="10" rx="1" fill="#fff" />
-            <rect x="10" y="8" width="12" height="4" rx="1" fill="#fff" />
-            <defs>
-              <linearGradient id="tealGrad2" x1="6" y1="7" x2="26" y2="28" gradientUnits="userSpaceOnUse">
-                <stop stopColor={COLORS.teal} />
-                <stop offset="1" stopColor={COLORS.teal2} />
-              </linearGradient>
-            </defs>
-          </svg>
+          <img src="/logo.jpg" alt="CAREi" width="32" height="32" className="rounded-lg" style={{ objectFit: 'cover' }} />
           <span className="font-serif text-xl text-white tracking-wide font-semibold">CAREi</span>
         </div>
         <button
@@ -519,15 +499,7 @@ export default function SplashScreen() {
       <footer className="relative z-10 px-6 py-6 border-t" style={{ background: COLORS.darkNavy, borderColor: 'rgba(255,255,255,0.06)' }}>
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-              <path d="M16 28C16 28 6 21 6 13C6 9.5 8.5 7 11.5 7C13.6 7 15.3 8.1 16 9.8C16.7 8.1 18.4 7 20.5 7C23.5 7 26 9.5 26 13C26 21 16 28 16 28Z" fill="url(#tealGrad3)" />
-              <defs>
-                <linearGradient id="tealGrad3" x1="6" y1="7" x2="26" y2="28" gradientUnits="userSpaceOnUse">
-                  <stop stopColor={COLORS.teal} />
-                  <stop offset="1" stopColor={COLORS.teal2} />
-                </linearGradient>
-              </defs>
-            </svg>
+            <img src="/logo.jpg" alt="CAREi" width="20" height="20" className="rounded-md" style={{ objectFit: 'cover' }} />
             <span className="text-white/60 text-sm">CAREi</span>
           </div>
           <div className="text-white/30 text-xs text-center">

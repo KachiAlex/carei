@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useRoute } from 'wouter'
 import { motion } from 'framer-motion'
-import { getClient } from '../api/client'
+import { getClient, getCarePlan } from '../api/client'
+import { getToken } from '../utils/tokenCache'
+import { secureGet } from '../utils/secureStorage'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -23,21 +25,25 @@ interface Client {
   communicationGuidance?: string
   mobility?: string
   medications?: { name: string; dose: string; notes?: string }[]
-  pbsFramework?: {
-    strategies?: string[]
-    anxietySigns?: string[]
-    escalationSteps?: string[]
-    greenState?: string
-    amberState?: string
-    redState?: string
-    // Phase 5: Detailed PBS framework per document
-    calmSigns?: string[]
-    calmActions?: string[]
-    anxiousSigns?: string[]
-    anxiousActions?: string[]
-    riskSigns?: string[]
-    riskActions?: string[]
-  }
+}
+
+interface CarePlan {
+  id?: string
+  status?: string
+  version?: number
+  objectives?: string[]
+  preventive?: string[]
+  risks?: string[]
+  post_med?: string[]
+  last_review?: string[]
+  pbs_triggers?: string[]
+  safety_plan?: string[]
+  pbs_calm_signs?: string[]
+  pbs_calm_actions?: string[]
+  pbs_anxious_signs?: string[]
+  pbs_anxious_actions?: string[]
+  pbs_risk_signs?: string[]
+  pbs_risk_actions?: string[]
 }
 
 export default function CarePlanScreen() {
@@ -45,14 +51,30 @@ export default function CarePlanScreen() {
   const [match, params] = useRoute('/client/:id/care-plan')
   const clientId = params?.id || ''
   const [client, setClient] = useState<Client | null>(null)
+  const [plan, setPlan] = useState<CarePlan | null>(null)
   const [tab, setTab] = useState<'overview' | 'pbs' | 'medications' | 'history'>('overview')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!clientId) return
-    getClient(clientId)
-      .then((c: any) => { setClient(c); setLoading(false) })
-      .catch(() => setLoading(false))
+    ;(async () => {
+      let token = getToken()
+      if (!token) {
+        token = await secureGet('token')
+      }
+      try {
+        const [c, p] = await Promise.all([
+          getClient(clientId) as Promise<any>,
+          getCarePlan(clientId) as Promise<any>,
+        ])
+        setClient(c)
+        setPlan(p.plan)
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [clientId])
 
   if (loading) {
@@ -62,7 +84,7 @@ export default function CarePlanScreen() {
     return <div className="min-h-screen flex items-center justify-center text-slate-400">Client not found</div>
   }
 
-  const pbs = client.pbsFramework || {}
+  const pbs = plan || {}
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
@@ -102,6 +124,14 @@ export default function CarePlanScreen() {
       <div className="flex-1 px-4 py-4 overflow-auto">
         {tab === 'overview' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-3">
+            {/* Status Badge */}
+            {plan?.status && (
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${plan.status === 'published' ? 'bg-green-100 text-green-700' : plan.status === 'draft' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                  {plan.status.toUpperCase()}{plan.version ? ` · v${plan.version}` : ''}
+                </span>
+              </div>
+            )}
             {/* Conditions */}
             <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
               <h3 className="font-bold text-sm text-slate-800 mb-2">Conditions</h3>
@@ -116,6 +146,101 @@ export default function CarePlanScreen() {
               <div className="bg-white rounded-2xl p-4 border border-red-100 shadow-sm">
                 <h3 className="font-bold text-sm text-red-600 mb-1">Allergies</h3>
                 <p className="text-sm text-red-700">{client.allergies}</p>
+              </div>
+            )}
+            {/* Care Objectives */}
+            {plan?.objectives && plan.objectives.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                <h3 className="font-bold text-sm text-slate-800 mb-2">Care Objectives</h3>
+                <ul className="flex flex-col gap-1.5">
+                  {plan.objectives.map((item, i) => (
+                    <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-teal shrink-0">{i + 1}.</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* Preventive Strategies */}
+            {plan?.preventive && plan.preventive.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                <h3 className="font-bold text-sm text-slate-800 mb-2">Preventive Strategies</h3>
+                <ul className="flex flex-col gap-1.5">
+                  {plan.preventive.map((item, i) => (
+                    <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: COLORS.teal }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* Risks */}
+            {plan?.risks && plan.risks.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 border border-red-100 shadow-sm">
+                <h3 className="font-bold text-sm text-red-700 mb-2">Risks & Precautions</h3>
+                <ul className="flex flex-col gap-1.5">
+                  {plan.risks.map((item, i) => (
+                    <li key={i} className="text-xs text-red-700 flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: COLORS.red }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* PBS Triggers */}
+            {plan?.pbs_triggers && plan.pbs_triggers.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                <h3 className="font-bold text-sm text-slate-800 mb-2">PBS Triggers</h3>
+                <div className="flex flex-wrap gap-1.5">
+                  {plan.pbs_triggers.map((t, i) => (
+                    <span key={i} className="text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(167,139,250,0.1)', color: COLORS.lavender }}>{t}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Safety Plan */}
+            {plan?.safety_plan && plan.safety_plan.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 border border-red-100 shadow-sm">
+                <h3 className="font-bold text-sm text-red-700 mb-2">Safety Plan</h3>
+                <ul className="flex flex-col gap-1.5">
+                  {plan.safety_plan.map((item, i) => (
+                    <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-red-500 shrink-0">{i + 1}.</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* Post-Med Monitoring */}
+            {plan?.post_med && plan.post_med.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                <h3 className="font-bold text-sm text-slate-800 mb-2">Post-Medication Monitoring</h3>
+                <ul className="flex flex-col gap-1.5">
+                  {plan.post_med.map((item, i) => (
+                    <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: COLORS.teal }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {/* Review Details */}
+            {plan?.last_review && plan.last_review.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+                <h3 className="font-bold text-sm text-slate-800 mb-2">Review Details</h3>
+                <ul className="flex flex-col gap-1.5">
+                  {plan.last_review.map((item, i) => (
+                    <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: COLORS.amber }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
             {/* Support Level */}
@@ -153,21 +278,21 @@ export default function CarePlanScreen() {
                 <div className="w-3 h-3 rounded-full" style={{ background: '#22c55e' }} />
                 <h3 className="font-bold text-sm" style={{ color: '#16a34a' }}>🟢 Green State — Calm & Engaged</h3>
               </div>
-              {pbs.calmSigns && pbs.calmSigns.length > 0 && (
+              {pbs.pbs_calm_signs && pbs.pbs_calm_signs.length > 0 && (
                 <div className="mb-3">
                   <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Signs</div>
                   <div className="flex flex-wrap gap-1.5">
-                    {pbs.calmSigns.map((sign, i) => (
+                    {pbs.pbs_calm_signs.map((sign: string, i: number) => (
                       <span key={i} className="text-[10px] px-2 py-1 rounded-full bg-white border" style={{ borderColor: 'rgba(34,197,94,0.2)', color: '#16a34a' }}>{sign}</span>
                     ))}
                   </div>
                 </div>
               )}
-              {pbs.calmActions && pbs.calmActions.length > 0 && (
+              {pbs.pbs_calm_actions && pbs.pbs_calm_actions.length > 0 && (
                 <div>
                   <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Actions</div>
                   <ul className="flex flex-col gap-1">
-                    {pbs.calmActions.map((action, i) => (
+                    {pbs.pbs_calm_actions.map((action: string, i: number) => (
                       <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
                         <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: '#22c55e' }} />
                         {action}
@@ -176,8 +301,8 @@ export default function CarePlanScreen() {
                   </ul>
                 </div>
               )}
-              {!pbs.calmSigns && !pbs.calmActions && (
-                <p className="text-xs text-slate-500">{pbs.greenState || 'Client is calm, cooperative, and engaged. Maintain routine and positive reinforcement.'}</p>
+              {(!pbs.pbs_calm_signs || pbs.pbs_calm_signs.length === 0) && (!pbs.pbs_calm_actions || pbs.pbs_calm_actions.length === 0) && (
+                <p className="text-xs text-slate-500">Client is calm, cooperative, and engaged. Maintain routine and positive reinforcement.</p>
               )}
             </div>
 
@@ -187,21 +312,21 @@ export default function CarePlanScreen() {
                 <div className="w-3 h-3 rounded-full" style={{ background: COLORS.amber }} />
                 <h3 className="font-bold text-sm" style={{ color: '#d97706' }}>🟠 Amber State — Early Distress</h3>
               </div>
-              {pbs.anxiousSigns && pbs.anxiousSigns.length > 0 && (
+              {pbs.pbs_anxious_signs && pbs.pbs_anxious_signs.length > 0 && (
                 <div className="mb-3">
                   <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Warning Signs</div>
                   <div className="flex flex-wrap gap-1.5">
-                    {pbs.anxiousSigns.map((sign, i) => (
+                    {pbs.pbs_anxious_signs.map((sign: string, i: number) => (
                       <span key={i} className="text-[10px] px-2 py-1 rounded-full bg-white border" style={{ borderColor: 'rgba(246,183,60,0.3)', color: '#d97706' }}>{sign}</span>
                     ))}
                   </div>
                 </div>
               )}
-              {pbs.anxiousActions && pbs.anxiousActions.length > 0 && (
+              {pbs.pbs_anxious_actions && pbs.pbs_anxious_actions.length > 0 && (
                 <div>
                   <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Response Actions</div>
                   <ul className="flex flex-col gap-1">
-                    {pbs.anxiousActions.map((action, i) => (
+                    {pbs.pbs_anxious_actions.map((action: string, i: number) => (
                       <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
                         <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: COLORS.amber }} />
                         {action}
@@ -210,8 +335,8 @@ export default function CarePlanScreen() {
                   </ul>
                 </div>
               )}
-              {!pbs.anxiousSigns && !pbs.anxiousActions && (
-                <p className="text-xs text-slate-500">{pbs.amberState || 'Client showing early signs of distress. Use de-escalation techniques and redirection.'}</p>
+              {(!pbs.pbs_anxious_signs || pbs.pbs_anxious_signs.length === 0) && (!pbs.pbs_anxious_actions || pbs.pbs_anxious_actions.length === 0) && (
+                <p className="text-xs text-slate-500">Client showing early signs of distress. Use de-escalation techniques and redirection.</p>
               )}
             </div>
 
@@ -221,21 +346,21 @@ export default function CarePlanScreen() {
                 <div className="w-3 h-3 rounded-full" style={{ background: COLORS.red }} />
                 <h3 className="font-bold text-sm" style={{ color: '#dc2626' }}>🔴 Red State — High Distress / Crisis</h3>
               </div>
-              {pbs.riskSigns && pbs.riskSigns.length > 0 && (
+              {pbs.pbs_risk_signs && pbs.pbs_risk_signs.length > 0 && (
                 <div className="mb-3">
                   <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Risk Signs</div>
                   <div className="flex flex-wrap gap-1.5">
-                    {pbs.riskSigns.map((sign, i) => (
+                    {pbs.pbs_risk_signs.map((sign: string, i: number) => (
                       <span key={i} className="text-[10px] px-2 py-1 rounded-full bg-white border" style={{ borderColor: 'rgba(255,90,95,0.3)', color: '#dc2626' }}>{sign}</span>
                     ))}
                   </div>
                 </div>
               )}
-              {pbs.riskActions && pbs.riskActions.length > 0 && (
+              {pbs.pbs_risk_actions && pbs.pbs_risk_actions.length > 0 && (
                 <div>
                   <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Immediate Actions</div>
                   <ul className="flex flex-col gap-1">
-                    {pbs.riskActions.map((action, i) => (
+                    {pbs.pbs_risk_actions.map((action: string, i: number) => (
                       <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
                         <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: COLORS.red }} />
                         {action}
@@ -244,17 +369,17 @@ export default function CarePlanScreen() {
                   </ul>
                 </div>
               )}
-              {!pbs.riskSigns && !pbs.riskActions && (
-                <p className="text-xs text-slate-500">{pbs.redState || 'Client in crisis. Prioritize safety, create space, and call for support immediately.'}</p>
+              {(!pbs.pbs_risk_signs || pbs.pbs_risk_signs.length === 0) && (!pbs.pbs_risk_actions || pbs.pbs_risk_actions.length === 0) && (
+                <p className="text-xs text-slate-500">Client in crisis. Prioritize safety, create space, and call for support immediately.</p>
               )}
             </div>
 
             {/* De-escalation Steps */}
-            {pbs.escalationSteps && pbs.escalationSteps.length > 0 && (
+            {plan?.safety_plan && plan.safety_plan.length > 0 && (
               <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-sm text-slate-800 mb-2">De-escalation Steps</h3>
+                <h3 className="font-bold text-sm text-slate-800 mb-2">De-escalation Steps (from Safety Plan)</h3>
                 <ol className="flex flex-col gap-1.5">
-                  {pbs.escalationSteps.map((s, i) => (
+                  {plan.safety_plan.map((s, i) => (
                     <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
                       <span className="text-[10px] font-bold text-teal shrink-0">{i + 1}.</span>
                       {s}

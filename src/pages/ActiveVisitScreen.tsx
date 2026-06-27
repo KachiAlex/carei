@@ -912,14 +912,27 @@ export default function ActiveVisitScreen() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
             Back
           </motion.button>
-          <div className="relative z-10 flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
-              {client.name.split(' ').map((n: string) => n[0]).join('')}
+          <div className="relative z-10 flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold" style={{ background: `linear-gradient(135deg, ${COLORS.teal}25, ${COLORS.teal2}15)`, color: COLORS.teal }}>
+                {client.name.split(' ').map((n: string) => n[0]).join('')}
+              </div>
+              <div>
+                <h1 className="font-serif text-xl font-bold">{client.name}</h1>
+                <p className="text-white/50 text-sm">{visit.time} · {visit.duration}</p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-serif text-xl font-bold">{client.name}</h1>
-              <p className="text-white/50 text-sm">{visit.time} · {visit.duration}</p>
-            </div>
+            <button
+              onClick={() => {
+                const slug = window.location.pathname.match(/\/tenant\/([^\/]+)/)?.[1]
+                if (slug) window.location.href = `/tenant/${slug}/client/${client.id}/care-plan`
+                else window.location.href = `/client/${client.id}/care-plan`
+              }}
+              className="w-10 h-10 rounded-full flex items-center justify-center border border-white/10 bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              title="View Care Plan"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            </button>
           </div>
         </div>
 

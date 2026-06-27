@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, deleteTenant, createTenant } from '../api/client'
+import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, updateTenantPrice, deleteTenant, createTenant } from '../api/client'
 import { getToken, setToken, clearAuthCache } from '../utils/tokenCache'
 import { secureGet, secureRemove } from '../utils/secureStorage'
 
@@ -13,6 +13,8 @@ interface Tenant {
   max_users: number
   max_clients: number
   subscription_status: string
+  price_per_carer: number | null
+  billing_model: string
   user_count: number
   client_count: number
   visit_count: number
@@ -45,6 +47,7 @@ export default function SuperAdminScreen() {
     activeToday: 0,
     totalClients: 0,
     totalVisits: 0,
+    estimatedMrr: 0,
   })
 
   useEffect(() => {
@@ -76,12 +79,18 @@ export default function SuperAdminScreen() {
       const tenantList: Tenant[] = data.tenants || []
       setTenants(tenantList)
 
+      const activeTenants = tenantList.filter(t => t.active)
+      const estimatedMrr = activeTenants.reduce((acc, t) => {
+        const price = t.price_per_carer ?? 0
+        return acc + (price * (t.user_count || 0))
+      }, 0)
       setStats({
         totalTenants: tenantList.length,
         totalUsers: tenantList.reduce((acc, t) => acc + (t.user_count || 0), 0),
-        activeToday: tenantList.filter(t => t.active).length,
+        activeToday: activeTenants.length,
         totalClients: tenantList.reduce((acc, t) => acc + (t.client_count || 0), 0),
         totalVisits: tenantList.reduce((acc, t) => acc + (t.visit_count || 0), 0),
+        estimatedMrr,
       })
     } catch (err: any) {
       setError(err.message)
@@ -115,6 +124,17 @@ export default function SuperAdminScreen() {
     setActionError(null)
     try {
       await deleteTenant(slug)
+      await loadData()
+    } catch (err: any) {
+      setActionError(err.message)
+    }
+  }
+
+  const handlePriceChange = async (slug: string, price: number) => {
+    if (price < 0) return
+    setActionError(null)
+    try {
+      await updateTenantPrice(slug, price)
       await loadData()
     } catch (err: any) {
       setActionError(err.message)
@@ -217,7 +237,7 @@ export default function SuperAdminScreen() {
 
       <div className="max-w-7xl mx-auto p-6">
         {/* Stats */}
-        <div className="grid grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 mb-8">
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
             <div className="text-3xl font-bold text-white mb-1">{stats.totalTenants}</div>
             <div className="text-white/50 text-sm">Organizations</div>
@@ -237,6 +257,30 @@ export default function SuperAdminScreen() {
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
             <div className="text-3xl font-bold text-green-400 mb-1">{stats.activeToday}</div>
             <div className="text-white/50 text-sm">Active Tenants</div>
+          </div>
+          <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+            <div className="text-3xl font-bold text-emerald-400 mb-1">£{stats.estimatedMrr.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</div>
+            <div className="text-white/50 text-sm">Est. MRR</div>
+          </div>
+        </div>
+
+        {/* Licensing Recommendation */}
+        <div className="bg-white/5 rounded-xl p-4 border border-white/10 mb-8">
+          <h3 className="font-semibold text-white mb-2">Recommended Per-Carer Licensing Structure</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
+            {[
+              { name: 'Micro', carers: '1-5', price: '£9', note: 'No minimum' },
+              { name: 'Starter', carers: '6-15', price: '£7', note: 'Small agency sweet spot' },
+              { name: 'Growth', carers: '16-40', price: '£5', note: 'Volume discount' },
+              { name: 'Enterprise', carers: '41+', price: '£4', note: 'Custom negotiation' },
+            ].map((tier) => (
+              <div key={tier.name} className="rounded-lg p-3 border border-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                <div className="text-white font-medium text-sm">{tier.name}</div>
+                <div className="text-teal-400 font-bold text-lg">{tier.price}<span className="text-white/40 text-xs font-normal">/carer/mo</span></div>
+                <div className="text-white/40 text-xs">{tier.carers} carers</div>
+                <div className="text-white/30 text-[10px] mt-0.5">{tier.note}</div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -266,6 +310,8 @@ export default function SuperAdminScreen() {
                   <th className="px-4 py-2">Slug</th>
                   <th className="px-4 py-2">Plan</th>
                   <th className="px-4 py-2">Users / Limit</th>
+                  <th className="px-4 py-2">Price / Carer</th>
+                  <th className="px-4 py-2">Est. Monthly</th>
                   <th className="px-4 py-2">Clients</th>
                   <th className="px-4 py-2">Visits</th>
                   <th className="px-4 py-2">Status</th>
@@ -293,6 +339,38 @@ export default function SuperAdminScreen() {
                     </td>
                     <td className="px-4 py-3 text-white/60">
                       {tenant.user_count} / {tenant.max_users}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <span className="text-white/40 text-xs">£</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          defaultValue={tenant.price_per_carer ?? ''}
+                          onBlur={(e) => {
+                            const val = parseFloat(e.target.value)
+                            if (!isNaN(val) && val !== (tenant.price_per_carer ?? 0)) {
+                              handlePriceChange(tenant.slug, val)
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              const val = parseFloat((e.target as HTMLInputElement).value)
+                              if (!isNaN(val) && val !== (tenant.price_per_carer ?? 0)) {
+                                handlePriceChange(tenant.slug, val)
+                              }
+                            }
+                          }}
+                          className="w-16 bg-slate-800 text-white text-xs rounded px-2 py-1 border border-white/10 outline-none focus:border-teal-400"
+                          placeholder="—"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-emerald-400 font-medium">
+                        {tenant.price_per_carer ? `£${(tenant.price_per_carer * tenant.user_count).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-white/60">{tenant.client_count}</td>
                     <td className="px-4 py-3 text-white/60">{tenant.visit_count}</td>

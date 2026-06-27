@@ -779,6 +779,20 @@ export async function updateTenantActive(slug: string, active: boolean) {
   return res.json()
 }
 
+export async function updateTenantPrice(slug: string, pricePerCarer: number, billingModel?: string) {
+  const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}&action=price`, {
+    method: 'PATCH',
+    headers: { ...jsonHeaders, ...authHeaders() },
+    body: JSON.stringify({ pricePerCarer, ...(billingModel ? { billingModel } : {}) }),
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 export async function deleteTenant(slug: string) {
   const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}`, {
     method: 'DELETE',
@@ -794,4 +808,70 @@ export async function deleteTenant(slug: string) {
 
 export async function getAllTenantsAdmin() {
   return get('/tenants?admin=true')
+}
+
+// ─── Care Plans ───
+
+export interface CarePlanData {
+  objectives?: string[]
+  preventive?: string[]
+  risks?: string[]
+  postMed?: string[]
+  lastReview?: string[]
+  pbsTriggers?: string[]
+  safetyPlan?: string[]
+  pbsCalmSigns?: string[]
+  pbsCalmActions?: string[]
+  pbsAnxiousSigns?: string[]
+  pbsAnxiousActions?: string[]
+  pbsRiskSigns?: string[]
+  pbsRiskActions?: string[]
+}
+
+export async function getCarePlan(clientId: string) {
+  return get(`/care-plans?clientId=${encodeURIComponent(clientId)}`)
+}
+
+export async function createCarePlan(data: { clientId: string } & CarePlanData) {
+  return post('/care-plans', data)
+}
+
+export async function updateCarePlan(planId: string, data: CarePlanData) {
+  const res = await fetch(`${API_BASE}/care-plans?id=${encodeURIComponent(planId)}`, {
+    method: 'PUT',
+    headers: { ...jsonHeaders, ...authHeaders() },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function publishCarePlan(planId: string) {
+  const res = await fetch(`${API_BASE}/care-plans?id=${encodeURIComponent(planId)}&action=publish`, {
+    method: 'PATCH',
+    headers: { ...jsonHeaders, ...authHeaders() },
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function archiveCarePlan(planId: string) {
+  const res = await fetch(`${API_BASE}/care-plans?id=${encodeURIComponent(planId)}&action=archive`, {
+    method: 'PATCH',
+    headers: { ...jsonHeaders, ...authHeaders() },
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
 }

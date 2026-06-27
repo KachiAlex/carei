@@ -327,6 +327,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
+      // Update price per carer (superadmin only)
+      if (action === 'price') {
+        if (user.role !== 'superadmin') { res.status(403).json({ error: 'Superadmin access required' }); return }
+        if (!targetSlug) { res.status(400).json({ error: 'slug query param required' }); return }
+
+        const tenant = await getTenantFromSlug(targetSlug)
+        if (!tenant) { res.status(404).json({ error: 'Tenant not found' }); return }
+
+        const { pricePerCarer, billingModel } = req.body || {}
+        if (pricePerCarer !== undefined && (typeof pricePerCarer !== 'number' || pricePerCarer < 0)) {
+          res.status(400).json({ error: 'pricePerCarer must be a non-negative number' })
+          return
+        }
+
+        if (pricePerCarer !== undefined) {
+          await sql`UPDATE tenants SET price_per_carer = ${pricePerCarer}, updated_at = NOW() WHERE id = ${tenant.id}`
+        }
+        if (billingModel !== undefined) {
+          await sql`UPDATE tenants SET billing_model = ${billingModel}, updated_at = NOW() WHERE id = ${tenant.id}`
+        }
+
+        res.status(200).json({
+          message: 'Pricing updated successfully',
+          pricePerCarer: pricePerCarer ?? tenant.price_per_carer,
+          billingModel: billingModel ?? tenant.billing_model,
+        })
+        return
+      }
+
       res.status(400).json({ error: 'Unknown patch action' })
       return
     }

@@ -702,6 +702,44 @@ async function runMigrations() {
     await sql`ALTER TABLE users ALTER COLUMN pin DROP NOT NULL`
   })
 
+  await run(22, 'create_care_plans_table', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS care_plans (
+        id TEXT PRIMARY KEY,
+        client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+        tenant_id TEXT NOT NULL,
+        created_by TEXT REFERENCES users(id),
+        updated_by TEXT REFERENCES users(id),
+        status TEXT NOT NULL DEFAULT 'draft',
+        version INTEGER NOT NULL DEFAULT 1,
+        objectives TEXT[],
+        preventive TEXT[],
+        risks TEXT[],
+        post_med TEXT[],
+        last_review TEXT[],
+        pbs_triggers TEXT[],
+        safety_plan TEXT[],
+        pbs_calm_signs TEXT[],
+        pbs_calm_actions TEXT[],
+        pbs_anxious_signs TEXT[],
+        pbs_anxious_actions TEXT[],
+        pbs_risk_signs TEXT[],
+        pbs_risk_actions TEXT[],
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        published_at TIMESTAMPTZ
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_care_plans_client ON care_plans(client_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_care_plans_tenant ON care_plans(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_care_plans_status ON care_plans(status)`
+  })
+
+  await run(23, 'add_tenant_price_per_carer', async () => {
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS price_per_carer NUMERIC(10,2)`
+    await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS billing_model TEXT DEFAULT 'per-carer'`
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (
@@ -715,6 +753,8 @@ async function runMigrations() {
       active BOOLEAN DEFAULT TRUE,
       expires_at TIMESTAMPTZ,
       subscription_status TEXT DEFAULT 'active',
+      price_per_carer NUMERIC(10,2),
+      billing_model TEXT DEFAULT 'per-carer',
       settings JSONB DEFAULT '{}',
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -805,9 +845,9 @@ export function getTenantSlug(req: any): string | null {
   return null
 }
 
-export async function getTenantFromSlug(slug: string): Promise<{ id: string; slug: string; name: string } | null> {
+export async function getTenantFromSlug(slug: string): Promise<{ id: string; slug: string; name: string; price_per_carer?: number; billing_model?: string } | null> {
   const sql = getSql()
-  const rows = await sql`SELECT id, slug, name FROM tenants WHERE slug = ${slug}`
+  const rows = await sql`SELECT id, slug, name, price_per_carer, billing_model FROM tenants WHERE slug = ${slug}`
   return rows[0] as any || null
 }
 
@@ -973,6 +1013,8 @@ export async function getAllTenantsWithStats(): Promise<Array<{
   max_users: number
   max_clients: number
   subscription_status: string
+  price_per_carer: number | null
+  billing_model: string
   user_count: number
   client_count: number
   visit_count: number
@@ -1025,6 +1067,8 @@ export async function getAllTenantsWithStats(): Promise<Array<{
     max_users: r.max_users ?? 3,
     max_clients: r.max_clients ?? 10,
     subscription_status: r.subscription_status ?? 'active',
+    price_per_carer: r.price_per_carer ? parseFloat(r.price_per_carer) : null,
+    billing_model: r.billing_model ?? 'per-carer',
     user_count: parseInt(r.user_count || '0', 10),
     client_count: parseInt(r.client_count || '0', 10),
     visit_count: parseInt(r.visit_count || '0', 10),
