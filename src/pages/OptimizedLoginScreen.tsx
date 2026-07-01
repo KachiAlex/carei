@@ -94,7 +94,7 @@ interface UserInfo {
   userId: string
 }
 
-export default function LoginScreen() {
+export default function OptimizedLoginScreen() {
   const [, setLocation] = useLocation()
   const search = useSearch()
   const redirectPath = (() => {

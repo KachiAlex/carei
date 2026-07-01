@@ -218,9 +218,13 @@ export default function SuperAdminScreen() {
       <div className="bg-slate-900/50 border-b border-white/10 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-slate-900 font-bold text-lg">
-              C
-            </div>
+            <button 
+              onClick={() => setLocation('/')}
+              className="bg-transparent border-none cursor-pointer transition-transform hover:scale-105"
+              title="Go to home"
+            >
+              <img src="/logo.jpg" alt="CAREi" width="40" height="40" className="rounded-xl" style={{ objectFit: 'cover' }} />
+            </button>
             <div>
               <h1 className="font-bold text-white">Super Admin</h1>
               <p className="text-white/40 text-xs">Platform Management</p>

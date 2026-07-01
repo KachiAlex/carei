@@ -98,6 +98,8 @@ const AcceptInviteScreen = lazy(() => import('./pages/AcceptInviteScreen'))
 const TenantMembersScreen = lazy(() => import('./pages/TenantMembersScreen'))
 const SettingsScreen = lazy(() => import('./pages/SettingsScreen'))
 const ManagerCarePlanEditScreen = lazy(() => import('./pages/ManagerCarePlanEditScreen'))
+const EnhancedManagerCarePlanEditScreen = lazy(() => import('./pages/EnhancedManagerCarePlanEditScreen'))
+const FinalEnhancedCarePlanEditScreen = lazy(() => import('./pages/FinalEnhancedCarePlanEditScreen'))
 
 function LoadingFallback() {
   return (
@@ -157,6 +159,8 @@ function TenantRoutes() {
         <Route path="/tenant/:slug/manager" component={ManagerDashboard} />
         <Route path="/tenant/:slug/manager/clients" component={ClientManagement} />
         <Route path="/tenant/:slug/manager/clients/:id/care-plan/edit" component={ManagerCarePlanEditScreen} />
+        <Route path="/tenant/:slug/manager/clients/:id/care-plan/enhanced" component={EnhancedManagerCarePlanEditScreen} />
+        <Route path="/tenant/:slug/manager/clients/:id/care-plan/final" component={FinalEnhancedCarePlanEditScreen} />
         <Route path="/tenant/:slug/manager/schedule" component={VisitScheduling} />
         <Route path="/tenant/:slug/manager/approvals" component={ManagerApprovalsScreen} />
         <Route path="/tenant/:slug/manager/audit" component={ManagerAuditScreen} />
