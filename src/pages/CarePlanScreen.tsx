@@ -134,7 +134,10 @@ export default function CarePlanScreen() {
             )}
             {/* Conditions */}
             <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-              <h3 className="font-bold text-sm text-slate-800 mb-2">Conditions</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="font-bold text-sm text-slate-800">Conditions</h3>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">From client profile</span>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 {client.conditions?.map((c) => (
                   <span key={c} className="text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>{c}</span>
@@ -144,14 +147,20 @@ export default function CarePlanScreen() {
             {/* Allergies */}
             {client.allergies && (
               <div className="bg-white rounded-2xl p-4 border border-red-100 shadow-sm">
-                <h3 className="font-bold text-sm text-red-600 mb-1">Allergies</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-bold text-sm text-red-600">Allergies</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">From client profile</span>
+                </div>
                 <p className="text-sm text-red-700">{client.allergies}</p>
               </div>
             )}
             {/* Care Objectives */}
             {plan?.objectives && plan.objectives.length > 0 && (
               <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-sm text-slate-800 mb-2">Care Objectives</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-bold text-sm text-slate-800">Care Objectives</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">From care plan</span>
+                </div>
                 <ul className="flex flex-col gap-1.5">
                   {plan.objectives.map((item, i) => (
                     <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
@@ -165,7 +174,10 @@ export default function CarePlanScreen() {
             {/* Preventive Strategies */}
             {plan?.preventive && plan.preventive.length > 0 && (
               <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-sm text-slate-800 mb-2">Preventive Strategies</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-bold text-sm text-slate-800">Preventive Strategies</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">From care plan</span>
+                </div>
                 <ul className="flex flex-col gap-1.5">
                   {plan.preventive.map((item, i) => (
                     <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
@@ -179,7 +191,10 @@ export default function CarePlanScreen() {
             {/* Risks */}
             {plan?.risks && plan.risks.length > 0 && (
               <div className="bg-white rounded-2xl p-4 border border-red-100 shadow-sm">
-                <h3 className="font-bold text-sm text-red-700 mb-2">Risks & Precautions</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-bold text-sm text-red-700">Risks & Precautions</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">From care plan</span>
+                </div>
                 <ul className="flex flex-col gap-1.5">
                   {plan.risks.map((item, i) => (
                     <li key={i} className="text-xs text-red-700 flex items-start gap-2">
@@ -193,7 +208,10 @@ export default function CarePlanScreen() {
             {/* PBS Triggers */}
             {plan?.pbs_triggers && plan.pbs_triggers.length > 0 && (
               <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-sm text-slate-800 mb-2">PBS Triggers</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-bold text-sm text-slate-800">PBS Triggers</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">From care plan</span>
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {plan.pbs_triggers.map((t, i) => (
                     <span key={i} className="text-[10px] font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(167,139,250,0.1)', color: COLORS.lavender }}>{t}</span>
@@ -204,7 +222,10 @@ export default function CarePlanScreen() {
             {/* Safety Plan */}
             {plan?.safety_plan && plan.safety_plan.length > 0 && (
               <div className="bg-white rounded-2xl p-4 border border-red-100 shadow-sm">
-                <h3 className="font-bold text-sm text-red-700 mb-2">Safety Plan</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-bold text-sm text-red-700">Safety Plan</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">From care plan</span>
+                </div>
                 <ul className="flex flex-col gap-1.5">
                   {plan.safety_plan.map((item, i) => (
                     <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
@@ -218,7 +239,10 @@ export default function CarePlanScreen() {
             {/* Post-Med Monitoring */}
             {plan?.post_med && plan.post_med.length > 0 && (
               <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-sm text-slate-800 mb-2">Post-Medication Monitoring</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-bold text-sm text-slate-800">Post-Medication Monitoring</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">From care plan</span>
+                </div>
                 <ul className="flex flex-col gap-1.5">
                   {plan.post_med.map((item, i) => (
                     <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
@@ -232,7 +256,10 @@ export default function CarePlanScreen() {
             {/* Review Details */}
             {plan?.last_review && plan.last_review.length > 0 && (
               <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-sm text-slate-800 mb-2">Review Details</h3>
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-bold text-sm text-slate-800">Review Details</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">From care plan</span>
+                </div>
                 <ul className="flex flex-col gap-1.5">
                   {plan.last_review.map((item, i) => (
                     <li key={i} className="text-xs text-slate-600 flex items-start gap-2">
@@ -246,21 +273,30 @@ export default function CarePlanScreen() {
             {/* Support Level */}
             {client.supportFramework && (
               <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-sm text-slate-800 mb-1">Support Framework</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-bold text-sm text-slate-800">Support Framework</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">From client profile</span>
+                </div>
                 <p className="text-sm text-slate-600">{client.supportFramework}</p>
               </div>
             )}
             {/* Communication */}
             {client.communicationGuidance && (
               <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-sm text-slate-800 mb-1">Communication Guidance</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-bold text-sm text-slate-800">Communication Guidance</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">From client profile</span>
+                </div>
                 <p className="text-sm text-slate-600">{client.communicationGuidance}</p>
               </div>
             )}
             {/* Mobility */}
             {client.mobility && (
               <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-                <h3 className="font-bold text-sm text-slate-800 mb-1">Mobility</h3>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-bold text-sm text-slate-800">Mobility</h3>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">From client profile</span>
+                </div>
                 <p className="text-sm text-slate-600">{client.mobility}</p>
               </div>
             )}
@@ -270,7 +306,10 @@ export default function CarePlanScreen() {
         {tab === 'pbs' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-3">
             {/* Phase 5: Enhanced PBS Framework - Green / Amber / Red State Cards */}
-            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">PBS Framework States</div>
+            <div className="flex items-center gap-2">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">PBS Framework States</div>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-100 text-teal-700">From care plan</span>
+            </div>
             
             {/* GREEN State - Calm */}
             <div className="rounded-2xl p-4 border" style={{ background: 'rgba(34,197,94,0.04)', borderColor: 'rgba(34,197,94,0.15)' }}>
@@ -393,6 +432,10 @@ export default function CarePlanScreen() {
 
         {tab === 'medications' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Medications</div>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">From client profile</span>
+            </div>
             {(client.medications || []).map((med, i) => (
               <div key={i} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
                 <div className="flex items-center justify-between mb-1">
@@ -403,7 +446,7 @@ export default function CarePlanScreen() {
               </div>
             ))}
             {(!client.medications || client.medications.length === 0) && (
-              <div className="text-center text-sm text-slate-400 py-8">No medications recorded</div>
+              <div className="text-center text-sm text-slate-400 py-8">No medications recorded in client profile</div>
             )}
           </motion.div>
         )}
