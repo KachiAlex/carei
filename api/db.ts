@@ -740,6 +740,13 @@ async function runMigrations() {
     await sql`ALTER TABLE tenants ADD COLUMN IF NOT EXISTS billing_model TEXT DEFAULT 'per-carer'`
   })
 
+  await run(24, 'add_email_verified_to_users', async () => {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified BOOLEAN DEFAULT FALSE`
+    // Backfill: mark all existing users as email_verified since they already registered
+    await sql`UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL`
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (
