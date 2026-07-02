@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useLocation, useParams } from 'wouter'
 import { getClient, startVisit } from '../api/client'
+import FamilyMemberInvitation from '../components/FamilyMemberInvitation'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -54,6 +55,7 @@ export default function ClientOverviewScreen() {
   const [loading, setLoading] = useState(true)
   const [startingVisit, setStartingVisit] = useState(false)
   const [dismissedAllergy, setDismissedAllergy] = useState(false)
+  const [showFamilyInvite, setShowFamilyInvite] = useState(false)
   const [dismissedChoking, setDismissedChoking] = useState(false)
 
   useEffect(() => {
@@ -351,6 +353,37 @@ export default function ClientOverviewScreen() {
             </div>
           )}
 
+          {/* Family Portal Access */}
+          <div className="mb-4 rounded-2xl p-4 border border-teal/20 bg-teal/5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="text-[10px] font-semibold text-teal uppercase tracking-wider mb-1">Family Portal</div>
+                <div className="text-sm font-medium text-slate-800">Manage Family Access</div>
+              </div>
+              <button
+                onClick={() => setShowFamilyInvite(true)}
+                className="px-3 py-1.5 bg-teal text-white text-xs font-medium rounded-lg hover:bg-teal/90 transition-colors flex items-center gap-1"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <line x1="19" x2="19" y1="8" y2="14"/>
+                  <line x1="16" x2="22" y1="11" y2="11"/>
+                </svg>
+                Invite Family
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mb-2">
+              Give family members secure access to {client.name}'s care updates, visit summaries, and messaging.
+            </p>
+            <div className="flex items-center gap-2 text-xs text-teal">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              Secure, role-based access with audit logging
+            </div>
+          </div>
+
           {/* Last Handover */}
           {client.lastHandover && (
             <div className="mb-4 rounded-2xl p-4 border border-slate-100 bg-white">
@@ -414,6 +447,33 @@ export default function ClientOverviewScreen() {
           </motion.button>
         </div>
       </div>
+
+      {/* Family Invitation Modal */}
+      <AnimatePresence>
+        {showFamilyInvite && client && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            onClick={() => setShowFamilyInvite(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-lg"
+            >
+              <FamilyMemberInvitation
+                clientId={client.id}
+                clientName={client.name}
+                onClose={() => setShowFamilyInvite(false)}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
