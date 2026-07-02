@@ -78,7 +78,8 @@ export function useOnlineSync() {
               break
               
             case 'family-message':
-              await sendFamilyMessage(item.payload as any)
+              const { clientId, message } = item.payload as { clientId: string; message: string }
+              await sendFamilyMessage(clientId, message)
               break
               
             case 'visit-approval':

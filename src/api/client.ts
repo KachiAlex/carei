@@ -96,7 +96,7 @@ async function postWithRetry(path: string, body: unknown, retries = 3): Promise<
   throw lastError || new Error('Network error after retries')
 }
 
-async function post(path: string, body: unknown) {
+export async function post(path: string, body: unknown) {
   return postWithRetry(path, body)
 }
 
@@ -133,8 +133,35 @@ async function getWithRetry(path: string, retries = 3): Promise<any> {
   throw lastError || new Error('Network error after retries')
 }
 
-async function get(path: string) {
+export async function get(path: string) {
   return getWithRetry(path)
+}
+
+export async function put(path: string, body: unknown) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'PUT',
+    headers: { ...jsonHeaders, ...authHeaders() },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function del(path: string) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) {
+    handleAuthError(res.status)
+    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
 }
 
 export async function chatWithAI(message: string, context?: string) {
@@ -644,19 +671,6 @@ export async function getAgency(id: string) {
   return get(`/agencies?id=${id}`)
 }
 
-export async function sendFamilyMessage(data: {
-  visitId?: string
-  clientId?: string
-  message: string
-}) {
-  return post('/family-messages', data)
-}
-
-export async function getFamilyMessages(visitId?: string, clientId?: string) {
-  const qs = visitId ? `?visitId=${visitId}` : clientId ? `?clientId=${clientId}` : ''
-  return get(`/family-messages${qs}`)
-}
-
 export async function getVisitApprovals(status?: string) {
   const qs = status ? `?status=${status}` : ''
   return get(`/visit-approvals${qs}`)
@@ -707,6 +721,128 @@ export async function sendOtp(data: { email: string; purpose?: string }) {
 
 export async function verifyOtp(data: { email: string; code: string; purpose?: string; userData?: any }) {
   return post('/otp', { action: 'verify', ...data })
+}
+
+// Family Authentication API
+export async function familyLogin(data: { email: string; pin: string }) {
+  const res = await post('/family/auth/login', data) as any
+  if (res.token) {
+    setToken(res.token)
+    localStorage.setItem('familyToken', res.token)
+    localStorage.setItem('familyRefreshToken', res.refreshToken)
+    localStorage.setItem('familyMember', JSON.stringify(res.familyMember))
+  }
+  return res
+}
+
+export async function familyRegister(data: {
+  name: string
+  email: string
+  phoneNumber?: string
+  relationship: string
+  clientId: string
+  invitedBy: string
+  role: 'primary' | 'secondary' | 'limited'
+}) {
+  return post('/family/auth/register', data)
+}
+
+export async function familyLogout() {
+  try {
+    await post('/family/auth/logout', {})
+  } finally {
+    localStorage.removeItem('familyToken')
+    localStorage.removeItem('familyRefreshToken')
+    localStorage.removeItem('familyMember')
+  }
+}
+
+export async function refreshFamilyToken(refreshToken: string) {
+  const res = await post('/family/auth/refresh', { refreshToken }) as any
+  if (res.token) {
+    localStorage.setItem('familyToken', res.token)
+    localStorage.setItem('familyRefreshToken', res.refreshToken)
+  }
+  return res
+}
+
+export async function sendFamilyPasswordReset(email: string) {
+  return post('/family/auth/forgot-password', { email })
+}
+
+export async function resetFamilyPassword(data: { token: string; pin: string }) {
+  return post('/family/auth/reset-password', data)
+}
+
+// Family Dashboard API
+export async function getFamilyDashboard() {
+  return get('/family/dashboard')
+}
+
+export async function getFamilyClientDetails(clientId: string) {
+  return get(`/family/clients/${clientId}`)
+}
+
+// Family Member Management
+export async function getFamilyMembers(clientId: string) {
+  return get(`/family/members?clientId=${clientId}`)
+}
+
+export async function inviteFamilyMember(data: {
+  name: string
+  email: string
+  relationship: string
+  role: 'primary' | 'secondary' | 'limited'
+  clientId: string
+}) {
+  return post('/family/members/invite', data)
+}
+
+export async function updateFamilyMember(memberId: string, updates: any) {
+  return put(`/family/members/${memberId}`, updates)
+}
+
+export async function removeFamilyMember(memberId: string) {
+  return del(`/family/members/${memberId}`)
+}
+
+// Family Tasks
+export async function getFamilyTasks(clientId: string) {
+  return get(`/family/clients/${clientId}/tasks`)
+}
+
+export async function updateFamilyTask(clientId: string, taskId: string, updates: {
+  completed?: boolean
+  notes?: string
+}) {
+  return put(`/family/clients/${clientId}/tasks/${taskId}`, updates)
+}
+
+// Family Messages
+export async function getFamilyMessages(clientId: string) {
+  return get(`/family/clients/${clientId}/messages`)
+}
+
+export async function sendFamilyMessage(clientId: string, message: string) {
+  return post(`/family/clients/${clientId}/messages`, { message })
+}
+
+// Family Notifications
+export async function getFamilyNotifications() {
+  return get('/family/notifications')
+}
+
+export async function markNotificationRead(notificationId: string) {
+  return put(`/family/notifications/${notificationId}/read`, {})
+}
+
+export async function markAllNotificationsRead() {
+  return put('/family/notifications/read-all', {})
+}
+
+// Family Visits
+export async function getFamilyVisitsEnhanced(clientId: string) {
+  return get(`/family/clients/${clientId}/visits`)
 }
 
 export async function createTenant(data: {

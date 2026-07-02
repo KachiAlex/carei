@@ -89,6 +89,9 @@ const VisitHistoryScreen = lazy(() => import('./pages/VisitHistoryScreen'))
 const RotaScreen = lazy(() => import('./pages/RotaScreen'))
 const OperationsScreen = lazy(() => import('./pages/OperationsScreen'))
 const FamilyPortalScreen = lazy(() => import('./pages/FamilyPortalScreen'))
+const FamilyLoginScreen = lazy(() => import('./pages/FamilyLoginScreen'))
+const FamilyDashboardScreen = lazy(() => import('./pages/FamilyDashboardScreen'))
+const FamilySettingsScreen = lazy(() => import('./pages/FamilySettingsScreen'))
 const ManagerApprovalsScreen = lazy(() => import('./pages/ManagerApprovalsScreen'))
 const ManagerAuditScreen = lazy(() => import('./pages/ManagerAuditScreen'))
 const FamilySummaryScreen = lazy(() => import('./pages/FamilySummaryScreen'))
@@ -117,6 +120,9 @@ function PublicRoutes() {
       <Route path="/login" component={LoginScreen} />
       <Route path="/select-tenant" component={TenantSelectScreen} />
       <Route path="/manager/login" component={ManagerLoginScreen} />
+      <Route path="/family/login" component={FamilyLoginScreen} />
+      <Route path="/family/dashboard" component={FamilyDashboardScreen} />
+      <Route path="/family/settings" component={FamilySettingsScreen} />
       <Route path="/admin" component={AdminTeaserScreen} />
       <Route path="/super-admin" component={SuperAdminScreen} />
       <Route path="/join" component={AcceptInviteScreen} />
