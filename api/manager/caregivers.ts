@@ -43,8 +43,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const pinHash = await hashCredential(pin)
       const result = await sql`
-        INSERT INTO users (id, tenant_id, name, email, phone, region, pin, pin_hash, role, token_hash, token_expires_at)
-        VALUES (${id}, ${tenantId}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, NULL, ${pinHash}, ${role}, ${tokenHash}, ${tokenExpiresAt})
+        INSERT INTO users (id, tenant_id, name, email, phone, region, pin, pin_hash, role, token_hash, token_expires_at, email_verified)
+        VALUES (${id}, ${tenantId}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, NULL, ${pinHash}, ${role}, ${tokenHash}, ${tokenExpiresAt}, TRUE)
         ON CONFLICT (email) DO NOTHING
         RETURNING id
       ` as any[]

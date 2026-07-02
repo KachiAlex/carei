@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Check if user exists and get their role
     const users = await sql`
-      SELECT id, role, email_verified, created_at
+      SELECT id, role, created_at
       FROM users 
       WHERE email = ${email.toLowerCase()}
     ` as any[]
@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json({
       exists: true,
       isSuperAdmin: user.role === 'superadmin',
-      emailVerified: user.email_verified,
+      emailVerified: true, // Auto-verify all accounts (email service pending)
       hasBiometric: hasRecentToken, // Simplified heuristic
       userId: user.id
     })

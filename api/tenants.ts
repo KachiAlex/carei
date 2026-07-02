@@ -156,7 +156,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const tokenHash = await hashToken(managerToken)
           const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
           await sql`
-            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_expires_at)
+            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_expires_at, email_verified)
             VALUES (
               ${managerId},
               ${manager.name},
@@ -166,7 +166,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               ${manager.pin || ''},
               ${manager.role || 'admin'},
               ${tokenHash},
-              ${tokenExpiresAt}
+              ${tokenExpiresAt},
+              TRUE
             )
           `
           await addUserToTenant(managerId, tenant.id, manager.role || 'admin')

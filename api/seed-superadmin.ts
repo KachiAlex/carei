@@ -39,8 +39,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const passwordHash = hashPassword('superadmin123')
 
     await sql`
-      INSERT INTO users (id, name, email, phone, region, pin, role, password_hash)
-      VALUES (${id}, ${name}, ${email}, ${phone}, ${region}, ${pin}, ${role}, ${passwordHash})
+      INSERT INTO users (id, name, email, phone, region, pin, role, password_hash, email_verified)
+      VALUES (${id}, ${name}, ${email}, ${phone}, ${region}, ${pin}, ${role}, ${passwordHash}, TRUE)
     `
 
     res.status(201).json({

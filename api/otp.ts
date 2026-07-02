@@ -92,8 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
 
           await sql`
-            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_expires_at)
-            VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role || 'carer'}, ${tokenHash}, ${tokenExpiresAt})
+            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_expires_at, email_verified)
+            VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role || 'carer'}, ${tokenHash}, ${tokenExpiresAt}, TRUE)
           `
           res.status(200).json({ status: 'verified', token, user: { id, name, email: email.toLowerCase(), role: role || 'carer' } })
           return
