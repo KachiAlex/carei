@@ -18,5 +18,26 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "scope": "/",
+  "shortcuts": [
+    {
+      "name": "Family Login",
+      "short_name": "Family",
+      "description": "Access your loved one's care information",
+      "url": "/family/login",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Family Dashboard",
+      "short_name": "Dashboard",
+      "description": "View care updates and notifications",
+      "url": "/family/dashboard",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["medical", "health", "productivity"],
+  "lang": "en",
+  "dir": "ltr",
+  "prefer_related_applications": false
 }

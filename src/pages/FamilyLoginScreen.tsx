@@ -27,13 +27,46 @@ export default function FamilyLoginScreen() {
   const [resetMode, setResetMode] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetLoading, setResetLoading] = useState(false)
+  
+  // PWA install prompt
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false)
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [isStandalone, setIsStandalone] = useState(false)
 
   useEffect(() => {
     // Redirect if already authenticated
     if (isFamilyAuthenticated()) {
       setLocation('/family/dashboard')
     }
+    
+    // Check if running as installed PWA
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
+    
+    // Listen for beforeinstallprompt event
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+      setShowInstallPrompt(true)
+    }
+    
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    }
   }, [setLocation])
+  
+  const handleInstallPWA = async () => {
+    if (!deferredPrompt) return
+    
+    (deferredPrompt as any).prompt()
+    const { outcome } = await (deferredPrompt as any).userChoice
+    
+    if (outcome === 'accepted') {
+      setShowInstallPrompt(false)
+    }
+    setDeferredPrompt(null)
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
