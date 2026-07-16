@@ -7,7 +7,7 @@ function getApiBase(): string {
 
   // 2. Capacitor native app → absolute URL (runs on capacitor://localhost)
   if (typeof window !== 'undefined' && window.location.protocol.startsWith('capacitor')) {
-    return 'https://careiapp.com/api'
+    return 'https://www.careiapp.com/api'
   }
 
   // 3. Production web (deployed on Vercel) → relative path
