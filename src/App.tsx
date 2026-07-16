@@ -5,6 +5,7 @@ import { TenantProvider } from './contexts/TenantContext'
 import { secureGet, secureWipe } from './utils/secureStorage'
 import { setToken, setUser, clearAuthCache } from './utils/tokenCache'
 import { useAutoLock } from './hooks/useAutoLock'
+import { PWAInstallPrompt } from './components/PWAInstallPrompt'
 
 function useReducedMotion() {
   useEffect(() => {
@@ -203,6 +204,7 @@ function App() {
         <Suspense fallback={<LoadingFallback />}>
           <PublicRoutes />
           <TenantRoutes />
+          <PWAInstallPrompt />
         </Suspense>
       </AutoLockGuard>
     </Router>
