@@ -55,6 +55,10 @@ export default function BiometricsPrompt() {
     setLoading(true)
     try {
       if (nativeAvailable) {
+        const isNative = typeof window !== 'undefined' && 'Capacitor' in window
+        if (!isNative) {
+          throw new Error('Biometric login requires the native CAREi app.')
+        }
         const verified = await verifyBiometric('Confirm your identity to enable biometric login')
         if (!verified) {
           throw new Error('Biometric verification failed')
@@ -62,7 +66,12 @@ export default function BiometricsPrompt() {
         const token = getToken()
         const me = await getMe()
         if (token && me.user?.email) {
-          await storeCredentialsWithBiometric(me.user.email, token)
+          const stored = await storeCredentialsWithBiometric(me.user.email, token)
+          if (!stored) {
+            throw new Error('Failed to store biometric credentials on device')
+          }
+        } else {
+          throw new Error('Missing token or email for biometric enrollment')
         }
       }
       await updateBiometrics({ enabled: true })

@@ -173,6 +173,13 @@ export default function SettingsScreen() {
     try {
       const next = !biometricsEnabled
       if (next) {
+        // Check if running in Capacitor native app
+        const isNative = typeof window !== 'undefined' && 'Capacitor' in window
+        if (!isNative) {
+          setError('Biometric login is only available in the native CAREi app (Android/iOS). On web, use PIN login instead.')
+          setBiometricsLoading(false)
+          return
+        }
         // Enrolling: verify device supports biometric and user can authenticate
         const available = await isBiometricAvailable()
         if (!available) {
@@ -188,8 +195,22 @@ export default function SettingsScreen() {
         }
         // Store current token securely for future biometric login
         const token = getToken()
-        if (token && user?.email) {
-          await storeCredentialsWithBiometric(user.email, token)
+        if (!token) {
+          setError('No active session token found. Please re-login and try again.')
+          setBiometricsLoading(false)
+          return
+        }
+        if (user?.email) {
+          const stored = await storeCredentialsWithBiometric(user.email, token)
+          if (!stored) {
+            setError('Failed to store biometric credentials. Please try again.')
+            setBiometricsLoading(false)
+            return
+          }
+        } else {
+          setError('User email not found. Cannot store biometric credentials.')
+          setBiometricsLoading(false)
+          return
         }
       } else {
         await deleteBiometricCredentials()

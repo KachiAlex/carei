@@ -145,6 +145,11 @@ export default function LoginScreen() {
   useEffect(() => {
     if (view !== 'email') return
     setBioDiagnostic('')
+    const isNative = typeof window !== 'undefined' && 'Capacitor' in window
+    if (!isNative) {
+      setBioDiagnostic('Biometric login is available in the CAREi native app.')
+      return
+    }
     getBiometricAvailability().then(async (result) => {
       console.log('[CAREi bio] device availability:', JSON.stringify(result))
       setBioAvailable(result.available)
