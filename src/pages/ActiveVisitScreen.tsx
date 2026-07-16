@@ -4,7 +4,7 @@ import { useLocation, useParams } from 'wouter'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
-import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft, getDrugInteractions, logMedication, getMedicationLogs, reportIncident, saveVoiceMemo } from '../api/client'
+import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft, getDrugInteractions, logMedication, getMedicationLogs, reportIncident, saveVoiceMemo, uploadFile } from '../api/client'
 import { checkAllergy, checkMedicationOnList, checkDuplicateDose, checkTimeWindow, SAFETY_RULE_VERSION } from '../utils/safetyRules'
 import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
 
@@ -50,7 +50,7 @@ export default function ActiveVisitScreen() {
   const [meds, setMeds] = useState<{
     name: string
     dose: string
-    status: 'pending' | 'confirmed' | 'skipped' | 'refused'
+    status: 'pending' | 'confirmed' | 'skipped' | 'refused' | 'delayed'
     skipReason?: string
     isControlled?: boolean
     dueTime?: string
@@ -707,11 +707,18 @@ export default function ActiveVisitScreen() {
       reader.readAsDataURL(recordedBlob)
       reader.onloadend = async () => {
         const base64 = reader.result as string
+        let audioUrl: string
+        try {
+          audioUrl = await uploadFile(base64, `voice-memo-${Date.now()}.webm`, 'voice-memos')
+        } catch {
+          // If upload fails, fall back to base64 for offline queue
+          audioUrl = base64
+        }
         try {
           await saveVoiceMemo({
             visitId,
             clientId: client?.id,
-            audioUrl: base64,
+            audioUrl,
             duration: recordDuration,
           })
         } catch {
@@ -721,7 +728,7 @@ export default function ActiveVisitScreen() {
               payload: {
                 visitId,
                 clientId: client?.id,
-                audioUrl: base64,
+                audioUrl,
                 duration: recordDuration,
               },
             })
@@ -856,8 +863,9 @@ export default function ActiveVisitScreen() {
   }
 
   const skipMed = (medName: string, reason: string) => {
+    const isDelayed = reason === 'Delayed'
     setMeds((prev) =>
-      prev.map((m) => (m.name === medName ? { ...m, status: 'skipped' as const, skipReason: reason } : m))
+      prev.map((m) => (m.name === medName ? { ...m, status: isDelayed ? 'delayed' as const : 'skipped' as const, skipReason: reason } : m))
     )
     triggerHaptic(HAPTIC_PATTERNS.confirm)
     setShowSkipReason(false)
@@ -1240,6 +1248,7 @@ export default function ActiveVisitScreen() {
               <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Medications</div>
               <div className="text-[10px] font-medium text-slate-500">
                 {meds.filter((m) => m.status === 'confirmed').length}/{meds.length} given
+                {meds.filter((m) => m.status === 'delayed').length > 0 && ` · ${meds.filter((m) => m.status === 'delayed').length} delayed`}
               </div>
             </div>
             <div className="flex flex-col gap-2">
@@ -1247,6 +1256,7 @@ export default function ActiveVisitScreen() {
                 const alert = getDueTimeAlert(med.dueTime)
                 const isGiven = med.status === 'confirmed'
                 const isRefused = med.status === 'refused'
+                const isDelayed = med.status === 'delayed'
                 return (
                   <motion.div
                     key={med.name}
@@ -1259,6 +1269,8 @@ export default function ActiveVisitScreen() {
                         ? 'rgba(34,197,94,0.04)'
                         : isRefused
                           ? 'rgba(255,90,95,0.04)'
+                          : isDelayed
+                            ? 'rgba(246,183,60,0.04)'
                           : alert?.type === 'red-locked'
                             ? 'rgba(255,90,95,0.06)'
                             : 'white',
@@ -1266,13 +1278,15 @@ export default function ActiveVisitScreen() {
                         ? 'rgba(34,197,94,0.2)'
                         : isRefused
                           ? 'rgba(255,90,95,0.2)'
+                          : isDelayed
+                            ? 'rgba(246,183,60,0.3)'
                           : alert?.type === 'red-locked'
                             ? `${COLORS.red}30`
                             : 'rgba(0,0,0,0.08)',
                     }}
                   >
                     {/* Duplicate Alert Banner */}
-                    {medsGivenToday.has(med.name) && !isGiven && !isRefused && (
+                    {medsGivenToday.has(med.name) && !isGiven && !isRefused && !isDelayed && (
                       <div className="mb-2 rounded-lg p-2 border" style={{ background: 'rgba(246,183,60,0.08)', borderColor: `${COLORS.amber}40` }}>
                         <div className="flex items-center gap-1.5">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.amber} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1361,15 +1375,15 @@ export default function ActiveVisitScreen() {
                         </div>
                       </div>
                     )}
-                    {isGiven || isRefused ? (
+                    {isGiven || isRefused || isDelayed ? (
                       <span
                         className="text-xs font-medium px-2 py-1 rounded-lg"
                         style={{
-                          color: isGiven ? '#22c55e' : COLORS.red,
-                          background: isGiven ? 'rgba(34,197,94,0.1)' : 'rgba(255,90,95,0.08)',
+                          color: isGiven ? '#22c55e' : isDelayed ? COLORS.amber : COLORS.red,
+                          background: isGiven ? 'rgba(34,197,94,0.1)' : isDelayed ? 'rgba(246,183,60,0.08)' : 'rgba(255,90,95,0.08)',
                         }}
                       >
-                        {isGiven ? '✓ Given' : '⊘ Refused'}
+                        {isGiven ? '✓ Given' : isDelayed ? '⏰ Delayed' : '⊘ Refused'}
                       </span>
                     ) : (
                       <div className="flex gap-2">
@@ -2173,9 +2187,17 @@ export default function ActiveVisitScreen() {
       {showSkipReason && selectedMed && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-6">
           <div className="bg-white rounded-2xl p-5 max-w-sm w-full">
-            <h3 className="font-bold text-slate-800 mb-1">Skip {selectedMed}</h3>
-            <p className="text-xs text-slate-500 mb-4">Why was this medication not given?</p>
+            <h3 className="font-bold text-slate-800 mb-1">Medication Status: {selectedMed}</h3>
+            <p className="text-xs text-slate-500 mb-4">Select the current status</p>
             <div className="flex flex-col gap-2 mb-4">
+              <button
+                onClick={() => skipMed(selectedMed, 'Delayed')}
+                className="w-full text-left px-4 py-3 rounded-xl text-sm border cursor-pointer hover:bg-slate-50 transition-colors"
+                style={{ borderColor: 'rgba(79,209,197,0.3)', color: '#0d9488', background: 'rgba(79,209,197,0.06)' }}
+              >
+                ⏰ Delayed - Will be given later
+              </button>
+              <div className="text-xs text-slate-400 text-center py-1">— or not given —</div>
               {['Client refused', 'Client asleep', 'Client unavailable', 'Other'].map((reason) => (
                 <button
                   key={reason}

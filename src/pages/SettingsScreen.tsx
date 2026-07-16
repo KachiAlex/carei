@@ -9,7 +9,7 @@ import {
   getBiometricsStatus,
   updateBiometrics,
 } from '../api/client'
-import { isBiometricAvailable, verifyBiometric, getBiometricEnabled, setBiometricEnabled } from '../utils/biometric'
+import { isBiometricAvailable, verifyBiometric, getBiometricEnabled, setBiometricEnabled, storeCredentialsWithBiometric, deleteBiometricCredentials } from '../utils/biometric'
 import { getToken, setToken } from '../utils/tokenCache'
 import { secureGet, secureSet } from '../utils/secureStorage'
 
@@ -169,6 +169,7 @@ export default function SettingsScreen() {
   const handleToggleBiometrics = async () => {
     setBiometricsLoading(true)
     setError('')
+    setMsg('')
     try {
       const next = !biometricsEnabled
       if (next) {
@@ -185,6 +186,13 @@ export default function SettingsScreen() {
           setBiometricsLoading(false)
           return
         }
+        // Store current token securely for future biometric login
+        const token = getToken()
+        if (token && user?.email) {
+          await storeCredentialsWithBiometric(user.email, token)
+        }
+      } else {
+        await deleteBiometricCredentials()
       }
       await updateBiometrics({ enabled: next })
       setBiometricEnabled(next)

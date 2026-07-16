@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getBiometricsStatus, updateBiometrics } from '../api/client'
+import { getBiometricsStatus, updateBiometrics, getMe } from '../api/client'
 import { getToken } from '../utils/tokenCache'
+import { isBiometricAvailable, verifyBiometric, storeCredentialsWithBiometric, setBiometricEnabled } from '../utils/biometric'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -21,32 +22,51 @@ export default function BiometricsPrompt() {
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [nativeAvailable, setNativeAvailable] = useState(false)
 
   useEffect(() => {
     const token = getToken()
     if (!token) return
-    if (!supportsWebAuthn()) return
+    // Native biometrics take priority on mobile; WebAuthn for desktop web
+    if (!supportsWebAuthn() && !nativeAvailable) return
     // Don't show if user dismissed in this session
     if (sessionStorage.getItem('carei_bio_prompt_dismissed')) return
 
-    let cancelled = false
-    getBiometricsStatus()
-      .then((data) => {
-        if (cancelled) return
-        if (!data.enabled) {
-          setShow(true)
-        }
-      })
-      .catch(() => {})
+    isBiometricAvailable().then((available) => {
+      setNativeAvailable(available)
+      if (!available && !supportsWebAuthn()) return
 
-    return () => { cancelled = true }
-  }, [])
+      let cancelled = false
+      getBiometricsStatus()
+        .then((data) => {
+          if (cancelled) return
+          if (!data.enabled) {
+            setShow(true)
+          }
+        })
+        .catch(() => {})
+
+      return () => { cancelled = true }
+    })
+  }, [nativeAvailable])
 
   const handleEnable = async () => {
     setError('')
     setLoading(true)
     try {
+      if (nativeAvailable) {
+        const verified = await verifyBiometric('Confirm your identity to enable biometric login')
+        if (!verified) {
+          throw new Error('Biometric verification failed')
+        }
+        const token = getToken()
+        const me = await getMe()
+        if (token && me.user?.email) {
+          await storeCredentialsWithBiometric(me.user.email, token)
+        }
+      }
       await updateBiometrics({ enabled: true })
+      setBiometricEnabled(true)
       setShow(false)
       sessionStorage.setItem('carei_bio_prompt_dismissed', '1')
     } catch (err: any) {

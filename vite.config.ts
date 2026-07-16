@@ -33,13 +33,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/carei-app\.vercel\.app\/api\//,
-            handler: 'NetworkFirst',
-            options: { cacheName: 'api-cache', expiration: { maxEntries: 100, maxAgeSeconds: 86400 } },
-          },
-        ],
+        // No runtimeCaching for API routes — service worker is disabled in Capacitor
       },
       manifest: false, // Use existing public/manifest.json
     }),

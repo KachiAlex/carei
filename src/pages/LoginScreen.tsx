@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useSearch } from 'wouter'
-import { loginUser, loginWithPassword, sendOtp, verifyOtp, resetPin, getMe, getUserType } from '../api/client'
-import { isBiometricAvailable, verifyBiometric, getBiometricEnabled } from '../utils/biometric'
+import { loginUser, loginWithPassword, sendOtp, verifyOtp, resetPin, getMe, getUserType, biometricTokenLogin } from '../api/client'
+import { isBiometricAvailable, getBiometricEnabled, getCredentialsWithBiometric, storeCredentialsWithBiometric, getBiometricAvailability, hasStoredBiometricCredentials } from '../utils/biometric'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { secureSet } from '../utils/secureStorage'
-import { getToken, setToken, setUser as setTokenCacheUser } from '../utils/tokenCache'
+import { setToken, setUser as setTokenCacheUser } from '../utils/tokenCache'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -110,10 +110,18 @@ export default function LoginScreen() {
   const [newPin, setNewPin] = useState(['', '', '', ''])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
   const [bioAvailable, setBioAvailable] = useState(false)
+  const [bioDiagnostic, setBioDiagnostic] = useState<string>('')
+  const [storedCredentials, setStoredCredentials] = useState(false)
   const [resetStep, setResetStep] = useState<'email' | 'otp' | 'newpin'>('email')
+
+  // Load remembered email on mount
+  useEffect(() => {
+    const remembered = localStorage.getItem('carei_last_email')
+    if (remembered) setEmail(remembered)
+  }, [])
 
   // Brute force protection
   const [failedAttempts, setFailedAttempts] = useState(() => {
@@ -125,12 +133,46 @@ export default function LoginScreen() {
   })
   const isLockedOut = lockoutUntil ? Date.now() < lockoutUntil : false
 
-  // Check biometric availability
+  // Check biometric availability whenever biometric login might be enabled
   useEffect(() => {
-    if (getBiometricEnabled() && userInfo?.hasBiometric) {
+    if (!userInfo || userInfo.isSuperAdmin) return
+    if (userInfo.hasBiometric || getBiometricEnabled()) {
       isBiometricAvailable().then(setBioAvailable)
     }
   }, [userInfo])
+
+  // On the email screen, check if biometric credentials are stored (WITHOUT triggering a prompt)
+  useEffect(() => {
+    if (view !== 'email') return
+    setBioDiagnostic('')
+    getBiometricAvailability().then(async (result) => {
+      console.log('[CAREi bio] device availability:', JSON.stringify(result))
+      setBioAvailable(result.available)
+      if (!result.available) {
+        let message = 'Biometrics not available on this device'
+        if (result.errorMessage) message += `: ${result.errorMessage}`
+        else if (result.errorCode === 1) message = 'Biometric hardware unavailable'
+        else if (result.errorCode === 3) message = 'No biometrics enrolled in device settings'
+        else if (result.errorCode === 14) message = 'Device lock screen PIN/pattern not set'
+        setBioDiagnostic(message)
+        return
+      }
+      // Check if credentials are saved WITHOUT triggering a biometric prompt
+      const hasCredentials = await hasStoredBiometricCredentials()
+      console.log('[CAREi bio] credentials saved:', hasCredentials)
+      if (!hasCredentials) {
+        setBioDiagnostic('No biometric credentials stored. Enable biometrics after logging in.')
+        return
+      }
+      setStoredCredentials(true)
+      setBioDiagnostic('')
+      // Auto-prompt biometric unlock if user has it enabled
+      if (getBiometricEnabled()) {
+        setTimeout(() => handleBiometricUnlock(), 300)
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view])
 
   const handleEmailSubmit = async () => {
     if (!validateEmail(email)) {
@@ -163,33 +205,44 @@ export default function LoginScreen() {
   const handleBiometricUnlock = async () => {
     setError('')
     setLoading(true)
+    console.log('[CAREi bio] handleBiometricUnlock called')
     try {
-      const success = await verifyBiometric()
-      if (!success) {
-        triggerHaptic(HAPTIC_PATTERNS.error)
+      // This triggers the native biometric prompt (fingerprint/face)
+      const credentials = await getCredentialsWithBiometric()
+      console.log('[CAREi bio] credentials retrieved:', credentials ? 'yes' : 'no')
+      if (!credentials) {
         setLoading(false)
+        setError('No biometric login stored. Please use PIN to login.')
         return
       }
+
+      // Call the API endpoint to validate the biometric token and get a fresh one
+      console.log('[CAREi bio] calling biometricTokenLogin API')
+      const response = await biometricTokenLogin({
+        email: credentials.email,
+        token: credentials.token,
+      })
+
+      if (!response.token || !response.user) {
+        throw new Error(response.error || 'Biometric login failed')
+      }
+
       triggerHaptic(HAPTIC_PATTERNS.success)
-      const token = getToken()
-      if (!token) {
-        setError('Session expired. Please use PIN to login.')
-        setLoading(false)
-        return
+      setEmail(credentials.email)
+
+      // Remember email for next time
+      if (rememberMe) {
+        localStorage.setItem('carei_last_email', credentials.email)
       }
-      const me = await getMe()
-      if (me.user) {
-        triggerHaptic(HAPTIC_PATTERNS.success)
-        const userJson = JSON.stringify(me.user)
-        await secureSet('user', userJson)
-        setTokenCacheUser(userJson)
-        setLocation(redirectPath || '/select-tenant')
-      } else {
-        throw new Error('Invalid session')
-      }
+
+      const userJson = JSON.stringify(response.user)
+      await secureSet('user', userJson)
+      setTokenCacheUser(userJson)
+      setLocation(redirectPath || '/select-tenant')
     } catch (err: any) {
       setLoading(false)
       triggerHaptic(HAPTIC_PATTERNS.error)
+      console.log('[CAREi bio] unlock error:', err)
       setError(err.message || 'Biometric unlock failed. Please use PIN.')
     }
   }
@@ -225,11 +278,28 @@ export default function LoginScreen() {
       await secureSet('user', JSON.stringify(response.user))
       setToken(response.token)
       setTokenCacheUser(JSON.stringify(response.user))
-      
+
+      // Enroll biometric credentials for future login if biometrics are enabled
+      if (getBiometricEnabled() || userInfo?.hasBiometric) {
+        const available = await isBiometricAvailable()
+        console.log('[CAREi bio] storing credentials, device available:', available)
+        if (available) {
+          const stored = await storeCredentialsWithBiometric(email, response.token)
+          console.log('[CAREi bio] credentials stored:', stored)
+        }
+      }
+
+      // Remember email for next login
+      if (rememberMe) {
+        localStorage.setItem('carei_last_email', email)
+      } else {
+        localStorage.removeItem('carei_last_email')
+      }
+
       // Reset failed attempts
       localStorage.removeItem('carei_pin_fails')
       localStorage.removeItem('carei_lockout')
-      
+
       setLocation(redirectPath || '/select-tenant')
     } catch (err: any) {
       triggerHaptic(HAPTIC_PATTERNS.error)
@@ -369,6 +439,24 @@ export default function LoginScreen() {
 
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 
+            {/* Biometric diagnostic — hidden in production, useful for debugging */}
+            {bioDiagnostic && (
+              <p className="text-amber-300/80 text-xs text-center bg-amber-500/10 rounded-lg px-3 py-2">
+                {bioDiagnostic}
+              </p>
+            )}
+
+            {/* Remember email */}
+            <label className="flex items-center gap-2 text-white/70 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-white/20 bg-white/5 text-teal focus:ring-teal"
+              />
+              Remember my email
+            </label>
+
             <button
               onClick={handleEmailSubmit}
               disabled={loading || !email}
@@ -377,6 +465,25 @@ export default function LoginScreen() {
             >
               {loading ? 'Checking...' : 'Continue'}
             </button>
+
+            {/* Biometric unlock on email screen */}
+            {storedCredentials && bioAvailable && (
+              <button
+                onClick={handleBiometricUnlock}
+                disabled={loading}
+                className="w-full py-4 rounded-xl font-bold text-base cursor-pointer border-none disabled:opacity-50 flex items-center justify-center gap-3"
+                style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.15)' }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4"/>
+                  <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/>
+                  <path d="M17.29 21.02c.12-.6.13-1.16.13-2.02a6 6 0 0 0-9-5.2L7.5 13.5"/>
+                  <path d="M8 12a4 4 0 0 1 8 0c0 1.5-.5 3-1 4.5"/>
+                  <path d="M12 12c0 2.5-.5 4.5-1 6"/>
+                </svg>
+                {loading ? 'Verifying...' : 'Unlock with Fingerprint'}
+              </button>
+            )}
 
             <button
               onClick={() => setView('reset')}
@@ -410,7 +517,7 @@ export default function LoginScreen() {
           </div>
 
           {/* Biometric Option */}
-          {userInfo.hasBiometric && bioAvailable && !userInfo.isSuperAdmin && (
+          {bioAvailable && (userInfo.hasBiometric || getBiometricEnabled()) && !userInfo.isSuperAdmin && (
             <button
               onClick={handleBiometricUnlock}
               disabled={loading}

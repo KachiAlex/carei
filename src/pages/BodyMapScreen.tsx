@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation, useRoute } from 'wouter'
 import { motion } from 'framer-motion'
-import { saveBodyMapMark, getBodyMapMarks, deleteBodyMapMark } from '../api/client'
+import { saveBodyMapMark, getBodyMapMarks, deleteBodyMapMark, uploadFile } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -152,6 +152,10 @@ export default function BodyMapScreen() {
     setSavingMark(true)
     setMarkError(null)
     try {
+      let photoUrl: string | undefined
+      if (photoPreview) {
+        photoUrl = await uploadFile(photoPreview, 'body-map-photo.jpg', 'body-maps')
+      }
       const zone = BODY_ZONES[side].find(z => z.id === selectedZone)
       const res = await saveBodyMapMark({
         visitId,
@@ -161,7 +165,7 @@ export default function BodyMapScreen() {
         zone: selectedZone,
         type: markType,
         note: markNote,
-        photoUrl: photoPreview || undefined,
+        photoUrl: photoUrl || undefined,
       })
       if (res?.id) {
         const newMark: BodyMark = {
@@ -171,7 +175,7 @@ export default function BodyMapScreen() {
           side,
           type: markType,
           note: markNote,
-          photoUrl: photoPreview || undefined,
+          photoUrl: photoUrl || undefined,
           createdAt: new Date().toISOString(),
         }
         setMarks([...marks, newMark])

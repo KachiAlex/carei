@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useLocation } from 'wouter'
 import { useTenant } from '../contexts/TenantContext'
 import {
@@ -28,6 +28,7 @@ import { clearAuthCache } from '../utils/tokenCache'
 import { sendSOSAlert, sendSOSResolved, requestNotificationPermission } from '../utils/notifications'
 import { exportVisits, exportCarers, exportClients } from '../utils/exportCsv'
 import BiometricsPrompt from '../components/BiometricsPrompt'
+import FamilyMemberInvitation from '../components/FamilyMemberInvitation'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -105,6 +106,7 @@ export default function ManagerDashboard() {
   const [selectedClientDetail, setSelectedClientDetail] = useState<any>(null)
   const [showClientModal, setShowClientModal] = useState(false)
   const [clientActionMsg, setClientActionMsg] = useState('')
+  const [showFamilyInvite, setShowFamilyInvite] = useState(false)
 
   const refreshManagerData = () => {
     getManagerData()
@@ -729,7 +731,18 @@ export default function ManagerDashboard() {
             >
               <div className="flex items-center justify-between">
                 <div className="font-semibold text-slate-700">{c.name}</div>
-                {c.age && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{c.age} yrs</span>}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setLocation(`/tenant/${tenantSlug}/manager/clients/${c.id}/care-plan/edit`)
+                    }}
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-teal/10 text-teal font-medium hover:bg-teal/20 transition-colors"
+                  >
+                    Care Plan
+                  </button>
+                  {c.age && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{c.age} yrs</span>}
+                </div>
               </div>
               {c.address && <div className="text-xs text-slate-400 mt-0.5">{c.address}</div>}
               {Array.isArray(c.conditions) && c.conditions.length > 0 && (
@@ -815,6 +828,17 @@ export default function ManagerDashboard() {
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={() => {
+                    setShowClientModal(false)
+                    setShowFamilyInvite(true)
+                  }}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+                  style={{ background: COLORS.lavender }}
+                >
+                  Invite Family
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
                     const phone = selectedClientDetail.emergency_contact || ''
                     if (phone) window.location.href = `tel:${phone}`
                     else setClientActionMsg('No emergency contact available')
@@ -846,6 +870,33 @@ export default function ManagerDashboard() {
             </motion.div>
           </div>
         )}
+
+        {/* Family Invitation Modal */}
+        <AnimatePresence>
+          {showFamilyInvite && selectedClientDetail && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto"
+              onClick={() => setShowFamilyInvite(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-lg my-4 sm:my-0 max-h-[85dvh] overflow-y-auto rounded-xl"
+              >
+                <FamilyMemberInvitation
+                  clientId={selectedClientDetail.id}
+                  clientName={selectedClientDetail.name}
+                  onClose={() => setShowFamilyInvite(false)}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     )
   }

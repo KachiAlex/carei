@@ -108,17 +108,22 @@ export default function VisitSummaryScreen() {
   const generateHandover = async () => {
     if (!snapshot) return
     setGenerating(true)
+    const confirmedMeds = snapshot.medications.filter((m) => m.status === 'confirmed').length
+    const delayedMeds = snapshot.medications.filter((m) => m.status === 'delayed').length
+    const refusedMeds = snapshot.medications.filter((m) => m.status === 'refused').length
+    const medsSummary = `${confirmedMeds} given${delayedMeds > 0 ? `, ${delayedMeds} delayed` : ''}${refusedMeds > 0 ? `, ${refusedMeds} refused` : ''}`
+
     const context = [
       `Client: ${snapshot.clientName}, ${snapshot.clientAge} years`,
       `Duration: ${formatTime(snapshot.elapsed)}`,
       `Fluid intake: ${snapshot.fluid}ml`,
       `Tasks: ${snapshot.tasks.filter((t) => t.done).length}/${snapshot.tasks.length} completed`,
-      `Medications: ${snapshot.medications.filter((m) => m.status === 'confirmed').length}/${snapshot.medications.length} confirmed`,
+      `Medications: ${medsSummary}`,
       `Notes: ${snapshot.notes || 'None'}`,
     ].join('\n')
 
     if (!navigator.onLine) {
-      setHandoverNote(`Handover for ${snapshot.clientName}: Visit completed in ${formatTime(snapshot.elapsed)}. ${snapshot.tasks.filter((t) => t.done).length} of ${snapshot.tasks.length} tasks done. Fluid: ${snapshot.fluid}ml. Medications: ${snapshot.medications.filter((m) => m.status === 'confirmed').length} confirmed.`)
+      setHandoverNote(`Handover for ${snapshot.clientName}: Visit completed in ${formatTime(snapshot.elapsed)}. ${snapshot.tasks.filter((t) => t.done).length} of ${snapshot.tasks.length} tasks done. Fluid: ${snapshot.fluid}ml. Medications: ${medsSummary}.`)
       await enqueue({ type: 'ai-summary', payload: { context, visitId } })
       setGenerating(false)
       return
@@ -128,7 +133,7 @@ export default function VisitSummaryScreen() {
       const data = await summarizeTranscript(context)
       setHandoverNote(data.summary)
     } catch (e: any) {
-      setHandoverNote(`Handover for ${snapshot.clientName}: Visit completed in ${formatTime(snapshot.elapsed)}. ${snapshot.tasks.filter((t) => t.done).length} of ${snapshot.tasks.length} tasks done. Fluid: ${snapshot.fluid}ml. Medications: ${snapshot.medications.filter((m) => m.status === 'confirmed').length} confirmed.`)
+      setHandoverNote(`Handover for ${snapshot.clientName}: Visit completed in ${formatTime(snapshot.elapsed)}. ${snapshot.tasks.filter((t) => t.done).length} of ${snapshot.tasks.length} tasks done. Fluid: ${snapshot.fluid}ml. Medications: ${medsSummary}.`)
     } finally {
       setGenerating(false)
     }
@@ -365,24 +370,24 @@ export default function VisitSummaryScreen() {
               </div>
             )}
             {/* Medications */}
-            {snapshot.medications.filter((m) => m.status === 'confirmed' || m.status === 'refused').map((med, i) => (
+            {snapshot.medications.filter((m) => m.status === 'confirmed' || m.status === 'refused' || m.status === 'delayed').map((med, i) => (
               <div key={`med-${i}`} className="flex gap-3 py-2">
                 <div className="flex flex-col items-center">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: med.status === 'confirmed' ? 'rgba(79,209,197,0.1)' : 'rgba(255,90,95,0.08)' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={med.status === 'confirmed' ? COLORS.teal : COLORS.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ background: med.status === 'confirmed' ? 'rgba(79,209,197,0.1)' : med.status === 'delayed' ? 'rgba(246,183,60,0.08)' : 'rgba(255,90,95,0.08)' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={med.status === 'confirmed' ? COLORS.teal : med.status === 'delayed' ? COLORS.amber : COLORS.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg>
                   </div>
                   <div className="w-px flex-1 bg-slate-200 my-1" />
                 </div>
                 <div className="pb-3">
                   <div className="text-xs font-semibold text-slate-700">
-                    {med.name} {med.status === 'confirmed' ? 'Given' : 'Not Given'}
+                    {med.name} {med.status === 'confirmed' ? 'Given' : med.status === 'delayed' ? 'Delayed' : 'Not Given'}
                     {med.isControlled && <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(255,90,95,0.1)', color: COLORS.red }}>CONTROLLED</span>}
                   </div>
                   <div className="text-[10px] text-slate-400">
                     {med.dose}
                     {med.administeredAt && ` · ${formatDateTime(med.administeredAt)}`}
                     {med.witnessName && ` · Witnessed by ${med.witnessName}`}
-                    {med.status === 'refused' && med.skipReason && ` · ${med.skipReason}`}
+                    {(med.status === 'refused' || med.status === 'delayed') && med.skipReason && ` · ${med.skipReason}`}
                   </div>
                 </div>
               </div>

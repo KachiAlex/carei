@@ -28,15 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const user = users[0]
-    
-    // Check if user has biometric enabled (from secure storage would be ideal, but we can check if they have a recent token)
-    const hasRecentToken = user.created_at && new Date(user.created_at).getTime() > Date.now() - 30 * 24 * 60 * 60 * 1000
+    const biometricsEnabled = user.biometrics_enabled === true
 
     res.status(200).json({
       exists: true,
       isSuperAdmin: user.role === 'superadmin',
       emailVerified: true, // Auto-verify all accounts (email service pending)
-      hasBiometric: hasRecentToken, // Simplified heuristic
+      hasBiometric: biometricsEnabled,
       userId: user.id
     })
 

@@ -2,19 +2,21 @@ import { getToken, setToken, clearAuthCache } from '../utils/tokenCache'
 import { secureSet, secureRemove } from '../utils/secureStorage'
 
 function getApiBase(): string {
-  // Priority: 1. Environment variable, 2. Local dev, 3. Production
+  // 1. Environment override always wins
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
 
-  // Capacitor / native webview uses file:// or capacitor:// protocol
-  const isNative = typeof (window as any).Capacitor !== 'undefined' ||
-    !['http:', 'https:'].includes(window.location.protocol)
-
-  if (isNative) {
-    // Use production API for native apps
-    return 'https://carei-app.vercel.app/api'
+  // 2. Capacitor native app → absolute URL (runs on capacitor://localhost)
+  if (typeof window !== 'undefined' && window.location.protocol.startsWith('capacitor')) {
+    return 'https://careiapp.com/api'
   }
 
-  // For web: use relative path (same origin) in production, or localhost in dev
+  // 3. Production web (deployed on Vercel) → relative path
+  //    Works on both carei-app.vercel.app and careiapp.com custom domain
+  if (!import.meta.env.DEV) {
+    return '/api'
+  }
+
+  // 4. Local dev → relative path (proxied by Vite dev server)
   return '/api'
 }
 
@@ -60,14 +62,14 @@ export function authHeaders(): Record<string, string> {
   return headers
 }
 
-async function postWithRetry(path: string, body: unknown, retries = 3): Promise<any> {
+async function postWithRetry(path: string, body: unknown, retries = 3, extraHeaders?: Record<string, string>): Promise<any> {
   let lastError: Error | null = null
   
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const res = await fetch(`${API_BASE}${path}`, {
         method: 'POST',
-        headers: { ...jsonHeaders, ...authHeaders() },
+        headers: { ...jsonHeaders, ...authHeaders(), ...extraHeaders },
         body: JSON.stringify(body),
       })
       
@@ -96,17 +98,17 @@ async function postWithRetry(path: string, body: unknown, retries = 3): Promise<
   throw lastError || new Error('Network error after retries')
 }
 
-export async function post(path: string, body: unknown) {
-  return postWithRetry(path, body)
+export async function post(path: string, body: unknown, extraHeaders?: Record<string, string>) {
+  return postWithRetry(path, body, 3, extraHeaders)
 }
 
-async function getWithRetry(path: string, retries = 3): Promise<any> {
+async function getWithRetry(path: string, retries = 3, extraHeaders?: Record<string, string>): Promise<any> {
   let lastError: Error | null = null
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const res = await fetch(`${API_BASE}${path}`, {
-        headers: authHeaders(),
+        headers: { ...authHeaders(), ...extraHeaders },
       })
 
       if (!res.ok) {
@@ -133,35 +135,94 @@ async function getWithRetry(path: string, retries = 3): Promise<any> {
   throw lastError || new Error('Network error after retries')
 }
 
-export async function get(path: string) {
-  return getWithRetry(path)
+export async function get(path: string, extraHeaders?: Record<string, string>) {
+  return getWithRetry(path, 3, extraHeaders)
 }
 
-export async function put(path: string, body: unknown) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'PUT',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-    throw new Error(err.error || `HTTP ${res.status}`)
+async function putWithRetry(path: string, body: unknown, retries = 3, extraHeaders?: Record<string, string>): Promise<any> {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method: 'PUT',
+        headers: { ...jsonHeaders, ...authHeaders(), ...extraHeaders },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        handleAuthError(res.status)
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      return await res.json()
+    } catch (err) {
+      lastError = err as Error
+      if (err instanceof Error && err.message.includes('HTTP 4')) throw err
+      if (attempt < retries - 1) {
+        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
+      }
+    }
   }
-  return res.json()
+  throw lastError || new Error('Network error after retries')
 }
 
-export async function del(path: string) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-    throw new Error(err.error || `HTTP ${res.status}`)
+export async function put(path: string, body: unknown, extraHeaders?: Record<string, string>) {
+  return putWithRetry(path, body, 3, extraHeaders)
+}
+
+async function patchWithRetry(path: string, body?: unknown, retries = 3, extraHeaders?: Record<string, string>): Promise<any> {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const opts: RequestInit = {
+        method: 'PATCH',
+        headers: { ...jsonHeaders, ...authHeaders(), ...extraHeaders },
+      }
+      if (body !== undefined) opts.body = JSON.stringify(body)
+      const res = await fetch(`${API_BASE}${path}`, opts)
+      if (!res.ok) {
+        handleAuthError(res.status)
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      return await res.json()
+    } catch (err) {
+      lastError = err as Error
+      if (err instanceof Error && err.message.includes('HTTP 4')) throw err
+      if (attempt < retries - 1) {
+        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
+      }
+    }
   }
-  return res.json()
+  throw lastError || new Error('Network error after retries')
+}
+
+async function delWithRetry(path: string, retries = 3, extraHeaders?: Record<string, string>): Promise<any> {
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method: 'DELETE',
+        headers: { ...authHeaders(), ...extraHeaders },
+      })
+      if (!res.ok) {
+        handleAuthError(res.status)
+        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      return await res.json()
+    } catch (err) {
+      lastError = err as Error
+      if (err instanceof Error && err.message.includes('HTTP 4')) throw err
+      if (attempt < retries - 1) {
+        await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
+      }
+    }
+  }
+  throw lastError || new Error('Network error after retries')
+}
+
+export async function del(path: string, extraHeaders?: Record<string, string>) {
+  return delWithRetry(path, 3, extraHeaders)
 }
 
 export async function chatWithAI(message: string, context?: string) {
@@ -234,30 +295,11 @@ export async function updateClient(clientId: string, data: Partial<{
   preferences: string
   emergencyContact: string
 }>) {
-  const res = await fetch(`${API_BASE}/clients?id=${encodeURIComponent(clientId)}`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return patchWithRetry(`/clients?id=${encodeURIComponent(clientId)}`, data)
 }
 
 export async function deleteClient(clientId: string) {
-  const res = await fetch(`${API_BASE}/clients?id=${encodeURIComponent(clientId)}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return delWithRetry(`/clients?id=${encodeURIComponent(clientId)}`)
 }
 
 export async function getScheduledVisits(from?: string, to?: string) {
@@ -294,30 +336,11 @@ export async function updateScheduledVisit(visitId: string, data: Partial<{
   recurring: string
   visitDate: string
 }>) {
-  const res = await fetch(`${API_BASE}/schedule?id=${encodeURIComponent(visitId)}`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return patchWithRetry(`/schedule?id=${encodeURIComponent(visitId)}`, data)
 }
 
 export async function deleteScheduledVisit(visitId: string) {
-  const res = await fetch(`${API_BASE}/schedule?id=${encodeURIComponent(visitId)}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return delWithRetry(`/schedule?id=${encodeURIComponent(visitId)}`)
 }
 
 export async function registerUser(data: {
@@ -388,21 +411,20 @@ export async function changePassword(data: { currentPassword: string; newPasswor
 }
 
 export async function updateProfile(data: { name?: string; phone?: string; region?: string }) {
-  const res = await fetch(`${API_BASE}/auth/update-profile`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return patchWithRetry('/auth/update-profile', data)
 }
 
 export async function biometricLogin(data: { email: string; credentialId: string }) {
   const res = await post('/auth/biometric-login', data) as any
+  if (res.token) {
+    setToken(res.token)
+    await secureSet('token', res.token)
+  }
+  return res
+}
+
+export async function biometricTokenLogin(data: { email: string; token: string }) {
+  const res = await post('/auth/biometric-token-login', data) as any
   if (res.token) {
     setToken(res.token)
     await secureSet('token', res.token)
@@ -426,30 +448,11 @@ export async function fetchCaregiver(caregiverId: string) {
 }
 
 export async function updateCaregiverStatus(caregiverId: string, status: string) {
-  const res = await fetch(`${API_BASE}/manager/caregiver?id=${caregiverId}`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify({ status }),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return patchWithRetry(`/manager/caregiver?id=${caregiverId}`, { status })
 }
 
 export async function deleteCaregiver(caregiverId: string) {
-  const res = await fetch(`${API_BASE}/manager/caregiver?id=${caregiverId}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return delWithRetry(`/manager/caregiver?id=${caregiverId}`)
 }
 
 export async function getAssignments() {
@@ -471,30 +474,11 @@ export async function updateAssignment(assignmentId: string, data: {
   visitTime?: string
   instructions?: string
 }) {
-  const res = await fetch(`${API_BASE}/manager/assignments?id=${assignmentId}`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return patchWithRetry(`/manager/assignments?id=${assignmentId}`, data)
 }
 
 export async function deleteAssignment(caregiverId: string, clientId: string) {
-  const res = await fetch(`${API_BASE}/manager/assignments?caregiverId=${caregiverId}&clientId=${clientId}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return delWithRetry(`/manager/assignments?caregiverId=${caregiverId}&clientId=${clientId}`)
 }
 
 export async function getManagerTasks(clientId?: string) {
@@ -517,16 +501,7 @@ export async function createManagerTask(data: {
 }
 
 export async function deleteManagerTask(taskId: string) {
-  const res = await fetch(`${API_BASE}/manager/tasks?id=${taskId}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return delWithRetry(`/manager/tasks?id=${taskId}`)
 }
 
 export async function getCaregiverClients() {
@@ -558,7 +533,7 @@ export async function logMedication(data: {
   visitId?: string
   medicationName: string
   dose?: string
-  status: 'given' | 'skipped' | 'refused'
+  status: 'given' | 'skipped' | 'refused' | 'delayed'
   witnessName?: string
   reason?: string
   notes?: string
@@ -601,6 +576,11 @@ export async function saveVoiceMemo(data: {
   return post('/voice-memos', data)
 }
 
+export async function uploadFile(fileData: string, fileName: string, folder: string): Promise<string> {
+  const res = await post('/upload', { fileData, fileName, folder }) as any
+  return res.url
+}
+
 export async function getVoiceMemos(visitId?: string) {
   const qs = visitId ? `?visitId=${visitId}` : ''
   return get(`/voice-memos${qs}`)
@@ -615,16 +595,7 @@ export async function getVisitDraft(visitId: string) {
 }
 
 export async function deleteVisitDraft(visitId: string) {
-  const res = await fetch(`${API_BASE}/visit-draft?visitId=${encodeURIComponent(visitId)}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return delWithRetry(`/visit-draft?visitId=${encodeURIComponent(visitId)}`)
 }
 
 export async function getSchedule() {
@@ -651,16 +622,7 @@ export async function getBodyMapMarks(visitId?: string, clientId?: string) {
 }
 
 export async function deleteBodyMapMark(markId: string) {
-  const res = await fetch(`${API_BASE}/body-map?markId=${markId}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return delWithRetry(`/body-map?markId=${markId}`)
 }
 
 export async function getAgencies() {
@@ -852,17 +814,7 @@ export async function createTenant(data: {
   plan?: string
   manager?: { name: string; email: string; phone?: string; region?: string; pin?: string; role?: string }
 }) {
-  const res = await fetch(`${API_BASE}/tenants`, {
-    method: 'POST',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return post('/tenants', data)
 }
 
 export async function getTenantMembers(slug: string) {
@@ -874,72 +826,23 @@ export async function getTenantStatsApi(slug: string) {
 }
 
 export async function updateTenant(slug: string, data: { name?: string; settings?: Record<string, unknown> }) {
-  const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}`, {
-    method: 'PUT',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return putWithRetry(`/tenants?slug=${encodeURIComponent(slug)}`, data)
 }
 
 export async function updateTenantPlan(slug: string, plan: string) {
-  const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}&action=plan`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify({ plan }),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return patchWithRetry(`/tenants?slug=${encodeURIComponent(slug)}&action=plan`, { plan })
 }
 
 export async function updateTenantActive(slug: string, active: boolean) {
-  const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}&action=active`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify({ active }),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return patchWithRetry(`/tenants?slug=${encodeURIComponent(slug)}&action=active`, { active })
 }
 
 export async function updateTenantPrice(slug: string, pricePerCarer: number, billingModel?: string) {
-  const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}&action=price`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify({ pricePerCarer, ...(billingModel ? { billingModel } : {}) }),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return patchWithRetry(`/tenants?slug=${encodeURIComponent(slug)}&action=price`, { pricePerCarer, ...(billingModel ? { billingModel } : {}) })
 }
 
 export async function deleteTenant(slug: string) {
-  const res = await fetch(`${API_BASE}/tenants?slug=${encodeURIComponent(slug)}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return delWithRetry(`/tenants?slug=${encodeURIComponent(slug)}`)
 }
 
 export async function getUserType(email: string) {
@@ -982,41 +885,13 @@ export async function createCarePlan(data: { clientId: string } & CarePlanData) 
 }
 
 export async function updateCarePlan(planId: string, data: CarePlanData) {
-  const res = await fetch(`${API_BASE}/care-plans?id=${encodeURIComponent(planId)}`, {
-    method: 'PUT',
-    headers: { ...jsonHeaders, ...authHeaders() },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return putWithRetry(`/care-plans?id=${encodeURIComponent(planId)}`, data)
 }
 
 export async function publishCarePlan(planId: string) {
-  const res = await fetch(`${API_BASE}/care-plans?id=${encodeURIComponent(planId)}&action=publish`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders, ...authHeaders() },
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return patchWithRetry(`/care-plans?id=${encodeURIComponent(planId)}&action=publish`)
 }
 
 export async function archiveCarePlan(planId: string) {
-  const res = await fetch(`${API_BASE}/care-plans?id=${encodeURIComponent(planId)}&action=archive`, {
-    method: 'PATCH',
-    headers: { ...jsonHeaders, ...authHeaders() },
-  })
-  if (!res.ok) {
-    handleAuthError(res.status)
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
-    throw new Error(err.error || `HTTP ${res.status}`)
-  }
-  return res.json()
+  return patchWithRetry(`/care-plans?id=${encodeURIComponent(planId)}&action=archive`)
 }

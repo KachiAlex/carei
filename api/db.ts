@@ -747,6 +747,37 @@ async function runMigrations() {
     await sql`UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL`
   })
 
+  await run(25, 'add_published_at_to_care_plans', async () => {
+    await sql`ALTER TABLE care_plans ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ`
+  })
+
+  await run(26, 'create_family_members_table', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS family_members (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        client_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT,
+        relationship TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'secondary',
+        permissions TEXT[] DEFAULT '{}',
+        pin_hash TEXT,
+        token_hash TEXT,
+        token_expires_at TIMESTAMPTZ,
+        is_active BOOLEAN DEFAULT TRUE,
+        invited_by TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        last_login TIMESTAMPTZ
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_family_members_tenant ON family_members(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_family_members_client ON family_members(client_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_family_members_email ON family_members(email)`
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (
@@ -779,13 +810,43 @@ async function runMigrations() {
   `
   await sql`CREATE INDEX IF NOT EXISTS idx_tenant_users_tenant ON tenant_users(tenant_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_tenant_users_user ON tenant_users(user_id)`
+  await sql`
+    CREATE TABLE IF NOT EXISTS family_members (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL,
+      client_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      relationship TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'secondary',
+      permissions TEXT[] DEFAULT '{}',
+      pin_hash TEXT,
+      token_hash TEXT,
+      token_expires_at TIMESTAMPTZ,
+      is_active BOOLEAN DEFAULT TRUE,
+      invited_by TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      last_login TIMESTAMPTZ
+    )
+  `
+  await sql`CREATE INDEX IF NOT EXISTS idx_family_members_tenant ON family_members(tenant_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_family_members_client ON family_members(client_id)`
+  await sql`CREATE INDEX IF NOT EXISTS idx_family_members_email ON family_members(email)`
 }
 
 const ALLOWED_ORIGINS = [
   'https://carei-app.vercel.app',
   'https://carei.co.uk',
+  'https://careiapp.com',
+  'https://www.careiapp.com',
   'http://localhost:5173',
   'http://localhost:3000',
+  'https://localhost',
+  'https://capacitor',
+  'capacitor://localhost',
+  'http://localhost',
 ]
 
 export function setCors(req: any, res: any) {
@@ -796,7 +857,7 @@ export function setCors(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Tenant-Slug')
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload')
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://carei-app.vercel.app; img-src 'self' data: blob:; font-src 'self';")
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://carei-app.vercel.app https://careiapp.com https://www.careiapp.com; img-src 'self' data: blob:; font-src 'self';")
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('X-Frame-Options', 'DENY')
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')

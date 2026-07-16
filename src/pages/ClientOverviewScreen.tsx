@@ -455,7 +455,7 @@ export default function ClientOverviewScreen() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+            className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto"
             onClick={() => setShowFamilyInvite(false)}
           >
             <motion.div
@@ -463,7 +463,7 @@ export default function ClientOverviewScreen() {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg"
+              className="w-full max-w-lg my-4 sm:my-0 max-h-[85dvh] overflow-y-auto rounded-xl"
             >
               <FamilyMemberInvitation
                 clientId={client.id}

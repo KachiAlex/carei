@@ -120,9 +120,9 @@ export default function FamilyMemberInvitation({
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg max-w-lg w-full mx-auto">
+    <div className="bg-white rounded-xl shadow-lg w-full mx-auto">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-teal/10 rounded-full flex items-center justify-center">
             <UserPlus className="text-teal" size={20} />
@@ -150,7 +150,7 @@ export default function FamilyMemberInvitation({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5">
               {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -291,7 +291,7 @@ export default function FamilyMemberInvitation({
             key="success"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="p-6 text-center"
+            className="p-4 sm:p-6 text-center"
           >
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="text-green-600" size={32} />
@@ -322,7 +322,7 @@ export default function FamilyMemberInvitation({
             <div className="space-y-3">
               <p className="text-sm text-gray-500">Share login link with family member:</p>
               
-              <div className="flex gap-2 justify-center">
+              <div className="flex flex-col sm:flex-row gap-2 justify-center">
                 <button
                   onClick={handleCopyLink}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
