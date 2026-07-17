@@ -59,8 +59,8 @@ export default function BiometricsPrompt() {
         if (!isNative) {
           throw new Error('Biometric login requires the native CAREi app.')
         }
-        // setCredentials with BIOMETRY_CURRENT_SET will show its own biometric prompt
-        // on Android, so no need for a separate verifyIdentity call
+        // Store refresh token with AccessControl.NONE — no biometric prompt needed for storage.
+        // Biometric protection is enforced at retrieval time via verifyIdentity.
         const refreshToken = getRefreshToken()
         const me = await getMe()
         if (refreshToken && me.user?.email) {

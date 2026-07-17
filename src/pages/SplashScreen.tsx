@@ -1,6 +1,6 @@
 import { useLocation } from 'wouter'
 import { useEffect, useRef, useState } from 'react'
-import { getBiometricEnabled, hasStoredBiometricCredentials, getCredentialsWithBiometric } from '../utils/biometric'
+import { getBiometricEnabled, hasStoredBiometricCredentials, getCredentialsWithBiometric, storeCredentialsWithBiometric } from '../utils/biometric'
 import { biometricTokenLogin } from '../api/client'
 import { setToken, setRefreshToken, setUser as setTokenCacheUser } from '../utils/tokenCache'
 import { secureSet } from '../utils/secureStorage'
@@ -157,6 +157,8 @@ export default function SplashScreen() {
                   if (response.refreshToken) {
                     setRefreshToken(response.refreshToken)
                     await secureSet('refreshToken', response.refreshToken)
+                    // Re-store rotated refresh token in biometric storage
+                    await storeCredentialsWithBiometric(credentials.email, response.refreshToken)
                   }
                   await secureSet('token', response.token)
                   const userJson = JSON.stringify(response.user)

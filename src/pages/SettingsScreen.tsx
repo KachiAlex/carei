@@ -179,39 +179,40 @@ export default function SettingsScreen() {
     try {
       const next = !biometricsEnabled
       if (next) {
-        // Check if running in Capacitor native app
         const isNative = typeof window !== 'undefined' && 'Capacitor' in window
         if (!isNative) {
-          setError('Biometric login is only available in the native CAREi app (Android/iOS). On web, use PIN login instead.')
+          setError('Biometric login is only available in the native CAREi app.')
           setBiometricsLoading(false)
           return
         }
-        // Check device supports biometric
+
         const available = await isBiometricAvailable()
         if (!available) {
-          setError('Biometric authentication is not available on this device.')
+          setError('Biometric hardware not available. Make sure fingerprint is set up in Android Settings.')
           setBiometricsLoading(false)
           return
         }
-        // Store refresh token in biometric secure storage — setCredentials
-        // with BIOMETRY_CURRENT_SET will show its own biometric prompt on Android
-        const refreshToken = getRefreshToken()
+
+        let refreshToken = getRefreshToken()
         if (!refreshToken) {
-          setError('No active session found. Please re-login and try again.')
+          refreshToken = await secureGet('refreshToken')
+          if (refreshToken) setRefreshToken(refreshToken)
+        }
+        if (!refreshToken) {
+          setError('No session found. Please log out and log back in, then try again.')
           setBiometricsLoading(false)
           return
         }
-        if (user?.email) {
-          console.log('[CAREi bio] SettingsScreen: storing credentials for', user.email, 'refreshToken present:', !!refreshToken)
-          const stored = await storeCredentialsWithBiometric(user.email, refreshToken)
-          console.log('[CAREi bio] SettingsScreen: storeCredentialsWithBiometric returned:', stored)
-          if (!stored) {
-            setError('Failed to store biometric credentials. Make sure your fingerprint is enrolled in Android Settings and try again.')
-            setBiometricsLoading(false)
-            return
-          }
-        } else {
-          setError('User email not found. Cannot store biometric credentials.')
+
+        if (!user?.email) {
+          setError('User email not found. Please reload the page and try again.')
+          setBiometricsLoading(false)
+          return
+        }
+
+        const stored = await storeCredentialsWithBiometric(user.email, refreshToken)
+        if (!stored) {
+          setError('Failed to store biometric credentials on device. Please try again.')
           setBiometricsLoading(false)
           return
         }
