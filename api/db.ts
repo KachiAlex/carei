@@ -877,10 +877,10 @@ export function getAuthToken(req: any): string {
   return match ? match[1] : ''
 }
 
-export async function getUserFromToken(sql: any, token: string): Promise<{ id: string; name: string; role: string } | null> {
+export async function getUserFromToken(sql: any, token: string): Promise<{ id: string; name: string; role: string; email: string } | null> {
   // Primary: verify against hashed token + expiry
   const hashedUsers = await sql`
-    SELECT id, name, role, token_hash, token_expires_at
+    SELECT id, name, role, email, token_hash, token_expires_at
     FROM users
     WHERE token_hash IS NOT NULL
   ` as any[]
@@ -891,13 +891,13 @@ export async function getUserFromToken(sql: any, token: string): Promise<{ id: s
       if (u.token_expires_at && new Date(u.token_expires_at) < new Date()) {
         continue // expired
       }
-      return { id: u.id, name: u.name, role: u.role }
+      return { id: u.id, name: u.name, role: u.role, email: u.email }
     }
   }
 
   // Fallback: plaintext token during transition (migration 20 will backfill)
-  const rows = await sql`SELECT id, name, role FROM users WHERE token = ${token} LIMIT 1` as any[]
-  return rows[0] || null
+  const rows = await sql`SELECT id, name, role, email FROM users WHERE token = ${token} LIMIT 1` as any[]
+  return rows[0] ? { id: rows[0].id, name: rows[0].name, role: rows[0].role, email: rows[0].email } : null
 }
 
 // Multi-tenant helpers

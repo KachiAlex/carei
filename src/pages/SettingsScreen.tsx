@@ -70,6 +70,7 @@ export default function SettingsScreen() {
   // Biometrics
   const [biometricsEnabled, setBiometricsEnabled] = useState(false)
   const [biometricsLoading, setBiometricsLoading] = useState(false)
+  const [bioDebug, setBioDebug] = useState('')
 
   // Face recognition (placeholder)
   const [faceRecognition, setFaceRecognition] = useState(false)
@@ -173,6 +174,7 @@ export default function SettingsScreen() {
   }
 
   const handleToggleBiometrics = async () => {
+    setBioDebug('Step 1: toggle clicked. current: ' + biometricsEnabled)
     setBiometricsLoading(true)
     setError('')
     setMsg('')
@@ -180,13 +182,16 @@ export default function SettingsScreen() {
       const next = !biometricsEnabled
       if (next) {
         const isNative = typeof window !== 'undefined' && 'Capacitor' in window
+        setBioDebug('Step 2: isNative=' + isNative + ', Capacitor in window: ' + ('Capacitor' in window))
         if (!isNative) {
           setError('Biometric login is only available in the native CAREi app.')
           setBiometricsLoading(false)
           return
         }
 
+        setBioDebug('Step 3: checking biometric availability...')
         const available = await isBiometricAvailable()
+        setBioDebug('Step 4: biometric available=' + available)
         if (!available) {
           setError('Biometric hardware not available. Make sure fingerprint is set up in Android Settings.')
           setBiometricsLoading(false)
@@ -194,8 +199,10 @@ export default function SettingsScreen() {
         }
 
         let refreshToken = getRefreshToken()
+        setBioDebug('Step 5: refreshToken from cache=' + (!!refreshToken))
         if (!refreshToken) {
           refreshToken = await secureGet('refreshToken')
+          setBioDebug('Step 6: refreshToken from secure storage=' + (!!refreshToken))
           if (refreshToken) setRefreshToken(refreshToken)
         }
         if (!refreshToken) {
@@ -205,12 +212,15 @@ export default function SettingsScreen() {
         }
 
         if (!user?.email) {
+          setBioDebug('Step 7: FAIL - no user email. user=' + JSON.stringify(user))
           setError('User email not found. Please reload the page and try again.')
           setBiometricsLoading(false)
           return
         }
 
+        setBioDebug('Step 8: storing credentials for ' + user.email)
         const stored = await storeCredentialsWithBiometric(user.email, refreshToken)
+        setBioDebug('Step 9: store result=' + stored)
         if (!stored) {
           setError('Failed to store biometric credentials on device. Please try again.')
           setBiometricsLoading(false)
@@ -219,11 +229,14 @@ export default function SettingsScreen() {
       } else {
         await deleteBiometricCredentials()
       }
+      setBioDebug('Step 10: calling updateBiometrics API...')
       await updateBiometrics({ enabled: next })
+      setBioDebug('Step 11: done! enabled=' + next)
       setBiometricEnabled(next)
       setBiometricsEnabled(next)
       setMsg(next ? 'Biometric login enabled' : 'Biometric login disabled')
     } catch (err: any) {
+      setBioDebug('ERROR: ' + (err?.message || String(err)))
       setError(err.message || 'Failed to update biometrics')
     } finally {
       setBiometricsLoading(false)
@@ -467,6 +480,11 @@ export default function SettingsScreen() {
                 onChange={handleToggleBiometrics}
                 disabled={biometricsLoading}
               />
+              {bioDebug && (
+                <div className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 font-mono break-all">
+                  {bioDebug}
+                </div>
+              )}
 
               {/* Face Recognition */}
               <ToggleRow
