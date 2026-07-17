@@ -65,18 +65,48 @@ export function setBiometricEnabled(enabled: boolean): void {
 }
 
 export async function storeCredentialsWithBiometric(email: string, token: string): Promise<boolean> {
+  const server = BIOMETRIC_SERVER
+  const username = email.toLowerCase()
+
+  // Try BIOMETRY_ANY first (allows any enrolled biometric)
+  for (const accessControl of [AccessControl.BIOMETRY_ANY, AccessControl.BIOMETRY_CURRENT_SET]) {
+    try {
+      console.log(`[CAREi bio] calling setCredentials with accessControl=${accessControl}`)
+      await NativeBiometric.setCredentials({
+        username,
+        password: token,
+        server,
+        accessControl,
+      })
+      console.log(`[CAREi bio] setCredentials succeeded with accessControl=${accessControl}`)
+
+      // Verify credentials were actually stored
+      const check = await NativeBiometric.isCredentialsSaved({ server })
+      console.log(`[CAREi bio] post-store verification: isSaved=${check.isSaved}`)
+      if (check.isSaved) return true
+
+      console.log(`[CAREi bio] setCredentials reported success but isCredentialsSaved=false, trying next accessControl`)
+    } catch (err: any) {
+      console.log(`[CAREi bio] setCredentials error with accessControl=${accessControl}:`, JSON.stringify(err))
+      // Continue to next fallback
+    }
+  }
+
+  // Last resort: store without biometric protection (we'll use verifyIdentity before getCredentials)
   try {
-    console.log('[CAREi bio] calling setCredentials with BIOMETRY_ANY')
+    console.log('[CAREi bio] falling back to setCredentials with NONE')
     await NativeBiometric.setCredentials({
-      username: email.toLowerCase(),
+      username,
       password: token,
-      server: BIOMETRIC_SERVER,
-      accessControl: AccessControl.BIOMETRY_ANY,
+      server,
+      accessControl: AccessControl.NONE,
     })
-    console.log('[CAREi bio] setCredentials succeeded')
-    return true
-  } catch (err) {
-    console.log('[CAREi bio] setCredentials error:', err)
+    console.log('[CAREi bio] setCredentials succeeded with NONE')
+    const check = await NativeBiometric.isCredentialsSaved({ server })
+    console.log(`[CAREi bio] post-store verification (NONE): isSaved=${check.isSaved}`)
+    return check.isSaved
+  } catch (err: any) {
+    console.log('[CAREi bio] setCredentials error with NONE:', JSON.stringify(err))
     return false
   }
 }
@@ -91,6 +121,7 @@ function validateEmail(email: string): boolean {
 }
 
 export async function getCredentialsWithBiometric(): Promise<BiometricCredentials | null> {
+  // First try getSecureCredentials (works if stored with BIOMETRY_ANY or BIOMETRY_CURRENT_SET)
   try {
     console.log('[CAREi bio] calling getSecureCredentials')
     const result = await NativeBiometric.getSecureCredentials({
@@ -103,14 +134,36 @@ export async function getCredentialsWithBiometric(): Promise<BiometricCredential
     console.log('[CAREi bio] getSecureCredentials result:', result)
     if (!result.username || !result.password) return null
     if (!validateEmail(result.username)) {
-      // Old-format credential (username was a placeholder); clear it
       console.log('[CAREi bio] clearing old-format credential')
       await deleteBiometricCredentials()
       return null
     }
     return { email: result.username.toLowerCase(), token: result.password }
   } catch (err) {
-    console.log('[CAREi bio] getSecureCredentials error:', err)
+    console.log('[CAREi bio] getSecureCredentials error:', JSON.stringify(err))
+  }
+
+  // Fallback: getCredentials (no biometric prompt) + verifyIdentity
+  try {
+    console.log('[CAREi bio] falling back to getCredentials + verifyIdentity')
+    const verified = await verifyBiometric('Authenticate to access CAREi')
+    if (!verified) {
+      console.log('[CAREi bio] verifyIdentity failed in fallback')
+      return null
+    }
+    const result = await NativeBiometric.getCredentials({
+      server: BIOMETRIC_SERVER,
+    })
+    console.log('[CAREi bio] getCredentials result:', result)
+    if (!result.username || !result.password) return null
+    if (!validateEmail(result.username)) {
+      console.log('[CAREi bio] clearing old-format credential (fallback)')
+      await deleteBiometricCredentials()
+      return null
+    }
+    return { email: result.username.toLowerCase(), token: result.password }
+  } catch (err) {
+    console.log('[CAREi bio] getCredentials fallback error:', JSON.stringify(err))
     return null
   }
 }

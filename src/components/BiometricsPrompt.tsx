@@ -59,10 +59,8 @@ export default function BiometricsPrompt() {
         if (!isNative) {
           throw new Error('Biometric login requires the native CAREi app.')
         }
-        const verified = await verifyBiometric('Confirm your identity to enable biometric login')
-        if (!verified) {
-          throw new Error('Biometric verification failed')
-        }
+        // setCredentials with BIOMETRY_ANY will show its own biometric prompt
+        // on Android, so no need for a separate verifyIdentity call
         const token = getToken()
         const me = await getMe()
         if (token && me.user?.email) {

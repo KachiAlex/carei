@@ -180,20 +180,16 @@ export default function SettingsScreen() {
           setBiometricsLoading(false)
           return
         }
-        // Enrolling: verify device supports biometric and user can authenticate
+        // Check device supports biometric
         const available = await isBiometricAvailable()
         if (!available) {
           setError('Biometric authentication is not available on this device.')
           setBiometricsLoading(false)
           return
         }
-        const verified = await verifyBiometric('Confirm your identity to enable biometric login')
-        if (!verified) {
-          setError('Biometric verification failed. Please try again.')
-          setBiometricsLoading(false)
-          return
-        }
-        // Store current token securely for future biometric login
+        // Store current token securely — setCredentials with BIOMETRY_ANY
+        // will show its own biometric prompt on Android, so no need for
+        // a separate verifyIdentity call
         const token = getToken()
         if (!token) {
           setError('No active session token found. Please re-login and try again.')
