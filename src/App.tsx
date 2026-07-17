@@ -3,7 +3,7 @@ import { Route, Router, Switch, useLocation } from 'wouter'
 import { useOnlineSync } from './hooks/useOnlineSync'
 import { TenantProvider } from './contexts/TenantContext'
 import { secureGet, secureWipe } from './utils/secureStorage'
-import { setToken, setUser, clearAuthCache } from './utils/tokenCache'
+import { setToken, setRefreshToken, setUser, clearAuthCache } from './utils/tokenCache'
 import { useAutoLock } from './hooks/useAutoLock'
 import { PWAInstallPrompt } from './components/PWAInstallPrompt'
 
@@ -39,13 +39,22 @@ function useSecureBoot() {
         // Check expiry before accepting token
         const payload = decodeJwtPayload(token)
         if (payload?.exp && payload.exp * 1000 < Date.now()) {
-          // Token expired — wipe it
-          secureWipe()
-          clearAuthCache()
+          // Access token expired — try to refresh using refresh token
+          secureGet('refreshToken').then((refreshToken) => {
+            if (refreshToken) {
+              setRefreshToken(refreshToken)
+            } else {
+              secureWipe()
+              clearAuthCache()
+            }
+          })
           return
         }
         setToken(token)
       }
+    })
+    secureGet('refreshToken').then((refreshToken) => {
+      if (refreshToken) setRefreshToken(refreshToken)
     })
     secureGet('user').then((user) => {
       if (user) setUser(user)

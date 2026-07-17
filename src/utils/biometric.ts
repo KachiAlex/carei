@@ -41,8 +41,9 @@ export async function verifyBiometric(reason = 'Authenticate to access CAREi'): 
       reason,
       title: 'CAREi',
       subtitle: 'Biometric Authentication',
-      description: 'Use your fingerprint or face to unlock',
-      allowedBiometryTypes: [BiometryType.FINGERPRINT, BiometryType.FACE_AUTHENTICATION],
+      description: 'Use your fingerprint, face, or device PIN to unlock',
+      useFallback: true,
+      allowedBiometryTypes: [BiometryType.FINGERPRINT, BiometryType.FACE_AUTHENTICATION, BiometryType.DEVICE_CREDENTIAL],
     })
     console.log('[CAREi bio] verifyIdentity succeeded')
     return true
@@ -64,17 +65,18 @@ export function setBiometricEnabled(enabled: boolean): void {
   }
 }
 
-export async function storeCredentialsWithBiometric(email: string, token: string): Promise<boolean> {
+export async function storeCredentialsWithBiometric(email: string, refreshToken: string): Promise<boolean> {
   const server = BIOMETRIC_SERVER
   const username = email.toLowerCase()
 
-  // Try BIOMETRY_ANY first (allows any enrolled biometric)
-  for (const accessControl of [AccessControl.BIOMETRY_ANY, AccessControl.BIOMETRY_CURRENT_SET]) {
+  // Try BIOMETRY_CURRENT_SET first — invalidates key if biometrics change
+  // Then fall back to BIOMETRY_ANY (any enrolled biometric)
+  for (const accessControl of [AccessControl.BIOMETRY_CURRENT_SET, AccessControl.BIOMETRY_ANY]) {
     try {
       console.log(`[CAREi bio] calling setCredentials with accessControl=${accessControl}`)
       await NativeBiometric.setCredentials({
         username,
-        password: token,
+        password: refreshToken,
         server,
         accessControl,
       })
@@ -97,7 +99,7 @@ export async function storeCredentialsWithBiometric(email: string, token: string
     console.log('[CAREi bio] falling back to setCredentials with NONE')
     await NativeBiometric.setCredentials({
       username,
-      password: token,
+      password: refreshToken,
       server,
       accessControl: AccessControl.NONE,
     })
@@ -121,7 +123,7 @@ function validateEmail(email: string): boolean {
 }
 
 export async function getCredentialsWithBiometric(): Promise<BiometricCredentials | null> {
-  // First try getSecureCredentials (works if stored with BIOMETRY_ANY or BIOMETRY_CURRENT_SET)
+  // First try getSecureCredentials (works if stored with BIOMETRY_CURRENT_SET or BIOMETRY_ANY)
   try {
     console.log('[CAREi bio] calling getSecureCredentials')
     const result = await NativeBiometric.getSecureCredentials({
@@ -129,7 +131,7 @@ export async function getCredentialsWithBiometric(): Promise<BiometricCredential
       reason: 'Authenticate to access CAREi',
       title: 'CAREi',
       subtitle: 'Biometric Authentication',
-      description: 'Use your fingerprint or face to unlock',
+      description: 'Use your fingerprint, face, or device PIN to unlock',
     })
     console.log('[CAREi bio] getSecureCredentials result:', result)
     if (!result.username || !result.password) return null

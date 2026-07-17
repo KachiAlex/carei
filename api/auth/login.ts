@@ -47,15 +47,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    const token = generateSecureToken()
-    const tokenHash = await hashToken(token)
-    const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+    const accessToken = generateSecureToken()
+    const accessTokenHash = await hashToken(accessToken)
+    const accessTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 minutes
+
+    const refreshToken = generateSecureToken()
+    const refreshTokenHash = await hashToken(refreshToken)
+    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+
     // Also clear plaintext pin if hash exists (migration cleanup)
     const shouldClearPlaintextPin = user.pin_hash ? true : false
     if (shouldClearPlaintextPin) {
-      await sql`UPDATE users SET pin = NULL, token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
+      await sql`UPDATE users SET pin = NULL, token_hash = ${accessTokenHash}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${refreshTokenHash}, refresh_token_expires_at = ${refreshTokenExpiresAt}, token = NULL WHERE id = ${user.id}`
     } else {
-      await sql`UPDATE users SET token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
+      await sql`UPDATE users SET token_hash = ${accessTokenHash}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${refreshTokenHash}, refresh_token_expires_at = ${refreshTokenExpiresAt}, token = NULL WHERE id = ${user.id}`
     }
 
     // Auto-link orphaned users to carei tenant so they can access tenant-scoped endpoints
@@ -78,9 +83,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    res.setHeader('Set-Cookie', `carei_token=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`)
+    res.setHeader('Set-Cookie', `carei_token=${accessToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`)
     res.status(200).json({
-      token,
+      token: accessToken,
+      refreshToken,
       user: {
         id: user.id,
         name: user.name,

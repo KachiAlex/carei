@@ -1,5 +1,5 @@
-import { getToken, setToken, clearAuthCache } from '../utils/tokenCache'
-import { secureSet, secureRemove } from '../utils/secureStorage'
+import { getToken, setToken, getRefreshToken, setRefreshToken, clearAuthCache } from '../utils/tokenCache'
+import { secureSet, secureGet, secureRemove } from '../utils/secureStorage'
 
 function getApiBase(): string {
   // 1. Environment override always wins
@@ -23,10 +23,16 @@ function getApiBase(): string {
 export const API_BASE = getApiBase()
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
-async function handleAuthError(status: number) {
+async function handleAuthError(status: number): Promise<boolean> {
   if (status === 401) {
+    // Try to refresh the access token using the refresh token
+    const refreshed = await tryRefreshToken()
+    if (refreshed) return true // caller should retry
+
+    // Refresh failed — clear everything and redirect to login
     clearAuthCache()
     await secureRemove('token')
+    await secureRemove('refreshToken')
     await secureRemove('user')
     localStorage.removeItem('carei_current_tenant')
     localStorage.removeItem('carei_biometric_enabled')
@@ -34,6 +40,53 @@ async function handleAuthError(status: number) {
       window.location.href = '/login'
     }
   }
+  return false
+}
+
+let _refreshing: Promise<boolean> | null = null
+
+async function tryRefreshToken(): Promise<boolean> {
+  // Deduplicate concurrent refresh attempts
+  if (_refreshing) return _refreshing
+  _refreshing = doRefresh()
+  try { return await _refreshing } finally { _refreshing = null }
+}
+
+async function doRefresh(): Promise<boolean> {
+  let refreshToken = getRefreshToken()
+  if (!refreshToken) {
+    refreshToken = await secureGet('refreshToken')
+    if (refreshToken) setRefreshToken(refreshToken)
+  }
+  if (!refreshToken) return false
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { ...jsonHeaders },
+      body: JSON.stringify({ refreshToken }),
+    })
+    if (!res.ok) return false
+    const data = await res.json()
+    if (data.token && data.refreshToken) {
+      setToken(data.token)
+      setRefreshToken(data.refreshToken)
+      await secureSet('token', data.token)
+      await secureSet('refreshToken', data.refreshToken)
+      if (data.user) {
+        const userJson = JSON.stringify(data.user)
+        await secureSet('user', userJson)
+      }
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+export async function refreshSession(): Promise<boolean> {
+  return tryRefreshToken()
 }
 
 export function authHeaders(): Record<string, string> {
@@ -74,6 +127,10 @@ async function postWithRetry(path: string, body: unknown, retries = 3, extraHead
       })
       
       if (!res.ok) {
+        if (res.status === 401) {
+          const refreshed = await handleAuthError(res.status)
+          if (refreshed && attempt < retries - 1) continue // retry with new token
+        }
         handleAuthError(res.status)
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
@@ -112,6 +169,10 @@ async function getWithRetry(path: string, retries = 3, extraHeaders?: Record<str
       })
 
       if (!res.ok) {
+        if (res.status === 401) {
+          const refreshed = await handleAuthError(res.status)
+          if (refreshed && attempt < retries - 1) continue // retry with new token
+        }
         handleAuthError(res.status)
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
@@ -149,6 +210,10 @@ async function putWithRetry(path: string, body: unknown, retries = 3, extraHeade
         body: JSON.stringify(body),
       })
       if (!res.ok) {
+        if (res.status === 401) {
+          const refreshed = await handleAuthError(res.status)
+          if (refreshed && attempt < retries - 1) continue
+        }
         handleAuthError(res.status)
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
@@ -180,6 +245,10 @@ async function patchWithRetry(path: string, body?: unknown, retries = 3, extraHe
       if (body !== undefined) opts.body = JSON.stringify(body)
       const res = await fetch(`${API_BASE}${path}`, opts)
       if (!res.ok) {
+        if (res.status === 401) {
+          const refreshed = await handleAuthError(res.status)
+          if (refreshed && attempt < retries - 1) continue
+        }
         handleAuthError(res.status)
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
@@ -205,6 +274,10 @@ async function delWithRetry(path: string, retries = 3, extraHeaders?: Record<str
         headers: { ...authHeaders(), ...extraHeaders },
       })
       if (!res.ok) {
+        if (res.status === 401) {
+          const refreshed = await handleAuthError(res.status)
+          if (refreshed && attempt < retries - 1) continue
+        }
         handleAuthError(res.status)
         const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
@@ -366,6 +439,10 @@ export async function loginUser(data: { email: string; pin: string }) {
     setToken(res.token)
     await secureSet('token', res.token)
   }
+  if (res.refreshToken) {
+    setRefreshToken(res.refreshToken)
+    await secureSet('refreshToken', res.refreshToken)
+  }
   return res
 }
 
@@ -374,6 +451,10 @@ export async function loginWithPassword(data: { email: string; password: string 
   if (res.token) {
     setToken(res.token)
     await secureSet('token', res.token)
+  }
+  if (res.refreshToken) {
+    setRefreshToken(res.refreshToken)
+    await secureSet('refreshToken', res.refreshToken)
   }
   return res
 }
@@ -390,6 +471,7 @@ export async function resetPin(data: { email: string; newPin: string; otp: strin
 export async function logoutUser() {
   clearAuthCache()
   await secureRemove('token')
+  await secureRemove('refreshToken')
   await secureRemove('user')
   return post('/auth/logout', {})
 }
@@ -428,6 +510,10 @@ export async function biometricTokenLogin(data: { email: string; token: string }
   if (res.token) {
     setToken(res.token)
     await secureSet('token', res.token)
+  }
+  if (res.refreshToken) {
+    setRefreshToken(res.refreshToken)
+    await secureSet('refreshToken', res.refreshToken)
   }
   return res
 }

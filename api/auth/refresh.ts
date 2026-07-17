@@ -1,6 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, getUserFromToken, addUserToTenant, getTenantFromSlug } from '../db.js'
+import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug } from '../db.js'
 import { generateSecureToken, hashToken, verifyToken } from '../hash.js'
+
+const ACCESS_TOKEN_TTL = 15 * 60 * 1000 // 15 minutes
+const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60 * 1000 // 30 days
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -10,9 +13,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const { email, token } = req.body || {}
-  if (!email || !token) {
-    res.status(400).json({ error: 'email and token required' })
+  const { refreshToken } = req.body || {}
+  if (!refreshToken) {
+    res.status(400).json({ error: 'refreshToken required' })
     return
   }
 
@@ -20,62 +23,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureTables()
     const sql = getSql()
 
-    // The token from biometric storage is a refresh token.
-    // Try refresh token first, then fall back to access token for backward compat.
-    let matchedUser: any = null
-
-    // Try refresh token hash
-    const refreshUsers = await sql`
-      SELECT id, name, email, phone, region, role, biometrics_enabled, refresh_token_hash, refresh_token_expires_at
+    // Find user by refresh token hash
+    const users = await sql`
+      SELECT id, name, email, phone, region, role, refresh_token_hash, refresh_token_expires_at
       FROM users
       WHERE refresh_token_hash IS NOT NULL
     ` as any[]
 
-    for (const u of refreshUsers) {
-      const valid = await verifyToken(token, u.refresh_token_hash)
+    let matchedUser: any = null
+    for (const u of users) {
+      const valid = await verifyToken(refreshToken, u.refresh_token_hash)
       if (valid) {
         if (u.refresh_token_expires_at && new Date(u.refresh_token_expires_at) < new Date()) {
-          continue
+          continue // expired
         }
         matchedUser = u
         break
       }
     }
 
-    // Fallback: try as access token (backward compat with old biometric storage)
     if (!matchedUser) {
-      const user = await getUserFromToken(sql, token)
-      if (user) {
-        const userRows = await sql`
-          SELECT id, name, email, phone, region, role, biometrics_enabled
-          FROM users
-          WHERE id = ${user.id}
-          LIMIT 1
-        ` as any[]
-        matchedUser = userRows[0] || null
-      }
-    }
-
-    if (!matchedUser) {
-      res.status(401).json({ error: 'Invalid or expired biometric token' })
+      res.status(401).json({ error: 'Invalid or expired refresh token' })
       return
     }
 
-    if (matchedUser.email !== email.toLowerCase()) {
-      res.status(403).json({ error: 'Email does not match biometric credential' })
-      return
-    }
-
-    // Issue fresh access + refresh tokens (rotate)
+    // Rotate: generate new access + refresh tokens, invalidate old refresh token
     const accessToken = generateSecureToken()
     const accessTokenHash = await hashToken(accessToken)
-    const accessTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+    const accessTokenExpiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL).toISOString()
 
     const newRefreshToken = generateSecureToken()
     const newRefreshTokenHash = await hashToken(newRefreshToken)
-    const newRefreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    const newRefreshTokenExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL).toISOString()
 
-    await sql`UPDATE users SET token_hash = ${accessTokenHash}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${newRefreshTokenHash}, refresh_token_expires_at = ${newRefreshTokenExpiresAt}, token = NULL WHERE id = ${matchedUser.id}`
+    await sql`
+      UPDATE users
+      SET token_hash = ${accessTokenHash},
+          token_expires_at = ${accessTokenExpiresAt},
+          refresh_token_hash = ${newRefreshTokenHash},
+          refresh_token_expires_at = ${newRefreshTokenExpiresAt},
+          token = NULL
+      WHERE id = ${matchedUser.id}
+    `
 
     // Auto-link orphaned users to carei tenant
     const tenantRows = await sql`
@@ -111,6 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
     })
   } catch (err: any) {
-    res.status(500).json({ error: err.message })
+    console.error('[auth/refresh] error:', err)
+    res.status(500).json({ error: err.message || 'Token refresh failed' })
   }
 }

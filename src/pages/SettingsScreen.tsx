@@ -9,8 +9,8 @@ import {
   getBiometricsStatus,
   updateBiometrics,
 } from '../api/client'
-import { isBiometricAvailable, verifyBiometric, getBiometricEnabled, setBiometricEnabled, storeCredentialsWithBiometric, deleteBiometricCredentials } from '../utils/biometric'
-import { getToken, setToken } from '../utils/tokenCache'
+import { isBiometricAvailable, getBiometricEnabled, setBiometricEnabled, storeCredentialsWithBiometric, deleteBiometricCredentials } from '../utils/biometric'
+import { getRefreshToken, getToken, setToken } from '../utils/tokenCache'
 import { secureGet, secureSet } from '../utils/secureStorage'
 
 const COLORS = {
@@ -187,17 +187,16 @@ export default function SettingsScreen() {
           setBiometricsLoading(false)
           return
         }
-        // Store current token securely — setCredentials with BIOMETRY_ANY
-        // will show its own biometric prompt on Android, so no need for
-        // a separate verifyIdentity call
-        const token = getToken()
-        if (!token) {
-          setError('No active session token found. Please re-login and try again.')
+        // Store refresh token in biometric secure storage — setCredentials
+        // with BIOMETRY_CURRENT_SET will show its own biometric prompt on Android
+        const refreshToken = getRefreshToken()
+        if (!refreshToken) {
+          setError('No active session found. Please re-login and try again.')
           setBiometricsLoading(false)
           return
         }
         if (user?.email) {
-          const stored = await storeCredentialsWithBiometric(user.email, token)
+          const stored = await storeCredentialsWithBiometric(user.email, refreshToken)
           if (!stored) {
             setError('Failed to store biometric credentials. Please try again.')
             setBiometricsLoading(false)

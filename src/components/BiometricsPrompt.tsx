@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getBiometricsStatus, updateBiometrics, getMe } from '../api/client'
-import { getToken } from '../utils/tokenCache'
-import { isBiometricAvailable, verifyBiometric, storeCredentialsWithBiometric, setBiometricEnabled } from '../utils/biometric'
+import { getRefreshToken, getToken } from '../utils/tokenCache'
+import { isBiometricAvailable, storeCredentialsWithBiometric, setBiometricEnabled } from '../utils/biometric'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -59,12 +59,12 @@ export default function BiometricsPrompt() {
         if (!isNative) {
           throw new Error('Biometric login requires the native CAREi app.')
         }
-        // setCredentials with BIOMETRY_ANY will show its own biometric prompt
+        // setCredentials with BIOMETRY_CURRENT_SET will show its own biometric prompt
         // on Android, so no need for a separate verifyIdentity call
-        const token = getToken()
+        const refreshToken = getRefreshToken()
         const me = await getMe()
-        if (token && me.user?.email) {
-          const stored = await storeCredentialsWithBiometric(me.user.email, token)
+        if (refreshToken && me.user?.email) {
+          const stored = await storeCredentialsWithBiometric(me.user.email, refreshToken)
           if (!stored) {
             throw new Error('Failed to store biometric credentials on device')
           }

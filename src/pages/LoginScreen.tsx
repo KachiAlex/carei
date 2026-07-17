@@ -4,7 +4,7 @@ import { loginUser, loginWithPassword, sendOtp, verifyOtp, resetPin, getMe, getU
 import { isBiometricAvailable, getBiometricEnabled, getCredentialsWithBiometric, storeCredentialsWithBiometric, getBiometricAvailability, hasStoredBiometricCredentials } from '../utils/biometric'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { secureSet } from '../utils/secureStorage'
-import { setToken, setUser as setTokenCacheUser } from '../utils/tokenCache'
+import { setToken, setRefreshToken, setUser as setTokenCacheUser } from '../utils/tokenCache'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -239,6 +239,17 @@ export default function LoginScreen() {
       if (rememberMe) {
         localStorage.setItem('carei_last_email', credentials.email)
       }
+
+      // Store new tokens (biometric-token-login rotates both access + refresh)
+      setToken(response.token)
+      if (response.refreshToken) {
+        setRefreshToken(response.refreshToken)
+        await secureSet('refreshToken', response.refreshToken)
+
+        // Re-store the new refresh token in biometric storage (rotation)
+        await storeCredentialsWithBiometric(credentials.email, response.refreshToken)
+      }
+      await secureSet('token', response.token)
 
       const userJson = JSON.stringify(response.user)
       await secureSet('user', userJson)

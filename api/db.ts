@@ -751,6 +751,11 @@ async function runMigrations() {
     await sql`ALTER TABLE care_plans ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ`
   })
 
+  await run(27, 'add_refresh_token_columns', async () => {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS refresh_token_hash TEXT`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS refresh_token_expires_at TIMESTAMPTZ`
+  })
+
   await run(26, 'create_family_members_table', async () => {
     await sql`
       CREATE TABLE IF NOT EXISTS family_members (

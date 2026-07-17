@@ -2,6 +2,7 @@
 // All API calls read from this synchronously.
 
 let _token: string | null = null
+let _refreshToken: string | null = null
 let _user: string | null = null
 
 export function setToken(token: string | null) {
@@ -10,6 +11,14 @@ export function setToken(token: string | null) {
 
 export function getToken(): string | null {
   return _token
+}
+
+export function setRefreshToken(token: string | null) {
+  _refreshToken = token
+}
+
+export function getRefreshToken(): string | null {
+  return _refreshToken
 }
 
 export function setUser(userJson: string | null) {
@@ -22,5 +31,6 @@ export function getUser(): string | null {
 
 export function clearAuthCache() {
   _token = null
+  _refreshToken = null
   _user = null
 }
