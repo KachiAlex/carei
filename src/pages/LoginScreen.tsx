@@ -294,13 +294,18 @@ export default function LoginScreen() {
       await secureSet('user', JSON.stringify(response.user))
       setToken(response.token)
       setTokenCacheUser(JSON.stringify(response.user))
+      if (response.refreshToken) {
+        setRefreshToken(response.refreshToken)
+        await secureSet('refreshToken', response.refreshToken)
+      }
 
       // Enroll biometric credentials for future login if biometrics are enabled
+      // Store REFRESH TOKEN (not access token) in biometric secure storage
       if (getBiometricEnabled() || userInfo?.hasBiometric) {
         const available = await isBiometricAvailable()
         console.log('[CAREi bio] storing credentials, device available:', available)
-        if (available) {
-          const stored = await storeCredentialsWithBiometric(email, response.token)
+        if (available && response.refreshToken) {
+          const stored = await storeCredentialsWithBiometric(email, response.refreshToken)
           console.log('[CAREi bio] credentials stored:', stored)
         }
       }
@@ -352,6 +357,10 @@ export default function LoginScreen() {
       await secureSet('user', JSON.stringify(response.user))
       setToken(response.token)
       setTokenCacheUser(JSON.stringify(response.user))
+      if (response.refreshToken) {
+        setRefreshToken(response.refreshToken)
+        await secureSet('refreshToken', response.refreshToken)
+      }
       setLocation(redirectPath || '/super-admin')
     } catch (err: any) {
       triggerHaptic(HAPTIC_PATTERNS.error)

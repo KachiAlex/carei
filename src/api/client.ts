@@ -23,6 +23,20 @@ function getApiBase(): string {
 export const API_BASE = getApiBase()
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
+async function parseJsonResponse(res: Response): Promise<any> {
+  const contentType = res.headers.get('content-type') || ''
+  const text = await res.text()
+  if (text.trim().startsWith('<') || contentType.includes('text/html')) {
+    console.error('[CAREi API] Received HTML instead of JSON. URL:', res.url, 'Status:', res.status)
+    throw new Error('Server returned HTML instead of JSON. The API endpoint may not exist or a redirect occurred.')
+  }
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(`Invalid JSON response from server (status ${res.status})`)
+  }
+}
+
 async function handleAuthError(status: number): Promise<boolean> {
   if (status === 401) {
     // Try to refresh the access token using the refresh token
@@ -67,7 +81,8 @@ async function doRefresh(): Promise<boolean> {
       body: JSON.stringify({ refreshToken }),
     })
     if (!res.ok) return false
-    const data = await res.json()
+    const data = await parseJsonResponse(res).catch(() => null)
+    if (!data) return false
     if (data.token && data.refreshToken) {
       setToken(data.token)
       setRefreshToken(data.refreshToken)
@@ -132,11 +147,11 @@ async function postWithRetry(path: string, body: unknown, retries = 3, extraHead
           if (refreshed && attempt < retries - 1) continue // retry with new token
         }
         handleAuthError(res.status)
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        const err = await parseJsonResponse(res).catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
       }
 
-      return await res.json()
+      return await parseJsonResponse(res)
     } catch (err) {
       lastError = err as Error
 
@@ -174,11 +189,11 @@ async function getWithRetry(path: string, retries = 3, extraHeaders?: Record<str
           if (refreshed && attempt < retries - 1) continue // retry with new token
         }
         handleAuthError(res.status)
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        const err = await parseJsonResponse(res).catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
       }
 
-      return await res.json()
+      return await parseJsonResponse(res)
     } catch (err) {
       lastError = err as Error
 
@@ -215,10 +230,10 @@ async function putWithRetry(path: string, body: unknown, retries = 3, extraHeade
           if (refreshed && attempt < retries - 1) continue
         }
         handleAuthError(res.status)
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        const err = await parseJsonResponse(res).catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
       }
-      return await res.json()
+      return await parseJsonResponse(res)
     } catch (err) {
       lastError = err as Error
       if (err instanceof Error && err.message.includes('HTTP 4')) throw err
@@ -250,10 +265,10 @@ async function patchWithRetry(path: string, body?: unknown, retries = 3, extraHe
           if (refreshed && attempt < retries - 1) continue
         }
         handleAuthError(res.status)
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        const err = await parseJsonResponse(res).catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
       }
-      return await res.json()
+      return await parseJsonResponse(res)
     } catch (err) {
       lastError = err as Error
       if (err instanceof Error && err.message.includes('HTTP 4')) throw err
@@ -279,10 +294,10 @@ async function delWithRetry(path: string, retries = 3, extraHeaders?: Record<str
           if (refreshed && attempt < retries - 1) continue
         }
         handleAuthError(res.status)
-        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+        const err = await parseJsonResponse(res).catch(() => ({ error: `HTTP ${res.status}` }))
         throw new Error(err.error || `HTTP ${res.status}`)
       }
-      return await res.json()
+      return await parseJsonResponse(res)
     } catch (err) {
       lastError = err as Error
       if (err instanceof Error && err.message.includes('HTTP 4')) throw err
@@ -934,10 +949,10 @@ export async function deleteTenant(slug: string) {
 export async function getUserType(email: string) {
   const res = await fetch(`${API_BASE}/user-type?email=${encodeURIComponent(email)}`)
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Network error' }))
+    const err = await parseJsonResponse(res).catch(() => ({ error: 'Network error' }))
     throw new Error(err.error || `HTTP ${res.status}`)
   }
-  return res.json()
+  return parseJsonResponse(res)
 }
 
 export async function getAllTenantsAdmin() {
