@@ -5,9 +5,20 @@ function getApiBase(): string {
   // 1. Environment override always wins
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL
 
-  // 2. Capacitor native app → absolute URL (runs on capacitor://localhost)
-  if (typeof window !== 'undefined' && window.location.protocol.startsWith('capacitor')) {
-    return 'https://www.careiapp.com/api'
+  // 2. Capacitor native app → absolute URL
+  //    The app may run on capacitor://localhost OR https://localhost (androidScheme: 'https')
+  //    Detect via the Capacitor global or by checking for localhost on a non-dev build
+  if (typeof window !== 'undefined') {
+    const isCapacitorNative = typeof (window as any).Capacitor !== 'undefined' &&
+      (window as any).Capacitor.isNative !== undefined
+    const isCapacitorProtocol = window.location.protocol.startsWith('capacitor')
+    const isNativeHttps = window.location.protocol === 'https:' &&
+      window.location.hostname === 'localhost' &&
+      !import.meta.env.DEV
+
+    if (isCapacitorNative || isCapacitorProtocol || isNativeHttps) {
+      return 'https://www.careiapp.com/api'
+    }
   }
 
   // 3. Production web (deployed on Vercel) → relative path
