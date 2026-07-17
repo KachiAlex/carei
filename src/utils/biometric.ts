@@ -69,9 +69,17 @@ export async function storeCredentialsWithBiometric(email: string, refreshToken:
   const server = BIOMETRIC_SERVER
   const username = email.toLowerCase()
 
-  // Try BIOMETRY_CURRENT_SET first — invalidates key if biometrics change
-  // Then fall back to BIOMETRY_ANY (any enrolled biometric)
-  for (const accessControl of [AccessControl.BIOMETRY_CURRENT_SET, AccessControl.BIOMETRY_ANY]) {
+  // Clear any stale credentials first to avoid conflicts
+  try {
+    await NativeBiometric.deleteCredentials({ server })
+    console.log('[CAREi bio] cleared stale credentials before store')
+  } catch (err) {
+    console.log('[CAREi bio] deleteCredentials before store failed (ok to ignore):', err)
+  }
+
+  // Try BIOMETRY_ANY first (recommended by plugin docs for most apps)
+  // Then fall back to BIOMETRY_CURRENT_SET (invalidates key if biometrics change)
+  for (const accessControl of [AccessControl.BIOMETRY_ANY, AccessControl.BIOMETRY_CURRENT_SET]) {
     try {
       console.log(`[CAREi bio] calling setCredentials with accessControl=${accessControl}`)
       await NativeBiometric.setCredentials({

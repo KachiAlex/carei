@@ -10,7 +10,7 @@ import {
   updateBiometrics,
 } from '../api/client'
 import { isBiometricAvailable, getBiometricEnabled, setBiometricEnabled, storeCredentialsWithBiometric, deleteBiometricCredentials } from '../utils/biometric'
-import { getRefreshToken, getToken, setToken } from '../utils/tokenCache'
+import { getRefreshToken, setRefreshToken, getToken, setToken } from '../utils/tokenCache'
 import { secureGet, secureSet } from '../utils/secureStorage'
 
 const COLORS = {
@@ -90,6 +90,12 @@ export default function SettingsScreen() {
       if (!token) {
         token = await secureGet('token')
         if (token) setToken(token)
+      }
+      // Also load refresh token into memory cache
+      let refreshToken = getRefreshToken()
+      if (!refreshToken) {
+        refreshToken = await secureGet('refreshToken')
+        if (refreshToken) setRefreshToken(refreshToken)
       }
       if (!token) {
         setLocation('/login?redirect=/settings')
@@ -196,9 +202,11 @@ export default function SettingsScreen() {
           return
         }
         if (user?.email) {
+          console.log('[CAREi bio] SettingsScreen: storing credentials for', user.email, 'refreshToken present:', !!refreshToken)
           const stored = await storeCredentialsWithBiometric(user.email, refreshToken)
+          console.log('[CAREi bio] SettingsScreen: storeCredentialsWithBiometric returned:', stored)
           if (!stored) {
-            setError('Failed to store biometric credentials. Please try again.')
+            setError('Failed to store biometric credentials. Make sure your fingerprint is enrolled in Android Settings and try again.')
             setBiometricsLoading(false)
             return
           }
