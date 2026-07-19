@@ -171,10 +171,8 @@ export default function LoginScreen() {
       }
       setStoredCredentials(true)
       setBioDiagnostic('')
-      // Auto-prompt biometric unlock if user has it enabled
-      if (getBiometricEnabled()) {
-        setTimeout(() => handleBiometricUnlock(), 300)
-      }
+      // Do NOT auto-prompt biometric unlock here — it can crash the app on launch.
+      // The user must tap the "Unlock with Fingerprint" button.
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view])
@@ -192,14 +190,8 @@ export default function LoginScreen() {
       const userType = await getUserType(email)
       setUserInfo(userType)
       setView('authenticate')
-      
-      // Auto-trigger biometric if available
-      if (userType.hasBiometric && getBiometricEnabled()) {
-        const available = await isBiometricAvailable()
-        if (available) {
-          setTimeout(() => handleBiometricUnlock(), 500)
-        }
-      }
+
+      // No auto-trigger biometric prompt — user taps the button instead.
     } catch (err: any) {
       setError(err.message || 'Email not found')
     } finally {

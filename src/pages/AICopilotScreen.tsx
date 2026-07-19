@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { chatWithAI } from '../api/client'
+import { chatWithAI, getCopilotContext } from '../api/client'
 import { enqueue } from '../utils/offlineQueue'
 
 const COLORS = {
@@ -19,14 +19,36 @@ interface Message {
   pending?: boolean
 }
 
+const QUICK_ACTIONS = [
+  'What are my tasks today?',
+  'Who are my assigned clients?',
+  'Show care plan highlights',
+  'When is my next visit?',
+  'Any safety flags I should know?',
+]
+
+function formatContextSummary(ctx: any) {
+  if (!ctx) return 'General care context.'
+  const parts = [
+    `User: ${ctx.user?.name} (${ctx.user?.role})`,
+    `Today: ${ctx.today}`,
+    `${ctx.clients?.length || 0} client(s) assigned`,
+    `${ctx.tasks?.length || 0} task(s)`,
+    `${ctx.scheduledVisits?.length || 0} visit(s) scheduled`,
+  ]
+  return parts.join(' | ')
+}
+
 export default function AICopilotScreen() {
   const [, setLocation] = useLocation()
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', text: "Hello, I'm CAREi. Ask me anything about your clients, medications, or care tasks.", timestamp: new Date() },
+    { role: 'ai', text: "Hello, I'm CAREi. Ask me about your clients, visits, tasks, or care plans.", timestamp: new Date() },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
+  const [context, setContext] = useState<any>(null)
+  const [contextLoading, setContextLoading] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
 
@@ -34,9 +56,33 @@ export default function AICopilotScreen() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const sendMessage = async () => {
-    if (!input.trim()) return
-    const userMsg: Message = { role: 'user', text: input.trim(), timestamp: new Date() }
+  useEffect(() => {
+    getCopilotContext()
+      .then((data) => {
+        setContext(data)
+        setMessages((prev) => {
+          if (prev.length === 1 && prev[0].role === 'ai') {
+            return [
+              {
+                role: 'ai',
+                text: `Hello, I'm CAREi. I can see you have ${data.clients?.length || 0} client(s), ${data.tasks?.length || 0} task(s), and ${data.scheduledVisits?.length || 0} visit(s) today. Ask me anything about your clients or care tasks.`,
+                timestamp: new Date(),
+              },
+            ]
+          }
+          return prev
+        })
+      })
+      .catch(() => {
+        // Context is optional; the chat can fall back to a simpler prompt.
+      })
+      .finally(() => setContextLoading(false))
+  }, [])
+
+  const sendMessage = async (text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed || loading) return
+    const userMsg: Message = { role: 'user', text: trimmed, timestamp: new Date() }
     setMessages((prev) => [...prev, userMsg])
     setInput('')
 
@@ -45,14 +91,17 @@ export default function AICopilotScreen() {
         ...prev,
         { role: 'ai', text: "You are currently offline. Your question has been queued and will be sent when you are back in signal.", timestamp: new Date(), pending: true },
       ])
-      await enqueue({ type: 'ai-copilot', payload: { text: userMsg.text, context: 'General care context.' } })
+      await enqueue({ type: 'ai-copilot', payload: { text: userMsg.text, context: formatContextSummary(context) } })
       return
     }
 
     setLoading(true)
     try {
-      const data = await chatWithAI(userMsg.text, 'General care context.')
-      const aiMsg: Message = { role: 'ai', text: data.reply, timestamp: new Date() }
+      const history = messages
+        .filter((m) => !m.pending)
+        .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
+      const data = await chatWithAI(trimmed, context, history.slice(-6))
+      const aiMsg: Message = { role: 'ai', text: data.reply || 'No response from AI.', timestamp: new Date() }
       setMessages((prev) => [...prev, aiMsg])
     } catch (e: any) {
       const errMsg: Message = { role: 'ai', text: `Sorry, I couldn't process that. ${e.message}`, timestamp: new Date() }
@@ -108,17 +157,40 @@ export default function AICopilotScreen() {
               <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z" />
             </svg>
           </div>
-          <span className="font-bold text-sm">CAREi Copilot</span>
+          <div>
+            <span className="font-bold text-sm block">CAREi Copilot</span>
+            {contextLoading ? (
+              <span className="text-[10px] text-white/50">Loading your care context…</span>
+            ) : context ? (
+              <span className="text-[10px] text-white/50">{context.clients?.length || 0} clients · {context.tasks?.length || 0} tasks</span>
+            ) : null}
+          </div>
         </div>
         <div className="w-8" />
       </div>
+
+      {/* Quick actions */}
+      {!loading && (
+        <div className="px-4 py-2 bg-white border-b border-slate-200 shrink-0 flex gap-2 overflow-x-auto no-scrollbar">
+          {QUICK_ACTIONS.map((action) => (
+            <button
+              key={action}
+              onClick={() => sendMessage(action)}
+              className="whitespace-nowrap px-3 py-1.5 rounded-full text-xs border bg-slate-50 hover:bg-teal-50 hover:border-teal-200 transition-colors cursor-pointer"
+              style={{ borderColor: 'rgba(0,0,0,0.06)', color: '#334155' }}
+            >
+              {action}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-auto px-4 py-4 space-y-4">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className="max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
+              className="max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed"
               style={{
                 background: msg.role === 'user' ? COLORS.teal : msg.pending ? 'rgba(246,183,60,0.08)' : 'white',
                 color: msg.role === 'user' ? COLORS.darkNavy : msg.pending ? COLORS.amber : '#475569',
@@ -169,12 +241,12 @@ export default function AICopilotScreen() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+            onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
             placeholder="Ask CAREi anything..."
             className="flex-1 bg-slate-100 rounded-full px-4 py-2.5 text-sm outline-none border-none focus:ring-2 focus:ring-teal/30"
           />
           <button
-            onClick={sendMessage}
+            onClick={() => sendMessage(input)}
             disabled={!input.trim() || loading}
             className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 cursor-pointer border-none disabled:opacity-40 touch-target"
             style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}

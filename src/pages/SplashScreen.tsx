@@ -1,9 +1,7 @@
 import { useLocation } from 'wouter'
 import { useEffect, useRef, useState } from 'react'
-import { getBiometricEnabled, hasStoredBiometricCredentials, getCredentialsWithBiometric, storeCredentialsWithBiometric } from '../utils/biometric'
-import { biometricTokenLogin } from '../api/client'
-import { setToken, setRefreshToken, setUser as setTokenCacheUser } from '../utils/tokenCache'
-import { secureSet } from '../utils/secureStorage'
+import { getToken } from '../utils/tokenCache'
+import { secureGet } from '../utils/secureStorage'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -136,49 +134,11 @@ export default function SplashScreen() {
 
   if (loading) {
     return <LoadingOverlay onDone={async () => {
-      const isNative = typeof (window as any).Capacitor !== 'undefined' ||
-        !['http:', 'https:'].includes(window.location.protocol)
-      if (isNative) {
-        // Check if biometric login is available and credentials are stored
-        const bioEnabled = getBiometricEnabled()
-        if (bioEnabled) {
-          try {
-            const hasStored = await hasStoredBiometricCredentials()
-            if (hasStored) {
-              // Auto-prompt biometric unlock
-              const credentials = await getCredentialsWithBiometric()
-              if (credentials) {
-                const response = await biometricTokenLogin({
-                  email: credentials.email,
-                  token: credentials.token,
-                })
-                if (response.token && response.user) {
-                  setToken(response.token)
-                  if (response.refreshToken) {
-                    setRefreshToken(response.refreshToken)
-                    await secureSet('refreshToken', response.refreshToken)
-                    // Re-store rotated refresh token in biometric storage
-                    await storeCredentialsWithBiometric(credentials.email, response.refreshToken)
-                  }
-                  await secureSet('token', response.token)
-                  const userJson = JSON.stringify(response.user)
-                  await secureSet('user', userJson)
-                  setTokenCacheUser(userJson)
-                  setLocation('/select-tenant')
-                  return
-                }
-              }
-            }
-          } catch (err) {
-            console.log('[CAREi splash] biometric auto-unlock failed:', err)
-          }
-          // Biometric failed or not set up → go to login screen
-          setLocation('/login')
-        } else {
-          setLocation('/login')
-        }
+      const token = getToken() || await secureGet('token')
+      if (token) {
+        setLocation('/select-tenant')
       } else {
-        setLoading(false)
+        setLocation('/login')
       }
     }} />
   }

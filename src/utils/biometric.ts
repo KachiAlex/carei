@@ -1,4 +1,4 @@
-import { NativeBiometric, BiometryType } from '@capgo/capacitor-native-biometric'
+import { NativeBiometric, AccessControl } from '@capgo/capacitor-native-biometric'
 
 const SERVER = 'carei.app'
 const TAG = '[CAREi bio]'
@@ -49,7 +49,7 @@ export function setBiometricEnabled(enabled: boolean): void {
   else localStorage.removeItem('carei_biometric_enabled')
 }
 
-// ─── Biometric prompt ───
+// ─── Biometric prompt only (no credential retrieval) ───
 
 export async function verifyBiometric(reason = 'Authenticate to access CAREi'): Promise<boolean> {
   try {
@@ -60,7 +60,6 @@ export async function verifyBiometric(reason = 'Authenticate to access CAREi'): 
       subtitle: 'Biometric Authentication',
       description: 'Use your fingerprint, face, or device PIN to unlock',
       useFallback: true,
-      allowedBiometryTypes: [BiometryType.FINGERPRINT, BiometryType.FACE_AUTHENTICATION, BiometryType.DEVICE_CREDENTIAL],
     })
     console.log(TAG, 'verifyIdentity success')
     return true
@@ -71,8 +70,8 @@ export async function verifyBiometric(reason = 'Authenticate to access CAREi'): 
 }
 
 // ─── Store credentials ───
-// Uses AccessControl.NONE so no biometric prompt is needed to store.
-// Biometric protection is enforced at retrieval time via verifyIdentity.
+// Uses BIOMETRY_CURRENT_SET: credentials are tied to the current biometric
+// enrolment. This is the plugin's native, tested pattern on Android.
 
 export async function storeCredentialsWithBiometric(email: string, refreshToken: string): Promise<boolean> {
   const username = email.toLowerCase()
@@ -85,48 +84,42 @@ export async function storeCredentialsWithBiometric(email: string, refreshToken:
     // ignore — nothing to delete
   }
 
-  // Store with NONE — no biometric prompt required for storage
-  try {
-    await NativeBiometric.setCredentials({
-      username,
-      password: refreshToken,
-      server: SERVER,
-    })
-    console.log(TAG, 'setCredentials success')
-  } catch (err: any) {
-    console.log(TAG, 'setCredentials error:', err)
-    return false
+  // Try BIOMETRY_ANY first (recommended for most apps), then CURRENT_SET
+  for (const accessControl of [AccessControl.BIOMETRY_ANY, AccessControl.BIOMETRY_CURRENT_SET]) {
+    try {
+      console.log(TAG, 'setCredentials accessControl:', accessControl)
+      await NativeBiometric.setCredentials({
+        username,
+        password: refreshToken,
+        server: SERVER,
+        accessControl,
+      })
+      console.log(TAG, 'setCredentials success with', accessControl)
+      return true
+    } catch (err: any) {
+      console.log(TAG, 'setCredentials failed with', accessControl, ':', err)
+    }
   }
 
-  // Verify storage worked
-  try {
-    const check = await NativeBiometric.isCredentialsSaved({ server: SERVER })
-    console.log(TAG, 'post-store check isSaved:', check.isSaved)
-    return check.isSaved
-  } catch (err) {
-    console.log(TAG, 'isCredentialsSaved error after store:', err)
-    // setCredentials didn't throw, so assume it worked
-    return true
-  }
+  console.log(TAG, 'setCredentials failed all access controls')
+  return false
 }
 
 // ─── Retrieve credentials ───
-// Shows biometric prompt, then retrieves stored credentials.
+// getSecureCredentials shows the biometric prompt and returns the credential.
+// This is the native, tested retrieval path for the plugin.
 
 export async function getCredentialsWithBiometric(): Promise<BiometricCredentials | null> {
   console.log(TAG, 'getCredentials start')
-
-  // Step 1: Biometric prompt
-  const verified = await verifyBiometric('Authenticate to access CAREi')
-  if (!verified) {
-    console.log(TAG, 'biometric verification failed or cancelled')
-    return null
-  }
-
-  // Step 2: Retrieve credentials (no prompt — already verified)
   try {
-    const result = await NativeBiometric.getCredentials({ server: SERVER })
-    console.log(TAG, 'getCredentials result:', result ? 'has data' : 'empty')
+    const result = await NativeBiometric.getSecureCredentials({
+      server: SERVER,
+      reason: 'Authenticate to access CAREi',
+      title: 'CAREi',
+      subtitle: 'Biometric Authentication',
+      description: 'Use your fingerprint, face, or device PIN to unlock',
+    })
+    console.log(TAG, 'getSecureCredentials result:', result ? 'has data' : 'empty')
     if (!result.username || !result.password) return null
 
     const email = result.username.toLowerCase()
@@ -138,22 +131,17 @@ export async function getCredentialsWithBiometric(): Promise<BiometricCredential
 
     return { email, token: result.password }
   } catch (err) {
-    console.log(TAG, 'getCredentials error:', err)
+    console.log(TAG, 'getSecureCredentials error:', err)
     return null
   }
 }
 
 // ─── Check if credentials exist (no prompt) ───
+// Rely on the localStorage flag we keep in sync when enabling/disabling.
+// Avoid calling native credential-checking APIs on app launch; they can crash.
 
 export async function hasStoredBiometricCredentials(): Promise<boolean> {
-  try {
-    const result = await NativeBiometric.isCredentialsSaved({ server: SERVER })
-    console.log(TAG, 'hasCredentials:', result.isSaved)
-    return result.isSaved
-  } catch (err) {
-    console.log(TAG, 'hasCredentials error:', err)
-    return false
-  }
+  return getBiometricEnabled()
 }
 
 // ─── Delete credentials ───

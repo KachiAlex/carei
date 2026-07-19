@@ -324,8 +324,12 @@ export async function del(path: string, extraHeaders?: Record<string, string>) {
   return delWithRetry(path, 3, extraHeaders)
 }
 
-export async function chatWithAI(message: string, context?: string) {
-  return post('/anthropic/chat', { message, context })
+export async function chatWithAI(message: string, context?: any, history?: { role: string; content: string }[]) {
+  return post('/copilot/chat', { message, context, history })
+}
+
+export async function getCopilotContext() {
+  return get('/copilot/context')
 }
 
 export async function summarizeTranscript(transcript: string) {
