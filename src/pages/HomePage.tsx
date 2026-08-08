@@ -4,7 +4,6 @@ import { useLocation } from 'wouter'
 const siteHtml = `
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap');
-@import url('https://unpkg.com/@tabler/icons-webfont@2.30.0/dist/tabler-icons.min.css');
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -142,7 +141,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
 }
 .feat-card:hover { border-color: rgba(14,207,176,0.4); background: rgba(14,207,176,0.05); }
 .feat-icon { width: 44px; height: 44px; border-radius: 12px; background: var(--teal-muted); border: 1px solid rgba(14,207,176,0.25); display: flex; align-items: center; justify-content: center; margin-bottom: 18px; }
-.feat-icon i { font-size: 20px; color: var(--teal); }
+.feat-icon svg { width: 24px; height: 24px; color: var(--teal); }
 .feat-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
 .feat-card p { font-size: 13px; color: var(--text-dim); line-height: 1.6; }
 .feat-new { display: inline-block; background: rgba(14,207,176,0.15); color: var(--teal); font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-bottom: 10px; letter-spacing: 0.3px; }
@@ -349,50 +348,50 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
     </div>
     <div class="features-grid">
       <div class="feat-card">
-        <div class="feat-icon"><i class="ti ti-brain" aria-hidden="true"></i></div>
+        <div class="feat-icon"><svg width="24" height="24" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-brain"></use></svg></div>
         <span class="feat-new">New</span>
         <h3>AI Copilot</h3>
         <p>Ask anything about the current client — voice or text. Answers drawn strictly from their care record, with proactive allergy and contraindication alerts.</p>
       </div>
       <div class="feat-card">
-        <div class="feat-icon"><i class="ti ti-microphone" aria-hidden="true"></i></div>
+        <div class="feat-icon"><svg width="24" height="24" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-microphone"></use></svg></div>
         <span class="feat-new">New</span>
         <h3>Voice-first documentation</h3>
         <p>Narrate observations while you work. Deepgram transcribes in real-time; AI extracts structured data for review. Original audio stored for audit.</p>
       </div>
       <div class="feat-card">
-        <div class="feat-icon"><i class="ti ti-notes" aria-hidden="true"></i></div>
+        <div class="feat-icon"><svg width="24" height="24" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-notes"></use></svg></div>
         <h3>ContinuCare+ handover</h3>
         <p>Auto-generates a 3-point briefing at clock-out — observations, tasks, flags. Submitted within 10 seconds, visible to the next carer immediately.</p>
       </div>
       <div class="feat-card">
-        <div class="feat-icon"><i class="ti ti-pill" aria-hidden="true"></i></div>
+        <div class="feat-icon"><svg width="24" height="24" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-pill"></use></svg></div>
         <h3>Digital MAR</h3>
         <p>Per-medication confirmation with mandatory skip reasons. CQC-auditable records with carer identity, timestamp, and GPS. Full PDF export.</p>
       </div>
       <div class="feat-card">
-        <div class="feat-icon"><i class="ti ti-shield-lock" aria-hidden="true"></i></div>
+        <div class="feat-icon"><svg width="24" height="24" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-shield-lock"></use></svg></div>
         <h3>Lone worker SOS</h3>
         <p>One-tap emergency button on every active visit screen. Sends location to supervisors in under 30 seconds with an immutable incident record.</p>
       </div>
       <div class="feat-card">
-        <div class="feat-icon"><i class="ti ti-activity" aria-hidden="true"></i></div>
+        <div class="feat-icon"><svg width="24" height="24" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-activity"></use></svg></div>
         <span class="feat-new">New</span>
         <h3>Passive safety monitoring</h3>
         <p>Always-on GPS heartbeat from clock-in to clock-out. Screen inactivity triggers check-in prompts. Auto-escalation to supervisor and secondary contact.</p>
       </div>
       <div class="feat-card">
-        <div class="feat-icon"><i class="ti ti-heart-rate-monitor" aria-hidden="true"></i></div>
+        <div class="feat-icon"><svg width="24" height="24" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-heart-rate-monitor"></use></svg></div>
         <h3>Vital signs</h3>
         <p>Entry fields appear only when the care plan requires them. Out-of-range values auto-flag the supervisor in real-time.</p>
       </div>
       <div class="feat-card">
-        <div class="feat-icon"><i class="ti ti-droplet" aria-hidden="true"></i></div>
+        <div class="feat-icon"><svg width="24" height="24" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-droplet"></use></svg></div>
         <h3>Fluid tracking</h3>
         <p>Persistent one-tap counter on the visit screen. 250ml per tap, configurable. Auto-included in handover — no extra carer action needed.</p>
       </div>
       <div class="feat-card">
-        <div class="feat-icon"><i class="ti ti-volume" aria-hidden="true"></i></div>
+        <div class="feat-icon"><svg width="24" height="24" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-volume"></use></svg></div>
         <span class="feat-new">New</span>
         <h3>Audio shift briefing</h3>
         <p>TTS playback of the upcoming visit — plays in the background while the phone is locked, designed for carers travelling between visits.</p>
