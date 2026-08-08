@@ -67,9 +67,11 @@ function LoadingOverlay({ onDone }: { onDone: () => void | Promise<void> }) {
 export default function SplashScreen() {
   const [, setLocation] = useLocation()
   const heroRef = useRef<HTMLDivElement>(null)
-  const [loading, setLoading] = useState(true)
+  const isNative = useState(() => typeof window !== 'undefined' && typeof (window as any).Capacitor !== 'undefined')[0]
+  const [loading, setLoading] = useState(isNative)
 
   useEffect(() => {
+    if (loading) return
     const els = document.querySelectorAll('[data-animate]')
     els.forEach((el, i) => {
       const htmlEl = el as HTMLElement
@@ -83,7 +85,7 @@ export default function SplashScreen() {
         })
       })
     })
-  }, [])
+  }, [loading])
 
   const features = [
     {
