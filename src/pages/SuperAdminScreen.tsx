@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useLocation } from 'wouter'
+import { useState, useEffect, useMemo } from 'react'
+import { useLocation, useSearch } from 'wouter'
 import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, updateTenantPrice, deleteTenant, createTenant } from '../api/client'
 import { getToken, setToken, clearAuthCache } from '../utils/tokenCache'
 import { secureGet, secureRemove } from '../utils/secureStorage'
@@ -49,6 +49,12 @@ export default function SuperAdminScreen() {
     totalVisits: 0,
     estimatedMrr: 0,
   })
+
+  const search = useSearch()
+  const activeTab = useMemo(() => {
+    const params = new URLSearchParams(search)
+    return (params.get('tab') as 'dashboard' | 'organizations' | 'licensing') || 'dashboard'
+  }, [search])
 
   useEffect(() => {
     loadData()
@@ -234,14 +240,18 @@ export default function SuperAdminScreen() {
 
         <nav className="flex-1 p-4 space-y-1">
           {[
-            { label: 'Dashboard', path: '/super-admin', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-            { label: 'Organizations', path: '/super-admin', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-            { label: 'Licensing', path: '/super-admin', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+            { label: 'Dashboard', tab: 'dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+            { label: 'Organizations', tab: 'organizations', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+            { label: 'Licensing', tab: 'licensing', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
           ].map((item) => (
             <button
               key={item.label}
-              onClick={() => setLocation(item.path)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors text-left bg-transparent border-none cursor-pointer"
+              onClick={() => setLocation(`/super-admin?tab=${item.tab}`)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-left bg-transparent border-none cursor-pointer transition-colors ${
+                activeTab === item.tab
+                  ? 'bg-teal-500/15 text-teal-400'
+                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+              }`}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d={item.icon} />
@@ -267,8 +277,10 @@ export default function SuperAdminScreen() {
       {/* Main content */}
       <div className="flex-1 min-w-0 overflow-auto">
         <main className="max-w-7xl mx-auto p-6">
-        {/* Stats */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 mb-8">
+        {activeTab === 'dashboard' && (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 mb-8">
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
             <div className="text-3xl font-bold text-white mb-1">{stats.totalTenants}</div>
             <div className="text-white/50 text-sm">Organizations</div>
@@ -294,9 +306,13 @@ export default function SuperAdminScreen() {
             <div className="text-white/50 text-sm">Est. MRR</div>
           </div>
         </div>
+          </>
+        )}
 
-        {/* Licensing Recommendation */}
-        <div className="bg-white/5 rounded-xl p-4 border border-white/10 mb-8">
+        {activeTab === 'licensing' && (
+          <>
+            {/* Licensing Recommendation */}
+            <div className="bg-white/5 rounded-xl p-4 border border-white/10 mb-8">
           <h3 className="font-semibold text-white mb-2">Recommended Per-Carer Licensing Structure</h3>
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
             {[
@@ -314,8 +330,12 @@ export default function SuperAdminScreen() {
             ))}
           </div>
         </div>
+          </>
+        )}
 
-        {(error || actionError) && (
+        {activeTab === 'organizations' && (
+          <>
+            {(error || actionError) && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-6">
             <p className="text-red-400 text-sm">{error || actionError}</p>
           </div>
@@ -436,9 +456,13 @@ export default function SuperAdminScreen() {
             </table>
           </div>
         </div>
+          </>
+        )}
 
-        {/* Quick Actions */}
-        <div className="mt-8 grid grid-cols-2 gap-4">
+        {activeTab === 'dashboard' && (
+          <>
+            {/* Quick Actions */}
+            <div className="mt-8 grid grid-cols-2 gap-4">
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
             <h3 className="font-medium text-white mb-2">System Health</h3>
             <div className="space-y-2">
@@ -473,9 +497,11 @@ export default function SuperAdminScreen() {
             </div>
           </div>
         </div>
+          </>
+        )}
 
         {/* Add Tenant Modal */}
-        {showAddModal && (
+        {activeTab === 'organizations' && showAddModal && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-slate-900 rounded-xl border border-white/10 w-full max-w-md p-4 sm:p-6 my-auto max-h-[85vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
