@@ -208,8 +208,8 @@ export default function OptimizedLoginScreen() {
     }
   }
 
-  const handlePinLogin = async () => {
-    const pinValue = pin.join('')
+  const handlePinLogin = async (completedPin?: string) => {
+    const pinValue = completedPin || pin.join('')
     if (pinValue.length !== 4) {
       setError('Please enter all 4 digits')
       return
