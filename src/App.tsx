@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Route, Router, Switch, useLocation } from 'wouter'
+import SplashScreen from './pages/SplashScreen'
 import { useOnlineSync } from './hooks/useOnlineSync'
 import { TenantProvider } from './contexts/TenantContext'
 import { secureGet, secureWipe } from './utils/secureStorage'
@@ -79,7 +80,6 @@ function useClipboardGuard() {
   }, [])
 }
 
-const SplashScreen = lazy(() => import('./pages/SplashScreen'))
 const LoginScreen = lazy(() => import('./pages/LoginScreen'))
 const TenantSelectScreen = lazy(() => import('./pages/TenantSelectScreen'))
 const CarerDashboard = lazy(() => import('./pages/CarerDashboard'))
