@@ -57,12 +57,18 @@ a.btn-hero, a.btn-demo, a.btn-teal, a.btn-ghost, a.price-btn { text-decoration: 
 
 /* ── HERO ── */
 .hero {
+  --hero-overlay: radial-gradient(circle at 70% 25%, rgba(14,207,176,0.22) 0%, transparent 45%),
+    linear-gradient(115deg, rgba(13,27,46,0.95) 0%, rgba(13,27,46,0.75) 50%, rgba(14,207,176,0.25) 100%);
+  --hero-image: url('/careiapp-cover.png');
   padding: 100px 48px 80px;
   display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center;
   max-width: 1200px; margin: 0 auto;
   position: relative;
   min-height: 600px;
-  background: radial-gradient(circle at 85% 35%, rgba(14,207,176,0.10) 0%, transparent 45%);
+  background-image: var(--hero-overlay), var(--hero-image);
+  background-size: cover, cover, cover;
+  background-position: center, center, 65% center;
+  background-repeat: no-repeat;
 }
 .hero-badge {
   display: inline-flex; align-items: center; gap: 8px;
@@ -226,7 +232,12 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
 
 /* responsive */
 @media (max-width: 1024px) {
-  .hero { grid-template-columns: 1fr; padding: 80px 32px; text-align: center; }
+  .hero {
+    --hero-overlay: radial-gradient(circle at 60% 15%, rgba(14,207,176,0.18) 0%, transparent 45%),
+      linear-gradient(180deg, rgba(13,27,46,0.96) 0%, rgba(13,27,46,0.88) 40%, rgba(13,27,46,0.65) 100%);
+    grid-template-columns: 1fr; padding: 80px 32px; text-align: center;
+    background-position: center, center, 55% center;
+  }
   .hero-sub { margin: 0 auto 36px; }
   .hero-actions { justify-content: center; }
   .hero-trust { justify-content: center; }
