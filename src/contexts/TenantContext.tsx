@@ -99,9 +99,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           const validTenant = userTenants.find(t => t.id === parsed.id)
           if (validTenant) {
             setCurrentTenantState(validTenant)
-            // Redirect to tenant-specific URL
+            // Redirect to tenant-specific URL only from login, never from home
             const currentPath = window.location.pathname
-            if (currentPath === '/login' || currentPath === '/') {
+            if (currentPath === '/login') {
               setLocation(`/tenant/${validTenant.slug}/dashboard`)
             }
           } else if (userTenants.length > 0) {
