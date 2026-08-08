@@ -974,6 +974,14 @@ export async function getAllTenantsAdmin() {
   return get('/tenants?admin=true')
 }
 
+export async function getPlans() {
+  return get('/plans')
+}
+
+export async function updatePlan(data: { slug: string; name: string; max_users: number; max_clients: number; price_per_carer: number; billing_model: string }) {
+  return put('/plans', data)
+}
+
 // ─── Care Plans ───
 
 export interface CarePlanData {

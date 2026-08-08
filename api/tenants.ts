@@ -7,11 +7,22 @@ import {
 } from './db.js'
 import { generateSecureToken, hashToken } from './hash.js'
 
-// Plan defaults for new tenants
-const PLAN_DEFAULTS: Record<string, { max_users: number; max_clients: number }> = {
-  trial: { max_users: 3, max_clients: 10 },
-  professional: { max_users: 15, max_clients: 100 },
-  enterprise: { max_users: 100, max_clients: 500 },
+async function getPlanDefaults(plan: string): Promise<{ max_users: number; max_clients: number; price_per_carer: number; billing_model: string } | null> {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT max_users, max_clients, price_per_carer, billing_model
+    FROM plans
+    WHERE slug = ${plan.toLowerCase()}
+    LIMIT 1
+  ` as any[]
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return {
+    max_users: r.max_users,
+    max_clients: r.max_clients,
+    price_per_carer: r.price_per_carer ? parseFloat(r.price_per_carer) : 0,
+    billing_model: r.billing_model,
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -136,7 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const resolvedPlan = (plan || 'trial').toLowerCase()
-      const defaults = PLAN_DEFAULTS[resolvedPlan] || PLAN_DEFAULTS.trial
+      const defaults = (await getPlanDefaults(resolvedPlan)) || { max_users: 3, max_clients: 10, price_per_carer: 0, billing_model: 'per-carer' }
 
       try {
         const tenant = await createTenant({ slug, name, domain, plan: resolvedPlan })
@@ -144,7 +155,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await sql`
           UPDATE tenants
           SET max_users = ${defaults.max_users},
-              max_clients = ${defaults.max_clients}
+              max_clients = ${defaults.max_clients},
+              price_per_carer = ${defaults.price_per_carer},
+              billing_model = ${defaults.billing_model}
           WHERE id = ${tenant.id}
         `
 
@@ -293,14 +306,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!plan) { res.status(400).json({ error: 'plan is required' }); return }
 
         const resolvedPlan = plan.toLowerCase()
-        const defaults = PLAN_DEFAULTS[resolvedPlan] || PLAN_DEFAULTS.trial
+        const defaults = (await getPlanDefaults(resolvedPlan)) || { max_users: 3, max_clients: 10, price_per_carer: 0, billing_model: 'per-carer' }
 
         await sql`
           UPDATE tenants
           SET plan = ${resolvedPlan},
               max_users = ${defaults.max_users},
               max_clients = ${defaults.max_clients},
-              updated_at = NOW()
+              price_per_carer = ${defaults.price_per_carer},
+              billing_model = ${defaults.billing_model}
           WHERE id = ${tenant.id}
         `
         res.status(200).json({

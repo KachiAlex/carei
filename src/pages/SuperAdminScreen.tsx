@@ -1,8 +1,18 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useLocation, useSearch } from 'wouter'
-import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, updateTenantPrice, deleteTenant, createTenant } from '../api/client'
+import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, updateTenantPrice, deleteTenant, createTenant, getPlans, updatePlan } from '../api/client'
 import { getToken, setToken, clearAuthCache } from '../utils/tokenCache'
 import { secureGet, secureRemove } from '../utils/secureStorage'
+
+interface Plan {
+  id: string
+  slug: string
+  name: string
+  max_users: number
+  max_clients: number
+  price_per_carer: number
+  billing_model: string
+}
 
 interface Tenant {
   id: string
@@ -49,16 +59,25 @@ export default function SuperAdminScreen() {
     totalVisits: 0,
     estimatedMrr: 0,
   })
+  const [plans, setPlans] = useState<Plan[]>([])
+  const [plansLoading, setPlansLoading] = useState(false)
+  const [plansError, setPlansError] = useState<string | null>(null)
 
   const search = useSearch()
   const activeTab = useMemo(() => {
     const params = new URLSearchParams(search)
-    return (params.get('tab') as 'dashboard' | 'organizations' | 'licensing') || 'dashboard'
+    return (params.get('tab') as 'dashboard' | 'organizations' | 'licensing' | 'plans') || 'dashboard'
   }, [search])
 
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    if (activeTab === 'plans' && plans.length === 0) {
+      loadPlans()
+    }
+  }, [activeTab])
 
   const loadData = async () => {
     let token = getToken()
@@ -102,6 +121,43 @@ export default function SuperAdminScreen() {
       setError(err.message)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const loadPlans = async () => {
+    setPlansLoading(true)
+    setPlansError(null)
+    try {
+      const data = await getPlans() as any
+      setPlans(data.plans || [])
+    } catch (err: any) {
+      setPlansError(err.message)
+    } finally {
+      setPlansLoading(false)
+    }
+  }
+
+  const handlePlanUpdate = async (idx: number, field: keyof Plan, value: string | number) => {
+    const updated = [...plans]
+    updated[idx] = { ...updated[idx], [field]: value } as Plan
+    setPlans(updated)
+  }
+
+  const handlePlanSave = async (idx: number) => {
+    setPlansError(null)
+    try {
+      const plan = plans[idx]
+      await updatePlan({
+        slug: plan.slug,
+        name: plan.name,
+        max_users: Number(plan.max_users),
+        max_clients: Number(plan.max_clients),
+        price_per_carer: Number(plan.price_per_carer),
+        billing_model: plan.billing_model,
+      })
+      await loadPlans()
+    } catch (err: any) {
+      setPlansError(err.message)
     }
   }
 
@@ -243,6 +299,7 @@ export default function SuperAdminScreen() {
             { label: 'Dashboard', tab: 'dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
             { label: 'Organizations', tab: 'organizations', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
             { label: 'Licensing', tab: 'licensing', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+            { label: 'Plans', tab: 'plans', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
           ].map((item) => (
             <button
               key={item.label}
@@ -330,6 +387,97 @@ export default function SuperAdminScreen() {
             ))}
           </div>
         </div>
+          </>
+        )}
+
+        {activeTab === 'plans' && (
+          <>
+            <div className="bg-white/5 rounded-xl border border-white/10 p-6">
+              <h2 className="font-semibold text-white mb-4">Configure Plans</h2>
+              {plansError && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
+                  <p className="text-red-400 text-sm">{plansError}</p>
+                </div>
+              )}
+              {plansLoading ? (
+                <div className="text-white/50 text-sm">Loading plans...</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-white/5 text-white/50 text-xs uppercase">
+                      <tr>
+                        <th className="px-4 py-2">Plan</th>
+                        <th className="px-4 py-2">Max Users</th>
+                        <th className="px-4 py-2">Max Clients</th>
+                        <th className="px-4 py-2">Price / Carer (£)</th>
+                        <th className="px-4 py-2">Billing Model</th>
+                        <th className="px-4 py-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {plans.map((plan, idx) => (
+                        <tr key={plan.slug} className="hover:bg-white/5 transition-colors">
+                          <td className="px-4 py-3">
+                            <input
+                              type="text"
+                              value={plan.name}
+                              onChange={(e) => handlePlanUpdate(idx, 'name', e.target.value)}
+                              className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm outline-none focus:border-teal-400"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <input
+                              type="number"
+                              min={1}
+                              value={plan.max_users}
+                              onChange={(e) => handlePlanUpdate(idx, 'max_users', e.target.value)}
+                              className="w-24 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm outline-none focus:border-teal-400"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <input
+                              type="number"
+                              min={1}
+                              value={plan.max_clients}
+                              onChange={(e) => handlePlanUpdate(idx, 'max_clients', e.target.value)}
+                              className="w-24 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm outline-none focus:border-teal-400"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={plan.price_per_carer}
+                              onChange={(e) => handlePlanUpdate(idx, 'price_per_carer', e.target.value)}
+                              className="w-28 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm outline-none focus:border-teal-400"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <select
+                              value={plan.billing_model}
+                              onChange={(e) => handlePlanUpdate(idx, 'billing_model', e.target.value)}
+                              className="bg-slate-800 text-white text-xs rounded px-2 py-1 border border-white/10 outline-none"
+                            >
+                              <option value="per-carer">Per Carer</option>
+                              <option value="flat">Flat Rate</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handlePlanSave(idx)}
+                              className="text-xs px-3 py-1.5 rounded-lg bg-teal-500 text-slate-900 hover:bg-teal-400 transition-colors font-medium"
+                            >
+                              Save
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </>
         )}
 

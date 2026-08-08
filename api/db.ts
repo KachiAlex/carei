@@ -783,6 +783,31 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_family_members_email ON family_members(email)`
   })
 
+  await run(28, 'create_plans_table', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS plans (
+        id TEXT PRIMARY KEY,
+        slug TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL,
+        max_users INTEGER NOT NULL,
+        max_clients INTEGER NOT NULL,
+        price_per_carer NUMERIC(10,2) DEFAULT 0,
+        billing_model TEXT DEFAULT 'per-carer',
+        is_default BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`
+      INSERT INTO plans (id, slug, name, max_users, max_clients, price_per_carer, billing_model, is_default)
+      VALUES
+        ('plan-trial', 'trial', 'Trial', 3, 10, 0, 'per-carer', TRUE),
+        ('plan-professional', 'professional', 'Professional', 15, 100, 7, 'per-carer', FALSE),
+        ('plan-enterprise', 'enterprise', 'Enterprise', 100, 500, 4, 'per-carer', FALSE)
+      ON CONFLICT (slug) DO NOTHING
+    `
+  })
+
   // Safety net: ensure multi-tenant tables exist even if migration tracking was inconsistent
   await sql`
     CREATE TABLE IF NOT EXISTS tenants (
