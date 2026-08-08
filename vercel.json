@@ -20,6 +20,7 @@
   ],
   "rewrites": [
     { "source": "/api/family/(.+)", "destination": "/api/family?path=$1" },
+    { "source": "/seed-superadmin", "destination": "/api/seed-superadmin" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
