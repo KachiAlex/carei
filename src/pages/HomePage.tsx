@@ -135,6 +135,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
 .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--teal); font-weight: 600; margin-bottom: 14px; }
 .section-title { font-family: var(--font-display); font-size: 42px; line-height: 1.12; margin-bottom: 16px; letter-spacing: -0.5px; }
 .section-sub { color: var(--text-dim); font-size: 16px; line-height: 1.7; max-width: 560px; font-weight: 300; }
+.section-alt { background: var(--navy-mid); border-radius: 24px; margin: 24px auto; }
 .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 0 48px; }
 
 /* ── FEATURES GRID ── */
@@ -466,7 +467,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
   <div class="divider"></div>
 
   <!-- FOR WHOM -->
-  <section id="for-whom">
+  <section id="for-whom" class="section-alt">
     <div class="section-label">Built for every role</div>
     <h2 class="section-title">One platform, every perspective</h2>
     <div class="personas">
@@ -554,7 +555,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
   <div class="divider"></div>
 
   <!-- TESTIMONIALS -->
-  <section id="testimonials">
+  <section id="testimonials" class="section-alt">
     <div style="text-align:center;margin-bottom:0;">
       <div class="section-label">What care homes say</div>
       <h2 class="section-title">Trusted across 200+ care homes</h2>
