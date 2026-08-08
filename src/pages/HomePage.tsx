@@ -596,7 +596,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
       <h2 class="section-title">Simple, per-carer pricing</h2>
       <p class="section-sub" style="margin:0 auto;">No setup fees. No long contracts. Cancel anytime. Every plan includes GDPR-compliant UK hosting.</p>
     </div>
-    <div class="pricing-grid">
+    <div class="pricing-grid" id="pricing-grid">
       <div class="price-card">
         <div class="price-plan">Starter</div>
         <div class="price-amount">£8 <span>/ carer / mo</span></div>
@@ -699,6 +699,58 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
 </div>
 `
 
+function renderPricingCards(plans: any[]) {
+  const featureMap: Record<string, string[]> = {
+    trial: ['Digital MAR + handover', 'Lone worker SOS', 'Vital signs + fluid tracking', 'Supervisor dashboard', 'UK data hosting'],
+    professional: ['Everything in Trial', 'AI Copilot', 'Voice-first documentation', 'Audio shift briefing', 'Passive lone worker monitoring', 'CQC audit export'],
+    enterprise: ['Everything in Professional', 'Dedicated account manager', 'Custom integrations (EMIS, SystmOne)', 'SLA-backed uptime', 'On-site training', 'DSPT support package'],
+  }
+
+  const checkIcon = '<svg class=\'ti-svg\' viewBox=\'0 0 24 24\' width=\'1em\' height=\'1em\' aria-hidden=\'true\' focusable=\'false\'><use href=\'/tabler-sprite.svg#tabler-check\'></use></svg>'
+
+  const priceLabel = (plan: any) => {
+    const price = Number(plan.price_per_carer ?? 0)
+    if (plan.slug === 'trial') return 'Free'
+    if (price === 0) return 'Custom'
+    return `£${price}`
+  }
+
+  const priceUnit = (plan: any) => {
+    const price = Number(plan.price_per_carer ?? 0)
+    if (plan.slug === 'trial' || price === 0) return ''
+    return plan.billing_model === 'flat' ? '<span>/ mo</span>' : '<span>/ carer / mo</span>'
+  }
+
+  const descMap: Record<string, string> = {
+    trial: 'For small care teams trying CAREi.',
+    professional: 'For growing providers who need AI documentation and compliance tools.',
+    enterprise: 'For multi-site providers and NHS Integrated Care Boards.',
+  }
+
+  return plans.map((plan, idx) => {
+    const featured = idx === 1 || plan.slug === 'professional'
+    const desc = descMap[plan.slug] || `For teams up to ${plan.max_users} users`
+    const features = featureMap[plan.slug] || [`Up to ${plan.max_users} users`, `Up to ${plan.max_clients} clients`, 'UK data hosting']
+    const btn = plan.slug === 'enterprise'
+      ? '<a href=\'mailto:sales@careiapp.com\' class=\'price-btn price-btn-outline\'>Talk to sales</a>'
+      : '<a href=\'/login\' class=\'price-btn price-btn-solid\'>Start free trial</a>'
+
+    return `
+      <div class=\'price-card${featured ? ' featured' : ''}\'>
+        ${featured ? '<div class=\'price-popular\'>Most popular</div>' : ''}
+        <div class=\'price-plan\'>${plan.name}</div>
+        <div class=\'price-amount\'>${priceLabel(plan)} ${priceUnit(plan)}</div>
+        <div class=\'price-desc\'>${desc}</div>
+        <div class=\'price-divider\'></div>
+        <ul class=\'price-features\'>
+          ${features.map((f: string) => `<li>${checkIcon} ${f}</li>`).join('')}
+        </ul>
+        ${btn}
+      </div>
+    `
+  }).join('')
+}
+
 export default function HomePage() {
   const [, setLocation] = useLocation()
 
@@ -714,6 +766,24 @@ export default function HomePage() {
     logos.forEach((logo) => logo.addEventListener('click', handleClick))
     return () => logos.forEach((logo) => logo.removeEventListener('click', handleClick))
   }, [setLocation])
+
+  useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        const res = await fetch('/api/public-plans')
+        if (!res.ok) return
+        const data = await res.json()
+        const plans = data.plans || []
+        if (plans.length && typeof document !== 'undefined') {
+          const grid = document.getElementById('pricing-grid')
+          if (grid) grid.innerHTML = renderPricingCards(plans)
+        }
+      } catch (err) {
+        console.error('Failed to load pricing:', err)
+      }
+    }
+    loadPricing()
+  }, [])
 
   return (
     <div
