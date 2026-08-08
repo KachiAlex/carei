@@ -33,6 +33,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
+        skipWaiting: true,
+        clientsClaim: true,
         // No runtimeCaching for API routes — service worker is disabled in Capacitor
       },
       manifest: false, // Use existing public/manifest.json

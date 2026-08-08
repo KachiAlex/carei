@@ -159,6 +159,8 @@ function PublicRoutes() {
 
 // Routes that ARE wrapped in TenantProvider (tenant-aware)
 function TenantRoutes() {
+  const [location] = useLocation()
+  if (!location.startsWith('/tenant/')) return null
   return (
     <TenantProvider>
       <Switch>
