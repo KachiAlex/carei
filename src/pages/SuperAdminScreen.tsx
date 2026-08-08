@@ -74,7 +74,7 @@ export default function SuperAdminScreen() {
   }, [])
 
   useEffect(() => {
-    if (activeTab === 'plans' && plans.length === 0) {
+    if ((activeTab === 'plans' || activeTab === 'organizations') && plans.length === 0) {
       loadPlans()
     }
   }, [activeTab])
@@ -531,9 +531,9 @@ export default function SuperAdminScreen() {
                         onChange={(e) => handlePlanChange(tenant.slug, e.target.value)}
                         className="bg-slate-800 text-white text-xs rounded px-2 py-1 border border-white/10 outline-none"
                       >
-                        <option value="trial">Trial</option>
-                        <option value="professional">Professional</option>
-                        <option value="enterprise">Enterprise</option>
+                        {plans.map((p) => (
+                          <option key={p.slug} value={p.slug}>{p.name}</option>
+                        ))}
                       </select>
                     </td>
                     <td className="px-4 py-3 text-white/60">
@@ -713,9 +713,9 @@ export default function SuperAdminScreen() {
                     onChange={(e) => setAddForm(prev => ({ ...prev, plan: e.target.value }))}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-teal-400/50"
                   >
-                    <option value="trial">Trial (3 users, 10 clients)</option>
-                    <option value="professional">Professional (15 users, 100 clients)</option>
-                    <option value="enterprise">Enterprise (100 users, 500 clients)</option>
+                    {plans.map((p) => (
+                      <option key={p.slug} value={p.slug}>{p.name} ({p.max_users} users, {p.max_clients} clients)</option>
+                    ))}
                   </select>
                 </div>
 
