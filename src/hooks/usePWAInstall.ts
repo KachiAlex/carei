@@ -9,6 +9,7 @@ interface PWAInstallState {
   isInstallable: boolean
   isIOS: boolean
   isStandalone: boolean
+  dismissed: boolean
   prompt: () => void
   dismiss: () => void
 }
@@ -23,7 +24,9 @@ export function usePWAInstall(): PWAInstallState {
     if (typeof window === 'undefined') return
 
     setIsStandalone(window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true)
-    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream)
+    const ua = navigator.userAgent
+    const isAppleTouchDevice = 'maxTouchPoints' in navigator && navigator.maxTouchPoints > 1
+    setIsIOS((/iPad|iPhone|iPod/.test(ua) || (isAppleTouchDevice && /Macintosh/.test(ua))) && !(window as any).MSStream)
 
     const handler = (e: BeforeInstallPromptEvent) => {
       e.preventDefault()
@@ -67,6 +70,7 @@ export function usePWAInstall(): PWAInstallState {
     isInstallable: !!deferredPrompt && !dismissed,
     isIOS,
     isStandalone,
+    dismissed,
     prompt,
     dismiss,
   }

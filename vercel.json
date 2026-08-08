@@ -32,7 +32,8 @@
     {
       "source": "/manifest.json",
       "headers": [
-        { "key": "Cache-Control", "value": "public, no-store, max-age=0, must-revalidate" }
+        { "key": "Cache-Control", "value": "public, no-store, max-age=0, must-revalidate" },
+        { "key": "Content-Type", "value": "application/manifest+json" }
       ]
     },
     {

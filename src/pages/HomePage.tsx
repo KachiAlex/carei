@@ -29,7 +29,7 @@ const siteHtml = `
 /* ── NAV ── */
 .nav {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 20px 48px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: calc(env(safe-area-inset-top) + 20px) 48px 20px; border-bottom: 1px solid rgba(255,255,255,0.06);
   position: sticky; top: 0; z-index: 100;
   background: rgba(13,27,46,0.92); backdrop-filter: blur(12px);
 }
@@ -246,7 +246,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
   .compliance-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 900px) {
-  .nav { padding: 16px 24px; }
+  .nav { padding: calc(env(safe-area-inset-top) + 16px) 24px 16px; }
   .nav-cta { display: none; }
   .nav-hamburger { display: block; }
   .nav-links { display: none; }
