@@ -45,6 +45,8 @@ const siteHtml = `
 .nav-links a:hover { color: var(--white); }
 .nav-cta { display: flex; gap: 12px; align-items: center; }
 a.nav-logo { text-decoration: none; color: var(--white); }
+.nav-hamburger { display: none; cursor: pointer; font-size: 22px; color: var(--white); padding: 6px; }
+.mobile-cta { display: none; }
 .btn-ghost { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: var(--white); padding: 9px 20px; border-radius: 8px; font-size: 14px; font-family: var(--font-body); cursor: pointer; transition: border-color .2s, color .2s; }
 .btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
 .btn-teal { background: var(--teal); color: var(--navy); padding: 9px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; border: none; font-family: var(--font-body); cursor: pointer; transition: background .2s; }
@@ -58,12 +60,9 @@ a.btn-hero, a.btn-demo, a.btn-teal, a.btn-ghost, a.price-btn { text-decoration: 
   padding: 100px 48px 80px;
   display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center;
   max-width: 1200px; margin: 0 auto;
-  background-image: url('/hero.png');
-  background-repeat: no-repeat;
-  background-position: right center;
-  background-size: contain;
   position: relative;
   min-height: 600px;
+  background: radial-gradient(circle at 85% 35%, rgba(14,207,176,0.10) 0%, transparent 45%);
 }
 .hero-badge {
   display: inline-flex; align-items: center; gap: 8px;
@@ -83,7 +82,7 @@ a.btn-hero, a.btn-demo, a.btn-teal, a.btn-ghost, a.price-btn { text-decoration: 
   display: flex; align-items: center; gap: 8px; background: var(--card-bg);
   border: 1px solid var(--card-border); padding: 10px 16px; border-radius: 10px; font-size: 12px;
 }
-.trust-badge i { color: var(--teal); font-size: 15px; }
+.trust-badge i, .trust-badge .ti-svg { color: var(--teal); font-size: 15px; }
 
 .hero-right { position: relative; }
 .stat-bar {
@@ -114,10 +113,10 @@ a.btn-hero, a.btn-demo, a.btn-teal, a.btn-ghost, a.price-btn { text-decoration: 
 .visit-name { font-weight: 600; font-size: 14px; }
 .visit-status { background: var(--teal); color: var(--navy); font-size: 10px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
 .visit-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
-.visit-row i { color: var(--teal); font-size: 13px; }
+.visit-row i, .visit-row .ti-svg { color: var(--teal); font-size: 13px; }
 .med-row { display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.04); border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; font-size: 12px; }
 .med-check { width: 18px; height: 18px; border-radius: 50%; background: var(--teal); display: flex; align-items: center; justify-content: center; }
-.med-check i { font-size: 10px; color: var(--navy); }
+.med-check i, .med-check .ti-svg { font-size: 10px; color: var(--navy); }
 .ai-bubble {
   background: rgba(14,207,176,0.1); border: 1px solid rgba(14,207,176,0.25);
   border-radius: 10px; padding: 10px 14px; margin-top: 12px;
@@ -178,7 +177,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
 .compliance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
 .compliance-badges { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .comp-badge { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 20px; }
-.comp-badge i { font-size: 24px; color: var(--teal); margin-bottom: 10px; display: block; }
+.comp-badge i, .comp-badge .ti-svg { font-size: 24px; color: var(--teal); margin-bottom: 10px; display: block; }
 .comp-badge h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
 .comp-badge p { font-size: 12px; color: var(--text-dim); }
 
@@ -204,7 +203,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
 .price-divider { height: 1px; background: rgba(255,255,255,0.08); margin-bottom: 20px; }
 .price-features { list-style: none; margin-bottom: 28px; }
 .price-features li { font-size: 13px; padding: 6px 0; display: flex; gap: 8px; align-items: center; }
-.price-features li i { color: var(--teal); font-size: 15px; }
+.price-features li i, .price-features li .ti-svg { color: var(--teal); font-size: 15px; }
 .price-btn { width: 100%; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: var(--font-body); border: none; }
 .price-btn-outline { background: transparent; border: 1px solid rgba(255,255,255,0.2) !important; color: var(--white); }
 .price-btn-solid { background: var(--teal); color: var(--navy); }
@@ -236,7 +235,19 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
 }
 @media (max-width: 900px) {
   .nav { padding: 16px 24px; }
+  .nav-cta { display: none; }
+  .nav-hamburger { display: block; }
   .nav-links { display: none; }
+  #nav-toggle:checked ~ .nav-links {
+    display: flex; flex-direction: column;
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: rgba(13,27,46,0.98); backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding: 24px 48px; gap: 20px;
+    box-shadow: 0 24px 40px rgba(0,0,0,0.25);
+  }
+  .nav-links a { font-size: 16px; }
+  .mobile-cta { display: flex; gap: 12px; margin-top: 8px; }
   .features-grid { grid-template-columns: repeat(2, 1fr); }
   .steps { grid-template-columns: repeat(2, 1fr); }
   .steps::before { display: none; }
@@ -257,6 +268,8 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
   .cta-section h2 { font-size: 34px; }
   .cta-buttons { flex-direction: column; align-items: center; }
 }
+
+.ti-svg { width: 1em; height: 1em; display: inline-block; vertical-align: middle; color: var(--teal); }
 </style>
 
 <h2 class="sr-only">CAREi — AI-powered care management platform marketing website</h2>
@@ -269,16 +282,22 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
       <img src="/logo.jpg" alt="CAREi" class="nav-logo-icon" />
       <span class="nav-logo-name">CAREi</span>
     </a>
+    <input type="checkbox" id="nav-toggle" hidden />
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#how-it-works">How it works</a>
       <a href="#compliance">Compliance</a>
       <a href="#pricing">Pricing</a>
+      <div class="mobile-cta">
+        <a href="/login" class="btn-ghost">Sign in</a>
+        <a href="/login" class="btn-teal">Get started free</a>
+      </div>
     </div>
     <div class="nav-cta">
       <a href="/login" class="btn-ghost">Sign in</a>
       <a href="/login" class="btn-teal">Get started free</a>
     </div>
+    <label for="nav-toggle" class="nav-hamburger" aria-label="Toggle navigation">☰</label>
   </nav>
 
   <!-- HERO -->
@@ -290,12 +309,12 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
         <p class="hero-sub">AI-powered care management for frontline carers. Voice notes, digital MAR, instant handovers — all in one place. Built for the NHS, DSPT-compliant from day one.</p>
         <div class="hero-actions">
           <a href="/login" class="btn-hero">Get started free →</a>
-          <a href="#" class="btn-demo">Watch demo</a>
+          <a href="#demo" class="btn-demo">Watch demo</a>
         </div>
         <div class="hero-trust">
-          <div class="trust-badge"><i class="ti ti-shield-check" aria-hidden="true"></i> GDPR ready</div>
-          <div class="trust-badge"><i class="ti ti-building-hospital" aria-hidden="true"></i> NHS-aligned</div>
-          <div class="trust-badge"><i class="ti ti-lock" aria-hidden="true"></i> End-to-end encrypted</div>
+          <div class="trust-badge"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-shield-check"></use></svg> GDPR ready</div>
+          <div class="trust-badge"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-building-hospital"></use></svg> NHS-aligned</div>
+          <div class="trust-badge"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-lock"></use></svg> End-to-end encrypted</div>
         </div>
       </div>
       <div class="hero-right">
@@ -317,16 +336,16 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
                 <div class="visit-name">Margaret Ellis, 84</div>
                 <div class="visit-status">In progress</div>
               </div>
-              <div class="visit-row"><i class="ti ti-map-pin" aria-hidden="true"></i> 12 Elmwood Close, Bristol BS3 4NR</div>
-              <div class="visit-row"><i class="ti ti-clock" aria-hidden="true"></i> 09:15 AM · 45 min visit</div>
-              <div class="visit-row"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Penicillin allergy on file — flagged</div>
+              <div class="visit-row"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-map-pin"></use></svg> 12 Elmwood Close, Bristol BS3 4NR</div>
+              <div class="visit-row"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-clock"></use></svg> 09:15 AM · 45 min visit</div>
+              <div class="visit-row"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-alert-triangle"></use></svg> Penicillin allergy on file — flagged</div>
             </div>
             <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Medications (3 of 4 confirmed)</div>
-            <div class="med-row"><span>Amlodipine 5mg</span><div class="med-check"><i class="ti ti-check" aria-hidden="true"></i></div></div>
-            <div class="med-row"><span>Lisinopril 10mg</span><div class="med-check"><i class="ti ti-check" aria-hidden="true"></i></div></div>
+            <div class="med-row"><span>Amlodipine 5mg</span><div class="med-check"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg></div></div>
+            <div class="med-row"><span>Lisinopril 10mg</span><div class="med-check"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg></div></div>
             <div class="med-row" style="opacity:0.5;"><span>Simvastatin 20mg — pending</span><div style="width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.3);"></div></div>
             <div class="ai-bubble">
-              <div class="ai-bubble-label"><i class="ti ti-robot" aria-hidden="true"></i> AI Copilot</div>
+              <div class="ai-bubble-label"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-robot"></use></svg> AI Copilot</div>
               <div class="ai-bubble-text">Margaret\'s care plan flags fluid intake target of 1.5L today. Current logged: 750ml. Recommend prompting during morning tea.</div>
             </div>
           </div>
@@ -490,21 +509,21 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
         <p class="section-sub">CAREi was designed alongside UK care providers and legal advisors from the ground up — not retrofitted for compliance after the fact.</p>
         <div style="margin-top:28px;display:flex;flex-direction:column;gap:14px;">
           <div style="display:flex;align-items:flex-start;gap:12px;">
-            <i class="ti ti-check" style="color:var(--teal);font-size:18px;margin-top:1px;" aria-hidden="true"></i>
+            <svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false" style="color:var(--teal);font-size:18px;margin-top:1px;"><use href="/tabler-sprite.svg#tabler-check"></use></svg>
             <div>
               <div style="font-size:14px;font-weight:600;margin-bottom:2px;">Immutable audit trails</div>
               <div style="font-size:13px;color:var(--text-dim);">Every action timestamped, GPS-tagged, and carer-attributed. Cannot be edited or deleted.</div>
             </div>
           </div>
           <div style="display:flex;align-items:flex-start;gap:12px;">
-            <i class="ti ti-check" style="color:var(--teal);font-size:18px;margin-top:1px;" aria-hidden="true"></i>
+            <svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false" style="color:var(--teal);font-size:18px;margin-top:1px;"><use href="/tabler-sprite.svg#tabler-check"></use></svg>
             <div>
               <div style="font-size:14px;font-weight:600;margin-bottom:2px;">End-to-end encryption</div>
               <div style="font-size:13px;color:var(--text-dim);">All client data encrypted in transit and at rest. UK data residency guaranteed.</div>
             </div>
           </div>
           <div style="display:flex;align-items:flex-start;gap:12px;">
-            <i class="ti ti-check" style="color:var(--teal);font-size:18px;margin-top:1px;" aria-hidden="true"></i>
+            <svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false" style="color:var(--teal);font-size:18px;margin-top:1px;"><use href="/tabler-sprite.svg#tabler-check"></use></svg>
             <div>
               <div style="font-size:14px;font-weight:600;margin-bottom:2px;">Role-based access control</div>
               <div style="font-size:13px;color:var(--text-dim);">Carers see only their clients. Supervisors see their team. Managers see everything.</div>
@@ -513,10 +532,10 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
         </div>
       </div>
       <div class="compliance-badges">
-        <div class="comp-badge"><i class="ti ti-shield-check" aria-hidden="true"></i><h4>GDPR ready</h4><p>UK GDPR compliant. Data never leaves UK servers.</p></div>
-        <div class="comp-badge"><i class="ti ti-building-hospital" aria-hidden="true"></i><h4>DSPT aligned</h4><p>NHS Data Security &amp; Protection Toolkit standards.</p></div>
-        <div class="comp-badge"><i class="ti ti-certificate" aria-hidden="true"></i><h4>CQC audit ready</h4><p>Every record built to withstand inspection.</p></div>
-        <div class="comp-badge"><i class="ti ti-lock-access" aria-hidden="true"></i><h4>ISO 27001</h4><p>Information security management certified.</p></div>
+        <div class="comp-badge"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-shield-check"></use></svg><h4>GDPR ready</h4><p>UK GDPR compliant. Data never leaves UK servers.</p></div>
+        <div class="comp-badge"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-building-hospital"></use></svg><h4>DSPT aligned</h4><p>NHS Data Security &amp; Protection Toolkit standards.</p></div>
+        <div class="comp-badge"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-certificate"></use></svg><h4>CQC audit ready</h4><p>Every record built to withstand inspection.</p></div>
+        <div class="comp-badge"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-lock-access"></use></svg><h4>ISO 27001</h4><p>Information security management certified.</p></div>
       </div>
     </div>
   </section>
@@ -573,11 +592,11 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
         <div class="price-desc">For small care teams getting started with digital records.</div>
         <div class="price-divider"></div>
         <ul class="price-features">
-          <li><i class="ti ti-check" aria-hidden="true"></i> Digital MAR + handover</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> Lone worker SOS</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> Vital signs + fluid tracking</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> Supervisor dashboard</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> UK data hosting</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Digital MAR + handover</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Lone worker SOS</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Vital signs + fluid tracking</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Supervisor dashboard</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> UK data hosting</li>
         </ul>
         <a href="/login" class="price-btn price-btn-outline">Start free trial</a>
       </div>
@@ -588,12 +607,12 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
         <div class="price-desc">For growing providers who need AI documentation and compliance tools.</div>
         <div class="price-divider"></div>
         <ul class="price-features">
-          <li><i class="ti ti-check" aria-hidden="true"></i> Everything in Starter</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> AI Copilot</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> Voice-first documentation</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> Audio shift briefing</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> Passive lone worker monitoring</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> CQC audit export</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Everything in Starter</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> AI Copilot</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Voice-first documentation</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Audio shift briefing</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Passive lone worker monitoring</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> CQC audit export</li>
         </ul>
         <a href="/login" class="price-btn price-btn-solid">Start free trial</a>
       </div>
@@ -603,12 +622,12 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
         <div class="price-desc">For multi-site providers and NHS Integrated Care Boards.</div>
         <div class="price-divider"></div>
         <ul class="price-features">
-          <li><i class="ti ti-check" aria-hidden="true"></i> Everything in Professional</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> Dedicated account manager</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> Custom integrations (EMIS, SystmOne)</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> SLA-backed uptime</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> On-site training</li>
-          <li><i class="ti ti-check" aria-hidden="true"></i> DSPT support package</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Everything in Professional</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Dedicated account manager</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Custom integrations (EMIS, SystmOne)</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> SLA-backed uptime</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> On-site training</li>
+          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> DSPT support package</li>
         </ul>
         <a href="mailto:sales@careiapp.com" class="price-btn price-btn-outline">Talk to sales</a>
       </div>
@@ -621,7 +640,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
     <p>Join 200+ care homes already running CAREi. Set up in under a day, trained in under an hour.</p>
     <div class="cta-buttons">
       <a href="/login" class="btn-hero" style="font-size:15px;padding:16px 36px;">Start 30-day free trial →</a>
-      <a href="#" class="btn-demo" style="font-size:15px;padding:16px 28px;">Book a demo</a>
+      <a href="mailto:sales@careiapp.com" class="btn-demo" style="font-size:15px;padding:16px 28px;">Book a demo</a>
     </div>
     <div style="margin-top:20px;font-size:13px;color:var(--text-dim);">No credit card required · UK data hosting · Cancel anytime</div>
   </div>
