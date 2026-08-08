@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useLocation } from 'wouter'
 
 const siteHtml = `
 <style>
@@ -664,9 +665,20 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
 `
 
 export default function HomePage() {
+  const [, setLocation] = useLocation()
+
   useEffect(() => {
     window.scrollTo(0, 0)
-  }, [])
+
+    const logos = document.querySelectorAll<HTMLAnchorElement>('a.nav-logo')
+    const handleClick = (e: Event) => {
+      e.preventDefault()
+      setLocation('/')
+      window.scrollTo(0, 0)
+    }
+    logos.forEach((logo) => logo.addEventListener('click', handleClick))
+    return () => logos.forEach((logo) => logo.removeEventListener('click', handleClick))
+  }, [setLocation])
 
   return (
     <div

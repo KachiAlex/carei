@@ -124,8 +124,7 @@ function LoadingFallback() {
 }
 
 function HomeOrSplash() {
-  const isNative = typeof window !== 'undefined' && typeof (window as any).Capacitor !== 'undefined'
-  return isNative ? <SplashScreen /> : <HomePage />
+  return <HomePage />
 }
 
 // Routes that are NOT wrapped in TenantProvider
