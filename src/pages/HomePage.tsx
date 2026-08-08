@@ -37,8 +37,8 @@ const siteHtml = `
 .nav-logo { display: flex; align-items: center; gap: 10px; }
 .nav-logo-icon {
   width: 36px; height: 36px; border-radius: 10px;
-  background: var(--teal); display: flex; align-items: center; justify-content: center;
-  font-weight: 900; color: var(--navy); font-size: 14px; font-family: var(--font-display);
+  background: #fff; display: block; object-fit: contain;
+  padding: 3px;
 }
 .nav-logo-name { font-size: 20px; font-weight: 600; letter-spacing: -0.3px; }
 .nav-links { display: flex; gap: 32px; }
@@ -59,6 +59,12 @@ a.btn-hero, a.btn-demo, a.btn-teal, a.btn-ghost, a.price-btn { text-decoration: 
   padding: 100px 48px 80px;
   display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center;
   max-width: 1200px; margin: 0 auto;
+  background-image: url('/hero.png');
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: contain;
+  position: relative;
+  min-height: 600px;
 }
 .hero-badge {
   display: inline-flex; align-items: center; gap: 8px;
@@ -261,7 +267,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
   <!-- NAV -->
   <nav class="nav">
     <a href="/" class="nav-logo">
-      <div class="nav-logo-icon">C</div>
+      <img src="/logo.jpg" alt="CAREi" class="nav-logo-icon" />
       <span class="nav-logo-name">CAREi</span>
     </a>
     <div class="nav-links">
@@ -626,7 +632,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
     <div class="footer-grid">
       <div class="footer-brand">
         <div class="nav-logo">
-          <div class="nav-logo-icon">C</div>
+          <img src="/logo.jpg" alt="CAREi" class="nav-logo-icon" />
           <span class="nav-logo-name">CAREi</span>
         </div>
         <p>AI-powered care management for frontline carers. Built in the UK, trusted across 200+ care homes.</p>
