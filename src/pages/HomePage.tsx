@@ -44,6 +44,7 @@ const siteHtml = `
 .nav-links a { color: var(--text-dim); text-decoration: none; font-size: 14px; transition: color .2s; cursor: pointer; }
 .nav-links a:hover { color: var(--white); }
 .nav-cta { display: flex; gap: 12px; align-items: center; }
+a.nav-logo { text-decoration: none; color: var(--white); }
 .btn-ghost { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: var(--white); padding: 9px 20px; border-radius: 8px; font-size: 14px; font-family: var(--font-body); cursor: pointer; transition: border-color .2s, color .2s; }
 .btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
 .btn-teal { background: var(--teal); color: var(--navy); padding: 9px 22px; border-radius: 8px; font-size: 14px; font-weight: 600; border: none; font-family: var(--font-body); cursor: pointer; transition: background .2s; }
@@ -258,16 +259,15 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
 
   <!-- NAV -->
   <nav class="nav">
-    <div class="nav-logo">
+    <a href="/" class="nav-logo">
       <div class="nav-logo-icon">C</div>
       <span class="nav-logo-name">CAREi</span>
-    </div>
+    </a>
     <div class="nav-links">
       <a href="#features">Features</a>
       <a href="#how-it-works">How it works</a>
       <a href="#compliance">Compliance</a>
       <a href="#pricing">Pricing</a>
-      <a href="/manager/login">Manager Portal</a>
     </div>
     <div class="nav-cta">
       <a href="/login" class="btn-ghost">Sign in</a>
