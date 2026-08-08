@@ -18,9 +18,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureTables()
     const sql = getSql()
 
-    // Check if superadmin already exists
+    const email = 'superadmin@careiapp.com'
+    const password = 'superadmin123'
+
+    // Remove any existing superadmin accounts
+    await sql`DELETE FROM users WHERE role = ${'superadmin'}`
+
     const existing = await sql`
-      SELECT id FROM users WHERE LOWER(email) = ${'superadmin@carei.com'}
+      SELECT id FROM users WHERE LOWER(email) = ${email.toLowerCase()}
       LIMIT 1
     ` as any[]
 
@@ -31,12 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const id = 'user-superadmin'
     const name = 'Super Admin'
-    const email = 'superadmin@carei.com'
     const phone = '00000000000'
     const region = 'Global'
     const pin = '0000'
     const role = 'superadmin'
-    const passwordHash = hashPassword('superadmin123')
+    const passwordHash = hashPassword(password)
 
     await sql`
       INSERT INTO users (id, name, email, phone, region, pin, role, password_hash, email_verified)
@@ -49,6 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       user: { id, name, email, role },
     })
   } catch (err: any) {
+    console.error('[seed-superadmin] error:', err)
     res.status(500).json({ error: err.message })
   }
 }
