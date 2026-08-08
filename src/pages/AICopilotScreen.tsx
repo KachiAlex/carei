@@ -27,6 +27,8 @@ const QUICK_ACTIONS = [
   'Any safety flags I should know?',
 ]
 
+const MAX_MESSAGE_LENGTH = 500
+
 function formatContextSummary(ctx: any) {
   if (!ctx) return 'General care context.'
   const parts = [
@@ -82,6 +84,13 @@ export default function AICopilotScreen() {
   const sendMessage = async (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || loading) return
+    if (trimmed.length > MAX_MESSAGE_LENGTH) {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'ai', text: `Please keep your message under ${MAX_MESSAGE_LENGTH} characters so I can answer safely.`, timestamp: new Date() },
+      ])
+      return
+    }
     const userMsg: Message = { role: 'user', text: trimmed, timestamp: new Date() }
     setMessages((prev) => [...prev, userMsg])
     setInput('')
@@ -103,8 +112,8 @@ export default function AICopilotScreen() {
       const data = await chatWithAI(trimmed, context, history.slice(-6))
       const aiMsg: Message = { role: 'ai', text: data.reply || 'No response from AI.', timestamp: new Date() }
       setMessages((prev) => [...prev, aiMsg])
-    } catch (e: any) {
-      const errMsg: Message = { role: 'ai', text: `Sorry, I couldn't process that. ${e.message}`, timestamp: new Date() }
+    } catch {
+      const errMsg: Message = { role: 'ai', text: "Sorry, I couldn't process that right now. Please check your connection and try again.", timestamp: new Date() }
       setMessages((prev) => [...prev, errMsg])
     } finally {
       setLoading(false)
@@ -113,7 +122,10 @@ export default function AICopilotScreen() {
 
   const startVoice = () => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
-      alert('Voice input not supported in this browser')
+      setMessages((prev) => [
+        ...prev,
+        { role: 'ai', text: 'Voice input is not supported in this browser. Please type your question.', timestamp: new Date() },
+      ])
       return
     }
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -224,6 +236,9 @@ export default function AICopilotScreen() {
 
       {/* Input */}
       <div className="px-4 py-3 bg-white border-t border-slate-200 shrink-0">
+        <p className="text-[10px] text-slate-400 text-center mb-2 leading-tight">
+          CAREi Copilot is an AI assistant, not a medical professional. Always verify clinical or care-critical information with your supervisor.
+        </p>
         <div className="flex items-center gap-2">
           <button
             onClick={isRecording ? stopVoice : startVoice}
@@ -240,9 +255,11 @@ export default function AICopilotScreen() {
           <input
             type="text"
             value={input}
+            maxLength={MAX_MESSAGE_LENGTH}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
             placeholder="Ask CAREi anything..."
+            aria-label="Ask CAREi anything"
             className="flex-1 bg-slate-100 rounded-full px-4 py-2.5 text-sm outline-none border-none focus:ring-2 focus:ring-teal/30"
           />
           <button

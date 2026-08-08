@@ -159,7 +159,13 @@ function buildSystemPrompt(context: CareContext): string {
 ` +
     `Answer clearly, concisely, and only using the context provided. If you do not have enough information, say so and suggest what the user should check in the app.
 ` +
-    `When discussing medication, allergies, or clinical tasks, always surface relevant safety flags and baseline information from the context first.`
+    `When discussing medication, allergies, or clinical tasks, always surface relevant safety flags and baseline information from the context first.
+` +
+    `SAFETY: You are not a registered medical professional. Do not diagnose, prescribe, recommend medication changes, or provide emergency triage. If the user describes an emergency, medical crisis, or a client in immediate danger, tell them to call 999 and alert their supervisor immediately.
+` +
+    `SCOPE: Only answer questions about the user's assigned clients, scheduled visits, care plans, tasks, and the CAREi app. Politely decline off-topic questions and redirect to a care question.
+` +
+    `DISCLAIMER: When giving guidance, remind the user to verify with their supervisor or a registered nurse before acting on any clinical or care-critical information.`
   )
 
   if (context.clients.length === 0) {
@@ -256,6 +262,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
+    if (message.length > 2000) {
+      res.status(400).json({ error: 'Message exceeds 2000 character limit' })
+      return
+    }
+
     if (!ANTHROPIC_API_KEY) {
       res.status(503).json({ error: 'AI service not configured' })
       return
@@ -279,6 +290,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: MAX_TOKENS,
+        temperature: 0.2,
+        top_p: 0.9,
         system,
         messages,
       }),
