@@ -213,12 +213,12 @@ export default function SuperAdminScreen() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#0B1120' }}>
-      {/* Header */}
-      <div className="bg-slate-900/50 border-b border-white/10 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen flex" style={{ background: '#0B1120' }}>
+      {/* Sidebar */}
+      <aside className="w-64 bg-slate-900/80 border-r border-white/10 hidden md:flex flex-col shrink-0">
+        <div className="p-6 border-b border-white/10">
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={() => setLocation('/')}
               className="bg-transparent border-none cursor-pointer transition-transform hover:scale-105"
               title="Go to home"
@@ -226,20 +226,47 @@ export default function SuperAdminScreen() {
               <img src="/logo.jpg" alt="CAREi" width="40" height="40" className="rounded-xl" style={{ objectFit: 'cover' }} />
             </button>
             <div>
-              <h1 className="font-bold text-white">Super Admin</h1>
-              <p className="text-white/40 text-xs">Platform Management</p>
+              <h1 className="font-bold text-white text-sm">CAREi</h1>
+              <p className="text-white/40 text-xs">Super Admin</p>
             </div>
           </div>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-1">
+          {[
+            { label: 'Dashboard', path: '/super-admin', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+            { label: 'Organizations', path: '/super-admin', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
+            { label: 'Licensing', path: '/super-admin', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+          ].map((item) => (
+            <button
+              key={item.label}
+              onClick={() => setLocation(item.path)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/70 hover:bg-white/5 hover:text-white transition-colors text-left bg-transparent border-none cursor-pointer"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d={item.icon} />
+              </svg>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-white/10">
           <button
             onClick={handleLogout}
-            className="px-4 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-all text-sm"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left bg-transparent border-none cursor-pointer"
           >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+            </svg>
             Sign out
           </button>
         </div>
-      </div>
+      </aside>
 
-      <div className="max-w-7xl mx-auto p-6">
+      {/* Main content */}
+      <div className="flex-1 min-w-0 overflow-auto">
+        <main className="max-w-7xl mx-auto p-6">
         {/* Stats */}
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 mb-8">
           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
@@ -608,7 +635,8 @@ export default function SuperAdminScreen() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
+  </div>
   )
 }
