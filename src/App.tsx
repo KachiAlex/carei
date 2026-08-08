@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Route, Router, Switch, useLocation } from 'wouter'
 import SplashScreen from './pages/SplashScreen'
+import HomePage from './pages/HomePage'
 import { useOnlineSync } from './hooks/useOnlineSync'
 import { TenantProvider } from './contexts/TenantContext'
 import { secureGet, secureWipe } from './utils/secureStorage'
@@ -122,11 +123,16 @@ function LoadingFallback() {
   )
 }
 
+function HomeOrSplash() {
+  const isNative = typeof window !== 'undefined' && typeof (window as any).Capacitor !== 'undefined'
+  return isNative ? <SplashScreen /> : <HomePage />
+}
+
 // Routes that are NOT wrapped in TenantProvider
 function PublicRoutes() {
   return (
     <Switch>
-      <Route path="/" component={SplashScreen} />
+      <Route path="/" component={HomeOrSplash} />
       <Route path="/login" component={LoginScreen} />
       <Route path="/select-tenant" component={TenantSelectScreen} />
       <Route path="/manager/login" component={ManagerLoginScreen} />
