@@ -299,15 +299,14 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
       <a href="#features">Features</a>
       <a href="#how-it-works">How it works</a>
       <a href="#compliance">Compliance</a>
-      <a href="#pricing">Pricing</a>
-      <div class="mobile-cta">
+            <div class="mobile-cta">
         <a href="/login" class="btn-ghost">Sign in</a>
-        <a href="/login" class="btn-teal">Get started free</a>
+        <a href="/login" class="btn-teal">Get started</a>
       </div>
     </div>
     <div class="nav-cta">
       <a href="/login" class="btn-ghost">Sign in</a>
-      <a href="/login" class="btn-teal">Get started free</a>
+      <a href="/login" class="btn-teal">Get started</a>
     </div>
     <label for="nav-toggle" class="nav-hamburger" aria-label="Toggle navigation">☰</label>
   </nav>
@@ -320,7 +319,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
         <h1>Care That<br><span>Documents Itself</span></h1>
         <p class="hero-sub">AI-powered care management for frontline carers. Voice notes, digital MAR, instant handovers — all in one place. Built for the NHS, DSPT-compliant from day one.</p>
         <div class="hero-actions">
-          <a href="/login" class="btn-hero">Get started free →</a>
+          <a href="/login" class="btn-hero">Get started →</a>
           <a href="#demo" class="btn-demo">Watch demo</a>
         </div>
         <div class="hero-trust">
@@ -330,12 +329,6 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
         </div>
       </div>
       <div class="hero-right">
-        <div class="stat-bar" style="margin-bottom:16px;">
-          <div class="stat-cell"><div class="stat-num">200+</div><div class="stat-lbl">Care homes</div></div>
-          <div class="stat-cell"><div class="stat-num">15K+</div><div class="stat-lbl">Shifts logged</div></div>
-          <div class="stat-cell"><div class="stat-num">99.9%</div><div class="stat-lbl">Uptime</div></div>
-          <div class="stat-cell"><div class="stat-num">4.9★</div><div class="stat-lbl">App store</div></div>
-        </div>
         <div class="hero-mockup">
           <div class="mockup-topbar">
             <div class="mockup-dots"><span></span><span></span><span></span></div>
@@ -349,7 +342,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
                 <div class="visit-status">In progress</div>
               </div>
               <div class="visit-row"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-map-pin"></use></svg> 12 Elmwood Close, Bristol BS3 4NR</div>
-              <div class="visit-row"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-clock"></use></svg> 09:15 AM · 45 min visit</div>
+              <div class="visit-row"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-clock"></use></svg> Visit in progress</div>
               <div class="visit-row"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-alert-triangle"></use></svg> Penicillin allergy on file — flagged</div>
             </div>
             <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Medications (3 of 4 confirmed)</div>
@@ -358,7 +351,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
             <div class="med-row" style="opacity:0.5;"><span>Simvastatin 20mg — pending</span><div style="width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,0.3);"></div></div>
             <div class="ai-bubble">
               <div class="ai-bubble-label"><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-robot"></use></svg> AI Copilot</div>
-              <div class="ai-bubble-text">Margaret\'s care plan flags fluid intake target of 1.5L today. Current logged: 750ml. Recommend prompting during morning tea.</div>
+              <div class="ai-bubble-text">Margaret's care plan flags a fluid intake target today. Check the latest log and prompt during her next drink.</div>
             </div>
           </div>
         </div>
@@ -375,7 +368,7 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
         <div class="section-label">Platform features</div>
         <h2 class="section-title">Everything a carer needs, nothing they don\'t</h2>
       </div>
-      <p class="section-sub" style="margin-top:8px;">CAREi v5.0 ships 14 features across 24 screens — designed with frontline carers, validated against CQC requirements, and built to reduce documentation burden by over 70%.</p>
+      <p class="section-sub" style="margin-top:8px;">Designed with frontline carers, validated against CQC requirements, and built to reduce documentation burden.</p>
     </div>
     <div class="features-grid">
       <div class="feat-card">
@@ -558,12 +551,12 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
   <section id="testimonials" class="section-alt">
     <div style="text-align:center;margin-bottom:0;">
       <div class="section-label">What care homes say</div>
-      <h2 class="section-title">Trusted across 200+ care homes</h2>
+      <h2 class="section-title">Trusted by care providers across the UK</h2>
     </div>
     <div class="testimonials-grid">
       <div class="testi-card">
         <div class="testi-stars">★★★★★</div>
-        <blockquote>"Since deploying CAREi, our carers spend 40% less time on documentation. They actually talk to residents now instead of filling forms at the end of a visit."</blockquote>
+        <blockquote>"Since deploying CAREi, our carers spend less time on documentation. They actually talk to residents now instead of filling forms at the end of a visit."</blockquote>
         <div class="testi-author">
           <div class="testi-avatar">SR</div>
           <div><div class="testi-name">Sarah Redmond</div><div class="testi-role">Care Home Manager · Bristol</div></div>
@@ -588,73 +581,15 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
     </div>
   </section>
 
-  <div class="divider"></div>
-
-  <!-- PRICING -->
-  <section id="pricing">
-    <div style="text-align:center;max-width:560px;margin:0 auto 0;">
-      <div class="section-label">Pricing</div>
-      <h2 class="section-title">Simple, per-carer pricing</h2>
-      <p class="section-sub" style="margin:0 auto;">No setup fees. No long contracts. Cancel anytime. Every plan includes GDPR-compliant UK hosting.</p>
-    </div>
-    <div class="pricing-grid" id="pricing-grid">
-      <div class="price-card">
-        <div class="price-plan">Starter</div>
-        <div class="price-amount">£8 <span>/ carer / mo</span></div>
-        <div class="price-desc">For small care teams getting started with digital records.</div>
-        <div class="price-divider"></div>
-        <ul class="price-features">
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Digital MAR + handover</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Lone worker SOS</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Vital signs + fluid tracking</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Supervisor dashboard</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> UK data hosting</li>
-        </ul>
-        <a href="/login" class="price-btn price-btn-outline">Start free trial</a>
-      </div>
-      <div class="price-card featured">
-        <div class="price-popular">Most popular</div>
-        <div class="price-plan">Professional</div>
-        <div class="price-amount">£14 <span>/ carer / mo</span></div>
-        <div class="price-desc">For growing providers who need AI documentation and compliance tools.</div>
-        <div class="price-divider"></div>
-        <ul class="price-features">
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Everything in Starter</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> AI Copilot</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Voice-first documentation</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Audio shift briefing</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Passive lone worker monitoring</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> CQC audit export</li>
-        </ul>
-        <a href="/login" class="price-btn price-btn-solid">Start free trial</a>
-      </div>
-      <div class="price-card">
-        <div class="price-plan">Enterprise</div>
-        <div class="price-amount">Custom</div>
-        <div class="price-desc">For multi-site providers and NHS Integrated Care Boards.</div>
-        <div class="price-divider"></div>
-        <ul class="price-features">
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Everything in Professional</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Dedicated account manager</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> Custom integrations (EMIS, SystmOne)</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> SLA-backed uptime</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> On-site training</li>
-          <li><svg class="ti-svg" viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" focusable="false"><use href="/tabler-sprite.svg#tabler-check"></use></svg> DSPT support package</li>
-        </ul>
-        <a href="mailto:sales@careiapp.com" class="price-btn price-btn-outline">Talk to sales</a>
-      </div>
-    </div>
-  </section>
-
   <!-- CTA -->
   <div id="demo" class="cta-section">
-    <h2>Ready to free your carers<br>from paperwork?</h2>
-    <p>Join 200+ care homes already running CAREi. Set up in under a day, trained in under an hour.</p>
+    <h2>Ready to reduce paperwork for your carers?</h2>
+    <p>Find out how CAREi can fit your team's workflow. Book a demo or start today.</p>
     <div class="cta-buttons">
-      <a href="/login" class="btn-hero" style="font-size:15px;padding:16px 36px;">Start 30-day free trial →</a>
+      <a href="/login" class="btn-hero" style="font-size:15px;padding:16px 36px;">Get started →</a>
       <a href="mailto:sales@careiapp.com" class="btn-demo" style="font-size:15px;padding:16px 28px;">Book a demo</a>
     </div>
-    <div style="margin-top:20px;font-size:13px;color:var(--text-dim);">No credit card required · UK data hosting · Cancel anytime</div>
+    <div style="margin-top:20px;font-size:13px;color:var(--text-dim);">UK data hosting</div>
   </div>
 
   <!-- FOOTER -->
@@ -665,14 +600,13 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
           <img src="/logo.jpg" alt="CAREi" class="nav-logo-icon" />
           <span class="nav-logo-name">CAREi</span>
         </div>
-        <p>AI-powered care management for frontline carers. Built in the UK, trusted across 200+ care homes.</p>
+        <p>AI-powered care management for frontline carers. Built in the UK for care teams.</p>
       </div>
       <div class="footer-col">
         <h4>Product</h4>
         <a href="#features">Features</a>
         <a href="#how-it-works">How it works</a>
-        <a href="#pricing">Pricing</a>
-        <a href="/manager/login">Manager portal</a>
+                <a href="/manager/login">Manager portal</a>
         <a href="#">Changelog</a>
       </div>
       <div class="footer-col">
@@ -693,64 +627,11 @@ section { padding: 80px 48px; max-width: 1200px; margin: 0 auto; }
     </div>
     <div class="footer-bottom">
       <p>© 2026 CAREi. All rights reserved. Registered in England &amp; Wales.</p>
-      <p style="color:var(--teal);">Live across 200+ care homes ●</p>
     </div>
   </footer>
 
 </div>
 `
-
-function renderPricingCards(plans: any[]) {
-  const featureMap: Record<string, string[]> = {
-    trial: ['Digital MAR + handover', 'Lone worker SOS', 'Vital signs + fluid tracking', 'Supervisor dashboard', 'UK data hosting'],
-    professional: ['Everything in Trial', 'AI Copilot', 'Voice-first documentation', 'Audio shift briefing', 'Passive lone worker monitoring', 'CQC audit export'],
-    enterprise: ['Everything in Professional', 'Dedicated account manager', 'Custom integrations (EMIS, SystmOne)', 'SLA-backed uptime', 'On-site training', 'DSPT support package'],
-  }
-
-  const checkIcon = '<svg class=\'ti-svg\' viewBox=\'0 0 24 24\' width=\'1em\' height=\'1em\' aria-hidden=\'true\' focusable=\'false\'><use href=\'/tabler-sprite.svg#tabler-check\'></use></svg>'
-
-  const priceLabel = (plan: any) => {
-    const price = Number(plan.price_per_carer ?? 0)
-    if (plan.slug === 'trial') return 'Free'
-    if (price === 0) return 'Custom'
-    return `£${price}`
-  }
-
-  const priceUnit = (plan: any) => {
-    const price = Number(plan.price_per_carer ?? 0)
-    if (plan.slug === 'trial' || price === 0) return ''
-    return plan.billing_model === 'flat' ? '<span>/ mo</span>' : '<span>/ carer / mo</span>'
-  }
-
-  const descMap: Record<string, string> = {
-    trial: 'For small care teams trying CAREi.',
-    professional: 'For growing providers who need AI documentation and compliance tools.',
-    enterprise: 'For multi-site providers and NHS Integrated Care Boards.',
-  }
-
-  return plans.map((plan, idx) => {
-    const featured = idx === 1 || plan.slug === 'professional'
-    const desc = descMap[plan.slug] || `For teams up to ${plan.max_users} users`
-    const features = featureMap[plan.slug] || [`Up to ${plan.max_users} users`, `Up to ${plan.max_clients} clients`, 'UK data hosting']
-    const btn = plan.slug === 'enterprise'
-      ? '<a href=\'mailto:sales@careiapp.com\' class=\'price-btn price-btn-outline\'>Talk to sales</a>'
-      : '<a href=\'/login\' class=\'price-btn price-btn-solid\'>Start free trial</a>'
-
-    return `
-      <div class=\'price-card${featured ? ' featured' : ''}\'>
-        ${featured ? '<div class=\'price-popular\'>Most popular</div>' : ''}
-        <div class=\'price-plan\'>${plan.name}</div>
-        <div class=\'price-amount\'>${priceLabel(plan)} ${priceUnit(plan)}</div>
-        <div class=\'price-desc\'>${desc}</div>
-        <div class=\'price-divider\'></div>
-        <ul class=\'price-features\'>
-          ${features.map((f: string) => `<li>${checkIcon} ${f}</li>`).join('')}
-        </ul>
-        ${btn}
-      </div>
-    `
-  }).join('')
-}
 
 export default function HomePage() {
   const [, setLocation] = useLocation()
@@ -767,24 +648,6 @@ export default function HomePage() {
     logos.forEach((logo) => logo.addEventListener('click', handleClick))
     return () => logos.forEach((logo) => logo.removeEventListener('click', handleClick))
   }, [setLocation])
-
-  useEffect(() => {
-    const loadPricing = async () => {
-      try {
-        const res = await fetch('/api/public-plans')
-        if (!res.ok) return
-        const data = await res.json()
-        const plans = data.plans || []
-        if (plans.length && typeof document !== 'undefined') {
-          const grid = document.getElementById('pricing-grid')
-          if (grid) grid.innerHTML = renderPricingCards(plans)
-        }
-      } catch (err) {
-        console.error('Failed to load pricing:', err)
-      }
-    }
-    loadPricing()
-  }, [])
 
   return (
     <div
