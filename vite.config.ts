@@ -35,7 +35,16 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
         skipWaiting: true,
         clientsClaim: true,
-        // No runtimeCaching for API routes — service worker is disabled in Capacitor
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'carei-pages',
+              networkTimeoutSeconds: 3,
+            },
+          },
+        ],
       },
       manifest: false, // Use existing public/manifest.json
     }),

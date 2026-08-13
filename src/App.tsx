@@ -11,6 +11,18 @@ import { setToken, setRefreshToken, setUser, clearAuthCache } from './utils/toke
 import { useAutoLock } from './hooks/useAutoLock'
 import { PWAInstallPrompt } from './components/PWAInstallPrompt'
 
+function lazyLoad<T extends React.ComponentType<any>>(importFn: () => Promise<{ default: T }>): React.LazyExoticComponent<T> {
+  return lazy(() =>
+    importFn().catch((err) => {
+      if (err.message?.includes('Failed to fetch dynamically imported module') || err.message?.includes('text/html')) {
+        console.error('[lazyLoad] Stale chunk detected, reloading page...', err.message)
+        window.location.reload()
+      }
+      throw err
+    })
+  )
+}
+
 function useReducedMotion() {
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -83,45 +95,45 @@ function useClipboardGuard() {
   }, [])
 }
 
-const LoginScreen = lazy(() => import('./pages/LoginScreen'))
-const TenantSelectScreen = lazy(() => import('./pages/TenantSelectScreen'))
-const CarerDashboard = lazy(() => import('./pages/CarerDashboard'))
-const ActiveVisitScreen = lazy(() => import('./pages/ActiveVisitScreen'))
-const AICopilotScreen = lazy(() => import('./pages/AICopilotScreen'))
-const VisitSummaryScreen = lazy(() => import('./pages/VisitSummaryScreen'))
-const ManagerLoginScreen = lazy(() => import('./pages/ManagerLoginScreen'))
-const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'))
-const ClientManagement = lazy(() => import('./pages/ClientManagement'))
-const VisitScheduling = lazy(() => import('./pages/VisitScheduling'))
-const ClientOverviewScreen = lazy(() => import('./pages/ClientOverviewScreen'))
-const CreateAccountScreen = lazy(() => import('./pages/CreateAccountScreen'))
-const BodyMapScreen = lazy(() => import('./pages/BodyMapScreen'))
-const CarePlanScreen = lazy(() => import('./pages/CarePlanScreen'))
-const EmergencyScreen = lazy(() => import('./pages/EmergencyScreen'))
-const VisitHistoryScreen = lazy(() => import('./pages/VisitHistoryScreen'))
-const RotaScreen = lazy(() => import('./pages/RotaScreen'))
-const OperationsScreen = lazy(() => import('./pages/OperationsScreen'))
-const FamilyPortalScreen = lazy(() => import('./pages/FamilyPortalScreen'))
-const FamilyLoginScreen = lazy(() => import('./pages/FamilyLoginScreen'))
-const FamilyDashboardScreen = lazy(() => import('./pages/FamilyDashboardScreen'))
-const FamilySettingsScreen = lazy(() => import('./pages/FamilySettingsScreen'))
-const ManagerApprovalsScreen = lazy(() => import('./pages/ManagerApprovalsScreen'))
-const ManagerAuditScreen = lazy(() => import('./pages/ManagerAuditScreen'))
-const FamilySummaryScreen = lazy(() => import('./pages/FamilySummaryScreen'))
-const AdminTeaserScreen = lazy(() => import('./pages/AdminTeaserScreen'))
-const SuperAdminScreen = lazy(() => import('./pages/SuperAdminScreen'))
-const AcceptInviteScreen = lazy(() => import('./pages/AcceptInviteScreen'))
-const TenantMembersScreen = lazy(() => import('./pages/TenantMembersScreen'))
-const SettingsScreen = lazy(() => import('./pages/SettingsScreen'))
-const AvailabilityScreen = lazy(() => import('./pages/AvailabilityScreen'))
-const DbsScreen = lazy(() => import('./pages/DbsScreen'))
-const TrainingScreen = lazy(() => import('./pages/TrainingScreen'))
-const RightToWorkScreen = lazy(() => import('./pages/RightToWorkScreen'))
-const SupervisionScreen = lazy(() => import('./pages/SupervisionScreen'))
-const MessagesScreen = lazy(() => import('./pages/MessagesScreen'))
-const ManagerCarePlanEditScreen = lazy(() => import('./pages/ManagerCarePlanEditScreen'))
-const EnhancedManagerCarePlanEditScreen = lazy(() => import('./pages/EnhancedManagerCarePlanEditScreen'))
-const FinalEnhancedCarePlanEditScreen = lazy(() => import('./pages/FinalEnhancedCarePlanEditScreen'))
+const LoginScreen = lazyLoad(() => import('./pages/LoginScreen'))
+const TenantSelectScreen = lazyLoad(() => import('./pages/TenantSelectScreen'))
+const CarerDashboard = lazyLoad(() => import('./pages/CarerDashboard'))
+const ActiveVisitScreen = lazyLoad(() => import('./pages/ActiveVisitScreen'))
+const AICopilotScreen = lazyLoad(() => import('./pages/AICopilotScreen'))
+const VisitSummaryScreen = lazyLoad(() => import('./pages/VisitSummaryScreen'))
+const ManagerLoginScreen = lazyLoad(() => import('./pages/ManagerLoginScreen'))
+const ManagerDashboard = lazyLoad(() => import('./pages/ManagerDashboard'))
+const ClientManagement = lazyLoad(() => import('./pages/ClientManagement'))
+const VisitScheduling = lazyLoad(() => import('./pages/VisitScheduling'))
+const ClientOverviewScreen = lazyLoad(() => import('./pages/ClientOverviewScreen'))
+const CreateAccountScreen = lazyLoad(() => import('./pages/CreateAccountScreen'))
+const BodyMapScreen = lazyLoad(() => import('./pages/BodyMapScreen'))
+const CarePlanScreen = lazyLoad(() => import('./pages/CarePlanScreen'))
+const EmergencyScreen = lazyLoad(() => import('./pages/EmergencyScreen'))
+const VisitHistoryScreen = lazyLoad(() => import('./pages/VisitHistoryScreen'))
+const RotaScreen = lazyLoad(() => import('./pages/RotaScreen'))
+const OperationsScreen = lazyLoad(() => import('./pages/OperationsScreen'))
+const FamilyPortalScreen = lazyLoad(() => import('./pages/FamilyPortalScreen'))
+const FamilyLoginScreen = lazyLoad(() => import('./pages/FamilyLoginScreen'))
+const FamilyDashboardScreen = lazyLoad(() => import('./pages/FamilyDashboardScreen'))
+const FamilySettingsScreen = lazyLoad(() => import('./pages/FamilySettingsScreen'))
+const ManagerApprovalsScreen = lazyLoad(() => import('./pages/ManagerApprovalsScreen'))
+const ManagerAuditScreen = lazyLoad(() => import('./pages/ManagerAuditScreen'))
+const FamilySummaryScreen = lazyLoad(() => import('./pages/FamilySummaryScreen'))
+const AdminTeaserScreen = lazyLoad(() => import('./pages/AdminTeaserScreen'))
+const SuperAdminScreen = lazyLoad(() => import('./pages/SuperAdminScreen'))
+const AcceptInviteScreen = lazyLoad(() => import('./pages/AcceptInviteScreen'))
+const TenantMembersScreen = lazyLoad(() => import('./pages/TenantMembersScreen'))
+const SettingsScreen = lazyLoad(() => import('./pages/SettingsScreen'))
+const AvailabilityScreen = lazyLoad(() => import('./pages/AvailabilityScreen'))
+const DbsScreen = lazyLoad(() => import('./pages/DbsScreen'))
+const TrainingScreen = lazyLoad(() => import('./pages/TrainingScreen'))
+const RightToWorkScreen = lazyLoad(() => import('./pages/RightToWorkScreen'))
+const SupervisionScreen = lazyLoad(() => import('./pages/SupervisionScreen'))
+const MessagesScreen = lazyLoad(() => import('./pages/MessagesScreen'))
+const ManagerCarePlanEditScreen = lazyLoad(() => import('./pages/ManagerCarePlanEditScreen'))
+const EnhancedManagerCarePlanEditScreen = lazyLoad(() => import('./pages/EnhancedManagerCarePlanEditScreen'))
+const FinalEnhancedCarePlanEditScreen = lazyLoad(() => import('./pages/FinalEnhancedCarePlanEditScreen'))
 
 function LoadingFallback() {
   return (

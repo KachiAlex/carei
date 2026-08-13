@@ -47,6 +47,6 @@
     { "source": "/api/family/(.+)", "destination": "/api/family?path=$1" },
     { "source": "/seed-superadmin", "destination": "/api/seed-superadmin" },
     { "source": "/plans", "destination": "/api/plans" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/)[^.]+)", "destination": "/index.html" }
   ]
 }
