@@ -65,17 +65,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             clientName, clientAge, clientAddress, clientId, visitTime, visitDuration,
             elapsed, tasks, fluid, notes, medications, handoverNote, clockOutAt, clockInAt, status,
             bpSystolic, bpDiastolic, pulse, o2Sat, fluidGlasses, mealStatus, mood, wellbeingNote,
+            clockInLat, clockInLng, clockInAccuracy, geoVerified, geoDistanceM, geoOverrideReason,
+            tagScanId, tagScanMethod, tagScannedAt, tagVerified,
           } = body
 
           await tenantSql`
             INSERT INTO visits (
               id, tenant_id, client_name, client_age, client_address, client_id, visit_time, visit_duration,
               elapsed, tasks, fluid, notes, medications, handover_note, clock_out_at, clock_in_at, status,
-              bp_systolic, bp_diastolic, pulse, o2_sat, fluid_glasses, meal_status, mood, wellbeing_note
+              bp_systolic, bp_diastolic, pulse, o2_sat, fluid_glasses, meal_status, mood, wellbeing_note,
+              clock_in_lat, clock_in_lng, clock_in_accuracy, geo_verified, geo_distance_m, geo_override_reason,
+              tag_scan_id, tag_scan_method, tag_scanned_at, tag_verified
             ) VALUES (
               ${visitId}, ${tenantId}, ${clientName}, ${clientAge}, ${clientAddress}, ${clientId || null}, ${visitTime}, ${visitDuration},
               ${elapsed}, ${JSON.stringify(tasks || [])}, ${fluid}, ${notes}, ${JSON.stringify(medications || [])}, ${handoverNote}, ${clockOutAt}, ${clockInAt}, ${status || 'pending'},
-              ${bpSystolic}, ${bpDiastolic}, ${pulse}, ${o2Sat}, ${fluidGlasses}, ${mealStatus}, ${mood}, ${wellbeingNote}
+              ${bpSystolic}, ${bpDiastolic}, ${pulse}, ${o2Sat}, ${fluidGlasses}, ${mealStatus}, ${mood}, ${wellbeingNote},
+              ${clockInLat ?? null}, ${clockInLng ?? null}, ${clockInAccuracy ?? null}, ${geoVerified ?? false}, ${geoDistanceM ?? null}, ${geoOverrideReason ?? null},
+              ${tagScanId ?? null}, ${tagScanMethod ?? null}, ${tagScannedAt ?? null}, ${tagVerified ?? false}
             )
             ON CONFLICT (id) DO UPDATE SET
               client_name = EXCLUDED.client_name,
@@ -101,6 +107,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               meal_status = EXCLUDED.meal_status,
               mood = EXCLUDED.mood,
               wellbeing_note = EXCLUDED.wellbeing_note,
+              clock_in_lat = COALESCE(EXCLUDED.clock_in_lat, visits.clock_in_lat),
+              clock_in_lng = COALESCE(EXCLUDED.clock_in_lng, visits.clock_in_lng),
+              clock_in_accuracy = COALESCE(EXCLUDED.clock_in_accuracy, visits.clock_in_accuracy),
+              geo_verified = EXCLUDED.geo_verified,
+              geo_distance_m = COALESCE(EXCLUDED.geo_distance_m, visits.geo_distance_m),
+              geo_override_reason = COALESCE(EXCLUDED.geo_override_reason, visits.geo_override_reason),
+              tag_scan_id = COALESCE(EXCLUDED.tag_scan_id, visits.tag_scan_id),
+              tag_scan_method = COALESCE(EXCLUDED.tag_scan_method, visits.tag_scan_method),
+              tag_scanned_at = COALESCE(EXCLUDED.tag_scanned_at, visits.tag_scanned_at),
+              tag_verified = EXCLUDED.tag_verified,
               submitted_at = NOW()
           `
           res.status(200).json({ status: 'saved', visitId })
@@ -156,17 +172,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         clientName, clientAge, clientAddress, clientId, visitTime, visitDuration,
         elapsed, tasks, fluid, notes, medications, handoverNote, clockOutAt, clockInAt, status,
         bpSystolic, bpDiastolic, pulse, o2Sat, fluidGlasses, mealStatus, mood, wellbeingNote,
+        clockInLat, clockInLng, clockInAccuracy, geoVerified, geoDistanceM, geoOverrideReason,
+        tagScanId, tagScanMethod, tagScannedAt, tagVerified,
       } = body
 
       await sql`
         INSERT INTO visits (
           id, client_name, client_age, client_address, client_id, visit_time, visit_duration,
           elapsed, tasks, fluid, notes, medications, handover_note, clock_out_at, clock_in_at, status,
-          bp_systolic, bp_diastolic, pulse, o2_sat, fluid_glasses, meal_status, mood, wellbeing_note
+          bp_systolic, bp_diastolic, pulse, o2_sat, fluid_glasses, meal_status, mood, wellbeing_note,
+          clock_in_lat, clock_in_lng, clock_in_accuracy, geo_verified, geo_distance_m, geo_override_reason,
+          tag_scan_id, tag_scan_method, tag_scanned_at, tag_verified
         ) VALUES (
           ${visitId}, ${clientName}, ${clientAge}, ${clientAddress}, ${clientId || null}, ${visitTime}, ${visitDuration},
           ${elapsed}, ${JSON.stringify(tasks || [])}, ${fluid}, ${notes}, ${JSON.stringify(medications || [])}, ${handoverNote}, ${clockOutAt}, ${clockInAt}, ${status || 'pending'},
-          ${bpSystolic}, ${bpDiastolic}, ${pulse}, ${o2Sat}, ${fluidGlasses}, ${mealStatus}, ${mood}, ${wellbeingNote}
+          ${bpSystolic}, ${bpDiastolic}, ${pulse}, ${o2Sat}, ${fluidGlasses}, ${mealStatus}, ${mood}, ${wellbeingNote},
+          ${clockInLat ?? null}, ${clockInLng ?? null}, ${clockInAccuracy ?? null}, ${geoVerified ?? false}, ${geoDistanceM ?? null}, ${geoOverrideReason ?? null},
+          ${tagScanId ?? null}, ${tagScanMethod ?? null}, ${tagScannedAt ?? null}, ${tagVerified ?? false}
         )
         ON CONFLICT (id) DO UPDATE SET
           client_name = EXCLUDED.client_name,
@@ -192,6 +214,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           meal_status = EXCLUDED.meal_status,
           mood = EXCLUDED.mood,
           wellbeing_note = EXCLUDED.wellbeing_note,
+          clock_in_lat = COALESCE(EXCLUDED.clock_in_lat, visits.clock_in_lat),
+          clock_in_lng = COALESCE(EXCLUDED.clock_in_lng, visits.clock_in_lng),
+          clock_in_accuracy = COALESCE(EXCLUDED.clock_in_accuracy, visits.clock_in_accuracy),
+          geo_verified = EXCLUDED.geo_verified,
+          geo_distance_m = COALESCE(EXCLUDED.geo_distance_m, visits.geo_distance_m),
+          geo_override_reason = COALESCE(EXCLUDED.geo_override_reason, visits.geo_override_reason),
+          tag_scan_id = COALESCE(EXCLUDED.tag_scan_id, visits.tag_scan_id),
+          tag_scan_method = COALESCE(EXCLUDED.tag_scan_method, visits.tag_scan_method),
+          tag_scanned_at = COALESCE(EXCLUDED.tag_scanned_at, visits.tag_scanned_at),
+          tag_verified = EXCLUDED.tag_verified,
           submitted_at = NOW()
       `
       res.status(200).json({ status: 'saved', visitId })

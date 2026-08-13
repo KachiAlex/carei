@@ -3,6 +3,8 @@ import { Route, Router, Switch, useLocation } from 'wouter'
 import SplashScreen from './pages/SplashScreen'
 import HomePage from './pages/HomePage'
 import { useOnlineSync } from './hooks/useOnlineSync'
+import { useRemoteWipe } from './hooks/useRemoteWipe'
+import { useDataMinimisation } from './hooks/useDataMinimisation'
 import { TenantProvider } from './contexts/TenantContext'
 import { secureGet, secureWipe } from './utils/secureStorage'
 import { setToken, setRefreshToken, setUser, clearAuthCache } from './utils/tokenCache'
@@ -111,6 +113,12 @@ const SuperAdminScreen = lazy(() => import('./pages/SuperAdminScreen'))
 const AcceptInviteScreen = lazy(() => import('./pages/AcceptInviteScreen'))
 const TenantMembersScreen = lazy(() => import('./pages/TenantMembersScreen'))
 const SettingsScreen = lazy(() => import('./pages/SettingsScreen'))
+const AvailabilityScreen = lazy(() => import('./pages/AvailabilityScreen'))
+const DbsScreen = lazy(() => import('./pages/DbsScreen'))
+const TrainingScreen = lazy(() => import('./pages/TrainingScreen'))
+const RightToWorkScreen = lazy(() => import('./pages/RightToWorkScreen'))
+const SupervisionScreen = lazy(() => import('./pages/SupervisionScreen'))
+const MessagesScreen = lazy(() => import('./pages/MessagesScreen'))
 const ManagerCarePlanEditScreen = lazy(() => import('./pages/ManagerCarePlanEditScreen'))
 const EnhancedManagerCarePlanEditScreen = lazy(() => import('./pages/EnhancedManagerCarePlanEditScreen'))
 const FinalEnhancedCarePlanEditScreen = lazy(() => import('./pages/FinalEnhancedCarePlanEditScreen'))
@@ -152,6 +160,8 @@ function PublicRoutes() {
       <Route path="/client/:id/care-plan" component={CarePlanScreen} />
       <Route path="/client/:id/history" component={VisitHistoryScreen} />
       <Route path="/settings" component={SettingsScreen} />
+      <Route path="/availability" component={AvailabilityScreen} />
+      <Route path="/messages" component={MessagesScreen} />
     </Switch>
   )
 }
@@ -190,6 +200,12 @@ function TenantRoutes() {
         <Route path="/tenant/:slug/manager/add-carer" component={CreateAccountScreen} />
         <Route path="/tenant/:slug/manager/members" component={TenantMembersScreen} />
         <Route path="/tenant/:slug/settings" component={SettingsScreen} />
+        <Route path="/tenant/:slug/availability" component={AvailabilityScreen} />
+        <Route path="/tenant/:slug/dbs" component={DbsScreen} />
+        <Route path="/tenant/:slug/training" component={TrainingScreen} />
+        <Route path="/tenant/:slug/right-to-work" component={RightToWorkScreen} />
+        <Route path="/tenant/:slug/supervisions" component={SupervisionScreen} />
+        <Route path="/tenant/:slug/messages" component={MessagesScreen} />
       </Switch>
     </TenantProvider>
   )
@@ -214,6 +230,27 @@ function App() {
   useSecureBoot()
   useClipboardGuard()
   useOnlineSync()
+  useDataMinimisation()
+  const { wiping, wipeReason } = useRemoteWipe()
+
+  if (wiping) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center" style={{ background: '#0f1a2e' }}>
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'rgba(255,90,95,0.1)' }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FF5A5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+          </svg>
+        </div>
+        <div className="text-white font-bold text-lg mb-2">Remote Wipe in Progress</div>
+        <div className="text-white/50 text-sm mb-4 text-center max-w-xs px-4">
+          {wipeReason || 'This device has been remotely wiped by your administrator.'}
+        </div>
+        <div className="w-8 h-8 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+        <div className="text-white/30 text-xs mt-4">Redirecting to login...</div>
+      </div>
+    )
+  }
+
   return (
     <Router>
       <AutoLockGuard>

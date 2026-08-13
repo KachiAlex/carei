@@ -4,9 +4,11 @@ import { useLocation, useParams } from 'wouter'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
-import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft, getDrugInteractions, logMedication, getMedicationLogs, reportIncident, saveVoiceMemo, uploadFile } from '../api/client'
+import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft, getDrugInteractions, logMedication, getMedicationLogs, reportIncident, saveVoiceMemo, uploadFile, getHandoverBriefing } from '../api/client'
 import { checkAllergy, checkMedicationOnList, checkDuplicateDose, checkTimeWindow, SAFETY_RULE_VERSION } from '../utils/safetyRules'
 import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
+import { verifyLocation, type GeoVerifyResult } from '../utils/geoVerify'
+import TagScanModal, { type TagScanResult } from '../components/TagScanModal'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -39,6 +41,21 @@ export default function ActiveVisitScreen() {
   const [clockedIn, setClockedIn] = useState(false)
   const [clockInAt, setClockInAt] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
+
+  // EVV Layer 1: Geo-verification
+  const [geoResult, setGeoResult] = useState<GeoVerifyResult | null>(null)
+  const [geoChecking, setGeoChecking] = useState(false)
+  const [geoOverrideReason, setGeoOverrideReason] = useState('')
+  const [showGeoOverride, setShowGeoOverride] = useState(false)
+
+  // EVV Layer 2: NFC/QR tag scanning
+  const [showTagScanner, setShowTagScanner] = useState(false)
+  const [tagScanResult, setTagScanResult] = useState<TagScanResult | null>(null)
+
+  // Pre-clock-in briefing: previous shift handover
+  const [briefing, setBriefing] = useState<any>(null)
+  const [briefingLoading, setBriefingLoading] = useState(false)
+  const [briefingExpanded, setBriefingExpanded] = useState(false)
   const [tasks, setTasks] = useState<{ name: string; done: boolean; completedAt?: number }[]>([])
   const [fluid, setFluid] = useState(0)
   const [notes, setNotes] = useState('')
@@ -137,7 +154,7 @@ export default function ActiveVisitScreen() {
   const [activePostMedMonitor, setActivePostMedMonitor] = useState<string | null>(null)
   const postMedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn, mealStatus, loneWorkerElapsed, bpSystolic, bpDiastolic, pulse, o2Sat, nutritionNote, selectedMood, wellbeingNote }, 3000)
+  useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn, mealStatus, loneWorkerElapsed, bpSystolic, bpDiastolic, pulse, o2Sat, nutritionNote, selectedMood, wellbeingNote, geoResult, geoOverrideReason, tagScanResult }, 3000)
 
   // Load visit + client from API, then DB data + draft
   useEffect(() => {
@@ -157,6 +174,13 @@ export default function ActiveVisitScreen() {
         if (c) {
           setClient(c)
           setLastSyncedAt(Date.now())
+          // Fetch previous shift handover briefing
+          if (c.id) {
+            setBriefingLoading(true)
+            getHandoverBriefing(c.id)
+              .then((data: any) => { if (mounted) { setBriefing(data); setBriefingLoading(false) } })
+              .catch(() => { if (mounted) setBriefingLoading(false) })
+          }
         }
 
         // Initialize tasks and meds from scheduled visit / client
@@ -247,6 +271,9 @@ export default function ActiveVisitScreen() {
           if (draft.nutritionNote) setNutritionNote(draft.nutritionNote)
           if (draft.selectedMood) setSelectedMood(draft.selectedMood)
           if (draft.wellbeingNote) setWellbeingNote(draft.wellbeingNote)
+          if (draft.geoResult) setGeoResult(draft.geoResult)
+          if (draft.geoOverrideReason) setGeoOverrideReason(draft.geoOverrideReason)
+          if (draft.tagScanResult) setTagScanResult(draft.tagScanResult)
         } catch (err: any) { console.error('getVisitDraft failed', err.message) }
       } catch (err: any) { 
         console.error('load visit failed', err.message)
@@ -288,11 +315,22 @@ export default function ActiveVisitScreen() {
         notes,
         medications: meds,
         mealStatus,
+        clockInAt: clockInAt ? new Date(clockInAt).toISOString() : null,
+        clockInLat: geoResult?.position?.lat ?? null,
+        clockInLng: geoResult?.position?.lng ?? null,
+        clockInAccuracy: geoResult?.position?.accuracy ?? null,
+        geoVerified: geoResult?.withinGeofence ?? false,
+        geoDistanceM: geoResult?.distanceMeters ?? null,
+        geoOverrideReason: geoOverrideReason || null,
+        tagScanId: tagScanResult?.tagId ?? null,
+        tagScanMethod: tagScanResult?.method ?? null,
+        tagScannedAt: tagScanResult?.scannedAt ?? null,
+        tagVerified: !!tagScanResult,
       }
       saveVisit(visitId, payload).catch(() => {})
     }, 5000)
     return () => { if (dbSyncRef.current) clearTimeout(dbSyncRef.current) }
-  }, [visitId, elapsed, tasks, fluid, notes, meds, clockedIn, client, visit, mealStatus])
+  }, [visitId, elapsed, tasks, fluid, notes, meds, clockedIn, client, visit, mealStatus, geoResult, tagScanResult])
 
   useEffect(() => {
     if (clockedIn) {
@@ -1038,18 +1076,262 @@ export default function ActiveVisitScreen() {
             </div>
           </div>
 
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            onClick={() => {
+          {/* Pre-clock-in briefing: previous shift handover */}
+          {briefingLoading && (
+            <div className="rounded-2xl p-4 border mb-3 bg-white" style={{ borderColor: 'rgba(0,0,0,0.06)' }}>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(167,139,250,0.08)' }}>
+                  <svg className="animate-pulse" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.lavender} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-700">Loading previous shift briefing...</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!briefingLoading && briefing?.hasBriefing && (
+            <div className="rounded-2xl border mb-3 overflow-hidden" style={{ borderColor: 'rgba(167,139,250,0.15)', background: 'white' }}>
+              <button
+                onClick={() => setBriefingExpanded(!briefingExpanded)}
+                className="w-full p-4 flex items-center gap-3 text-left cursor-pointer border-none bg-transparent"
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(167,139,250,0.08)' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.lavender} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-slate-700">Previous Shift Briefing</div>
+                  <div className="text-[10px] text-slate-400">
+                    {briefing.clockOutAt
+                      ? `Last visit ended ${new Date(briefing.clockOutAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                      : 'Recent visit'}
+                    {briefing.mood && ` · Mood: ${briefing.mood}`}
+                  </div>
+                </div>
+                <svg
+                  width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: briefingExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+                ><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+
+              {briefingExpanded && (
+                <div className="px-4 pb-4 space-y-3">
+                  {briefing.handoverNote && (
+                    <div className="bg-slate-50 rounded-xl p-3">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Handover Note</div>
+                      <div className="text-xs text-slate-700 leading-relaxed">{briefing.handoverNote}</div>
+                    </div>
+                  )}
+
+                  {briefing.notes && (
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Visit Notes</div>
+                      <div className="text-xs text-slate-600 leading-relaxed">{briefing.notes}</div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    {briefing.mood && (
+                      <span className="text-[10px] px-2 py-1 rounded-full font-medium" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>
+                        Mood: {briefing.mood}
+                      </span>
+                    )}
+                    {briefing.mealStatus && (
+                      <span className="text-[10px] px-2 py-1 rounded-full font-medium" style={{ background: 'rgba(246,183,60,0.08)', color: COLORS.amber }}>
+                        Meal: {briefing.mealStatus}
+                      </span>
+                    )}
+                    {briefing.fluid != null && (
+                      <span className="text-[10px] px-2 py-1 rounded-full font-medium" style={{ background: 'rgba(59,130,246,0.08)', color: '#3b82f6' }}>
+                        Fluid: {briefing.fluid}ml
+                      </span>
+                    )}
+                    {briefing.wellbeingNote && (
+                      <span className="text-[10px] px-2 py-1 rounded-full font-medium" style={{ background: 'rgba(167,139,250,0.08)', color: COLORS.lavender }}>
+                        Wellbeing: {briefing.wellbeingNote}
+                      </span>
+                    )}
+                  </div>
+
+                  {Array.isArray(briefing.tasks) && briefing.tasks.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Tasks Completed</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {briefing.tasks.map((t: any, i: number) => (
+                          <span key={i} className="text-[10px] px-2 py-0.5 rounded-md" style={{ background: 'rgba(34,197,94,0.06)', color: '#16a34a' }}>
+                            {typeof t === 'string' ? t : t?.name || 'Task'}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* EVV Layer 1: Geo-verification status */}
+          {geoResult && (
+            <div
+              className="rounded-2xl p-4 border mb-3"
+              style={{
+                background: geoResult.withinGeofence ? 'rgba(34,197,94,0.06)' : 'rgba(255,90,95,0.06)',
+                borderColor: geoResult.withinGeofence ? 'rgba(34,197,94,0.2)' : 'rgba(255,90,95,0.2)',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                  style={{ background: geoResult.withinGeofence ? 'rgba(34,197,94,0.12)' : 'rgba(255,90,95,0.12)' }}
+                >
+                  {geoResult.withinGeofence ? (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-slate-700">
+                    {geoResult.withinGeofence ? 'Location Verified' : 'Location Verification'}
+                  </div>
+                  <div className="text-xs text-slate-500">{geoResult.reason}</div>
+                  {geoResult.position && (
+                    <div className="text-[10px] text-slate-400 mt-0.5">
+                      GPS: {geoResult.position.lat.toFixed(5)}, {geoResult.position.lng.toFixed(5)} (±{Math.round(geoResult.position.accuracy)}m)
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Geo override form */}
+          {showGeoOverride && (
+            <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
+              <h3 className="font-bold text-sm text-slate-800 mb-2">Override Location Check</h3>
+              <p className="text-xs text-slate-500 mb-3">Provide a reason for clocking in outside the geofence. This will be recorded for audit.</p>
+              <select
+                value={geoOverrideReason}
+                onChange={(e) => setGeoOverrideReason(e.target.value)}
+                className="w-full bg-slate-50 rounded-xl px-3 py-2.5 text-sm text-slate-700 outline-none border border-slate-100 focus:border-teal transition-colors mb-3"
+              >
+                <option value="">Select a reason...</option>
+                <option value="GPS inaccurate on this device">GPS inaccurate on this device</option>
+                <option value="Client address not geocodable">Client address not geocodable</option>
+                <option value="Working remotely / telehealth visit">Working remotely / telehealth visit</option>
+                <option value="Multi-site visit, started from different location">Multi-site visit, started from different location</option>
+                <option value="Other">Other</option>
+              </select>
+              <button
+                onClick={() => {
+                  if (!geoOverrideReason) { alert('Please select a reason for the override.'); return }
+                  setClockedIn(true)
+                  setClockInAt(Date.now())
+                  setLoneWorkerElapsed(0)
+                  triggerHaptic(HAPTIC_PATTERNS.confirm)
+                }}
+                disabled={!geoOverrideReason}
+                className="w-full py-3 rounded-xl text-sm font-semibold text-white border-none cursor-pointer transition-all hover:opacity-90 disabled:opacity-50"
+                style={{ background: COLORS.amber }}
+              >
+                Clock In with Override
+              </button>
+              <button
+                onClick={() => { setShowGeoOverride(false); setGeoOverrideReason('') }}
+                className="w-full py-2 mt-2 rounded-xl text-xs font-semibold border cursor-pointer hover:bg-slate-50 transition-all"
+                style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {/* EVV Layer 2: Tag scan result */}
+          {tagScanResult && (
+            <div
+              className="rounded-2xl p-4 border mb-3"
+              style={{ background: 'rgba(34,197,94,0.06)', borderColor: 'rgba(34,197,94,0.2)' }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(34,197,94,0.12)' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><path d="M3 8h5"/><rect width="5" height="5" x="16" y="3" rx="1"/><path d="M16 8h5"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M3 16v5"/><path d="M8 16v5"/><rect width="5" height="5" x="16" y="16" rx="1"/><path d="M16 16v5"/><path d="M21 16v5"/></svg>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-700">Tag Verified</div>
+                  <div className="text-xs text-slate-500">
+                    Scanned via {tagScanResult.method === 'qr' ? 'QR camera' : 'manual entry'} at{' '}
+                    {new Date(tagScanResult.scannedAt).toLocaleTimeString()}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* EVV Layer 2: Scan Tag alternative button */}
+          {!tagScanResult && (
+            <button
+              onClick={() => setShowTagScanner(true)}
+              className="w-full py-3 rounded-2xl font-semibold text-sm cursor-pointer border-2 transition-all hover:bg-slate-50 mb-3 flex items-center justify-center gap-2"
+              style={{ borderColor: 'rgba(79,209,197,0.3)', color: COLORS.teal, background: 'transparent' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><path d="M3 8h5"/><rect width="5" height="5" x="16" y="3" rx="1"/><path d="M16 8h5"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M3 16v5"/><path d="M8 16v5"/><rect width="5" height="5" x="16" y="16" rx="1"/><path d="M16 16v5"/><path d="M21 16v5"/></svg>
+              Scan Location Tag Instead
+            </button>
+          )}
+
+          {/* Tag Scan Modal */}
+          <TagScanModal
+            open={showTagScanner}
+            expectedClientId={client?.id || visit?.clientId || ''}
+            expectedClientName={client?.name || visit?.clientName || ''}
+            onScanSuccess={(result) => {
+              setTagScanResult(result)
+              setShowTagScanner(false)
               setClockedIn(true)
               setClockInAt(Date.now())
               setLoneWorkerElapsed(0)
+              triggerHaptic(HAPTIC_PATTERNS.confirm)
             }}
-            className="w-full py-4 rounded-2xl font-bold text-base cursor-pointer border-none transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+            onClose={() => setShowTagScanner(false)}
+          />
+
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            disabled={geoChecking}
+            onClick={async () => {
+              setGeoChecking(true)
+              setGeoResult(null)
+              setShowGeoOverride(false)
+
+              const address = client?.address || visit?.clientAddress || ''
+              const result = await verifyLocation(address)
+              setGeoResult(result)
+              setGeoChecking(false)
+              triggerHaptic(HAPTIC_PATTERNS.tap)
+
+              if (result.withinGeofence) {
+                setClockedIn(true)
+                setClockInAt(Date.now())
+                setLoneWorkerElapsed(0)
+                triggerHaptic(HAPTIC_PATTERNS.confirm)
+              } else {
+                setShowGeoOverride(true)
+              }
+            }}
+            className="w-full py-4 rounded-2xl font-bold text-base cursor-pointer border-none transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 disabled:opacity-60"
             style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})`, color: COLORS.darkNavy, boxShadow: `0 8px 32px ${COLORS.teal}30` }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
-            Clock In
+            {geoChecking ? (
+              <>
+                <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                Verifying Location...
+              </>
+            ) : (
+              <>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
+                Clock In
+              </>
+            )}
           </motion.button>
         </div>
         </div>
@@ -1425,6 +1707,56 @@ export default function ActiveVisitScreen() {
             </svg>
             <span className="text-xs font-medium" style={{ color: COLORS.amber }}>Offline — data will sync when reconnected</span>
           </motion.div>
+        )}
+
+        {/* EVV Layer 1: Geo-verification badge in active visit */}
+        {geoResult && (
+          <div
+            className="rounded-2xl p-3 border mb-3 flex items-center gap-3"
+            style={{
+              background: geoResult.withinGeofence ? 'rgba(34,197,94,0.04)' : 'rgba(255,90,95,0.04)',
+              borderColor: geoResult.withinGeofence ? 'rgba(34,197,94,0.15)' : 'rgba(255,90,95,0.15)',
+            }}
+          >
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+              style={{ background: geoResult.withinGeofence ? 'rgba(34,197,94,0.1)' : 'rgba(255,90,95,0.1)' }}
+            >
+              {geoResult.withinGeofence ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.amber} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-slate-700">
+                {geoResult.withinGeofence ? 'EVV: Location verified' : 'EVV: Location override'}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {geoResult.distanceMeters != null ? `${geoResult.distanceMeters}m from client` : geoResult.reason}
+                {geoOverrideReason && ` · ${geoOverrideReason}`}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* EVV Layer 2: Tag scan badge in active visit */}
+        {tagScanResult && (
+          <div
+            className="rounded-2xl p-3 border mb-3 flex items-center gap-3"
+            style={{ background: 'rgba(34,197,94,0.04)', borderColor: 'rgba(34,197,94,0.15)' }}
+          >
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'rgba(34,197,94,0.1)' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><path d="M3 8h5"/><rect width="5" height="5" x="16" y="3" rx="1"/><path d="M16 8h5"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M3 16v5"/><path d="M8 16v5"/><rect width="5" height="5" x="16" y="16" rx="1"/><path d="M16 16v5"/><path d="M21 16v5"/></svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-slate-700">EVV: Tag verified</div>
+              <div className="text-[10px] text-slate-400">
+                {tagScanResult.method === 'qr' ? 'QR scan' : 'Manual entry'} ·{' '}
+                {new Date(tagScanResult.scannedAt).toLocaleTimeString()}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Phase 3: Lone Worker Safety */}
@@ -2102,6 +2434,16 @@ export default function ActiveVisitScreen() {
                     clockInAt: clockInAt ? new Date(clockInAt).toISOString() : null,
                     clockOutAt: new Date().toISOString(),
                     status: 'completed',
+                    clockInLat: geoResult?.position?.lat ?? null,
+                    clockInLng: geoResult?.position?.lng ?? null,
+                    clockInAccuracy: geoResult?.position?.accuracy ?? null,
+                    geoVerified: geoResult?.withinGeofence ?? false,
+                    geoDistanceM: geoResult?.distanceMeters ?? null,
+                    geoOverrideReason: geoOverrideReason || null,
+                    tagScanId: tagScanResult?.tagId ?? null,
+                    tagScanMethod: tagScanResult?.method ?? null,
+                    tagScannedAt: tagScanResult?.scannedAt ?? null,
+                    tagVerified: !!tagScanResult,
                     incidents,
                     voiceMemos,
                   }

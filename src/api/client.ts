@@ -352,12 +352,295 @@ export async function getManagerData() {
   return get('/manager/data')
 }
 
+export async function getManagerOverview() {
+  return get('/manager/overview')
+}
+
 export async function getVisits() {
   return get('/visits')
 }
 
 export async function fetchVisit(visitId: string) {
   return get(`/visit-detail?id=${encodeURIComponent(visitId)}`)
+}
+
+export async function getHandoverBriefing(clientId: string) {
+  return get(`/handover-briefing?clientId=${encodeURIComponent(clientId)}`)
+}
+
+export async function checkDeviceWipe(deviceId: string) {
+  return get(`/device-wipe?deviceId=${encodeURIComponent(deviceId)}`)
+}
+
+export async function issueDeviceWipe(deviceId: string, reason?: string) {
+  return post('/device-wipe', { deviceId, reason })
+}
+
+export async function acknowledgeWipe(commandId: string) {
+  return post('/device-wipe', { commandId, action: 'acknowledge' })
+}
+
+export async function getRetentionPolicy() {
+  return get('/data-retention')
+}
+
+export async function updateRetentionPolicy(policy: Record<string, any>) {
+  return post('/data-retention', { action: 'update', ...policy })
+}
+
+export async function triggerDataPurge() {
+  return post('/data-retention', { action: 'purge' })
+}
+
+export async function getAvailability(carerId?: string, type?: string, fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (carerId) params.set('carerId', carerId)
+  if (type) params.set('type', type)
+  if (fromDate) params.set('fromDate', fromDate)
+  if (toDate) params.set('toDate', toDate)
+  const qs = params.toString()
+  return get(`/availability${qs ? '?' + qs : ''}`)
+}
+
+export async function saveAvailabilitySlot(data: {
+  carerId: string
+  dayOfWeek: number
+  startTime: string
+  endTime: string
+  isAvailable?: boolean
+  slotId?: string
+}) {
+  return post('/availability', { action: 'availability', ...data })
+}
+
+export async function deleteAvailabilitySlot(slotId: string) {
+  return delWithRetry(`/availability?slotId=${encodeURIComponent(slotId)}`)
+}
+
+export async function createLeaveRequest(data: {
+  carerId: string
+  carerName?: string
+  leaveType: string
+  startDate: string
+  endDate: string
+  reason?: string
+}) {
+  return post('/availability', { action: 'leave', ...data })
+}
+
+export async function reviewLeaveRequest(leaveId: string, decision: 'approve' | 'reject', reviewedBy?: string) {
+  return post('/availability', { action: 'review', leaveId, decision, reviewedBy })
+}
+
+export async function deleteLeaveRequest(leaveId: string) {
+  return delWithRetry(`/availability?leaveId=${encodeURIComponent(leaveId)}`)
+}
+
+export async function estimateTravel(fromAddress: string, toAddress: string) {
+  return post('/travel', { action: 'estimate', fromAddress, toAddress })
+}
+
+export async function logTravel(data: {
+  carerId: string
+  fromClientId?: string
+  fromClientName?: string
+  fromAddress?: string
+  toClientId?: string
+  toClientName?: string
+  toAddress?: string
+  visitDate: string
+  distanceMeters?: number
+  travelTimeSeconds?: number
+  estimatedMode?: string
+}) {
+  return post('/travel', { action: 'log', ...data })
+}
+
+export async function batchEstimateTravel(visits: Array<{ clientId?: string; clientName?: string; address?: string }>, carerId: string, visitDate: string) {
+  return post('/travel', { action: 'batch', visits, carerId, visitDate })
+}
+
+export async function getTravelLogs(carerId?: string, fromDate?: string, toDate?: string) {
+  const params = new URLSearchParams()
+  if (carerId) params.set('carerId', carerId)
+  if (fromDate) params.set('fromDate', fromDate)
+  if (toDate) params.set('toDate', toDate)
+  const qs = params.toString()
+  return get(`/travel${qs ? '?' + qs : ''}`)
+}
+
+export async function getClashSettings() {
+  return get('/clash-detection')
+}
+
+export async function updateClashSettings(settings: { minGapMinutes?: number; checkTravelTime?: boolean; allowOverride?: boolean }) {
+  return post('/clash-detection', { action: 'update_settings', ...settings })
+}
+
+export async function checkClash(params: {
+  carerId: string
+  visitDate: string
+  time: string
+  duration?: string
+  excludeVisitId?: string
+}) {
+  return post('/clash-detection', { action: 'check', ...params })
+}
+
+export async function getDbsRecords(carerId?: string) {
+  const qs = carerId ? `?carerId=${encodeURIComponent(carerId)}` : ''
+  return get(`/dbs-checks${qs}`)
+}
+
+export async function getDbsSummary() {
+  return get('/dbs-checks?summary=true')
+}
+
+export async function saveDbsRecord(data: {
+  id?: string
+  carerId: string
+  carerName?: string
+  dbsType?: string
+  dbsNumber?: string
+  issueDate?: string
+  expiryDate?: string
+  updateService?: boolean
+  updateServiceLastChecked?: string
+  notes?: string
+  documentUrl?: string
+}) {
+  return post('/dbs-checks', data)
+}
+
+export async function deleteDbsRecord(id: string) {
+  return delWithRetry(`/dbs-checks?id=${encodeURIComponent(id)}`)
+}
+
+export async function getTrainingRecords(carerId?: string, category?: string) {
+  const params = new URLSearchParams()
+  if (carerId) params.set('carerId', carerId)
+  if (category) params.set('category', category)
+  const qs = params.toString()
+  return get(`/training${qs ? '?' + qs : ''}`)
+}
+
+export async function getTrainingSummary() {
+  return get('/training?summary=true')
+}
+
+export async function saveTrainingRecord(data: {
+  id?: string
+  carerId: string
+  carerName?: string
+  courseName: string
+  category?: string
+  provider?: string
+  completionDate?: string
+  expiryDate?: string
+  certificateNumber?: string
+  score?: string
+  notes?: string
+  documentUrl?: string
+}) {
+  return post('/training', data)
+}
+
+export async function deleteTrainingRecord(id: string) {
+  return delWithRetry(`/training?id=${encodeURIComponent(id)}`)
+}
+
+export async function getRightToWorkRecords(carerId?: string) {
+  const qs = carerId ? `?carerId=${encodeURIComponent(carerId)}` : ''
+  return get(`/right-to-work${qs}`)
+}
+
+export async function getRightToWorkSummary() {
+  return get('/right-to-work?summary=true')
+}
+
+export async function saveRightToWorkRecord(data: {
+  id?: string
+  carerId: string
+  carerName?: string
+  checkType?: string
+  passportNumber?: string
+  passportExpiry?: string
+  shareCode?: string
+  shareCodeExpiry?: string
+  nationality?: string
+  visaType?: string
+  visaExpiry?: string
+  workRestriction?: string
+  documentUrls?: string[]
+  notes?: string
+}) {
+  return post('/right-to-work', data)
+}
+
+export async function verifyRightToWork(id: string) {
+  return post('/right-to-work', { action: 'verify', id })
+}
+
+export async function rejectRightToWork(id: string) {
+  return post('/right-to-work', { action: 'reject', id })
+}
+
+export async function deleteRightToWorkRecord(id: string) {
+  return delWithRetry(`/right-to-work?id=${encodeURIComponent(id)}`)
+}
+
+export async function getSupervisions(params?: { carerId?: string; fromDate?: string; toDate?: string; status?: string; upcoming?: boolean }) {
+  const qs = new URLSearchParams()
+  if (params?.carerId) qs.set('carerId', params.carerId)
+  if (params?.fromDate) qs.set('fromDate', params.fromDate)
+  if (params?.toDate) qs.set('toDate', params.toDate)
+  if (params?.status) qs.set('status', params.status)
+  if (params?.upcoming) qs.set('upcoming', 'true')
+  const q = qs.toString()
+  return get(`/supervisions${q ? '?' + q : ''}`)
+}
+
+export async function saveSupervision(data: {
+  id?: string
+  carerId: string
+  carerName?: string
+  type?: string
+  scheduledDate: string
+  scheduledTime?: string
+  durationMinutes?: number
+  location?: string
+  agenda?: string
+  notes?: string
+}) {
+  return post('/supervisions', data)
+}
+
+export async function completeSupervision(id: string, data: { notes?: string; actionItems?: string[]; rating?: number }) {
+  return post('/supervisions', { action: 'complete', id, ...data })
+}
+
+export async function cancelSupervision(id: string) {
+  return post('/supervisions', { action: 'cancel', id })
+}
+
+export async function deleteSupervision(id: string) {
+  return delWithRetry(`/supervisions?id=${encodeURIComponent(id)}`)
+}
+
+export async function getConversations() {
+  return get('/messages')
+}
+
+export async function getMessages(conversationId: string) {
+  return get(`/messages?conversationId=${encodeURIComponent(conversationId)}`)
+}
+
+export async function getContacts() {
+  return get('/messages?contacts=true')
+}
+
+export async function sendMessage(recipientId: string, body: string, priority?: string) {
+  return post('/messages', { recipientId, body, priority })
 }
 
 export async function initDatabase() {

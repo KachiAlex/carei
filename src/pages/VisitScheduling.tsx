@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useLocation } from 'wouter'
 import { useTenant } from '../contexts/TenantContext'
-import { getScheduledVisits, createScheduledVisit, updateScheduledVisit, deleteScheduledVisit, getClients, getCarers } from '../api/client'
+import { getScheduledVisits, createScheduledVisit, updateScheduledVisit, deleteScheduledVisit, getClients, getCarers, checkClash } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -26,6 +26,8 @@ interface ScheduledVisit {
   flags: string[]
   recurring: string
   visitDate: string
+  recurrenceEndDate?: string
+  recurrenceParentId?: string
 }
 
 interface Client {
@@ -70,6 +72,9 @@ export default function VisitScheduling() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [clashResult, setClashResult] = useState<any>(null)
+  const [clashChecking, setClashChecking] = useState(false)
+  const [clashOverride, setClashOverride] = useState(false)
 
   const [form, setForm] = useState({
     clientId: '',
@@ -79,11 +84,35 @@ export default function VisitScheduling() {
     tasks: '',
     flags: '',
     recurring: 'none',
+    recurrenceEndDate: '',
   })
 
   useEffect(() => {
     loadData()
   }, [viewYear, viewMonth])
+
+  // Clash detection: check when carer, time, duration, or date changes
+  useEffect(() => {
+    if (!form.carerId || !form.time || !showForm) {
+      setClashResult(null)
+      return
+    }
+    setClashChecking(true)
+    setClashOverride(false)
+    const timer = setTimeout(() => {
+      checkClash({
+        carerId: form.carerId,
+        visitDate: selectedDate,
+        time: form.time,
+        duration: form.duration,
+        excludeVisitId: editingId || undefined,
+      })
+        .then((result: any) => { setClashResult(result) })
+        .catch(() => { setClashResult(null) })
+        .finally(() => { setClashChecking(false) })
+    }, 400) // debounce 400ms
+    return () => clearTimeout(timer)
+  }, [form.carerId, form.time, form.duration, selectedDate, showForm, editingId])
 
   const loadData = async () => {
     setLoading(true)
@@ -122,7 +151,7 @@ export default function VisitScheduling() {
   const selectedVisits = visitsByDate[selectedDate] || []
 
   const resetForm = () => {
-    setForm({ clientId: '', carerId: '', time: '09:00', duration: '1 hr', tasks: '', flags: '', recurring: 'none' })
+    setForm({ clientId: '', carerId: '', time: '09:00', duration: '1 hr', tasks: '', flags: '', recurring: 'none', recurrenceEndDate: '' })
   }
 
   const openAdd = (date?: string) => {
@@ -141,6 +170,7 @@ export default function VisitScheduling() {
       tasks: Array.isArray(visit.tasks) ? visit.tasks.join(', ') : '',
       flags: Array.isArray(visit.flags) ? visit.flags.join(', ') : '',
       recurring: visit.recurring || 'none',
+      recurrenceEndDate: visit.recurrenceEndDate || '',
     })
     setEditingId(visit.id)
     setShowForm(true)
@@ -150,6 +180,27 @@ export default function VisitScheduling() {
     const client = clients.find((c) => c.id === form.clientId)
     const carer = carers.find((c) => c.id === form.carerId)
     if (!client) return
+
+    // Block save if clash detected and not overridden
+    if (clashResult?.hasClash && !clashOverride) {
+      const allowOverride = clashResult?.settings?.allowOverride !== false
+      if (!allowOverride) {
+        alert('Cannot save: This visit clashes with an existing assignment and override is disabled.')
+        return
+      }
+      // If override is allowed, user must explicitly confirm
+      const confirmed = confirm(
+        `Warning: ${clashResult.conflicts.length} conflict(s) detected.\n\n` +
+        clashResult.conflicts.map((c: any) =>
+          c.type === 'double_booking'
+            ? `• Overlaps with ${c.clientName} at ${c.time} (${c.overlapMinutes} min overlap)`
+            : `• Only ${c.gapMinutes} min gap with ${c.clientName} at ${c.time}`
+        ).join('\n') +
+        '\n\nSave anyway?'
+      )
+      if (!confirmed) return
+    }
+
     setSaving(true)
     const payload = {
       clientId: client.id,
@@ -162,6 +213,7 @@ export default function VisitScheduling() {
       flags: form.flags.split(',').map((f) => f.trim()).filter(Boolean),
       recurring: form.recurring,
       visitDate: selectedDate,
+      recurrenceEndDate: form.recurrenceEndDate || undefined,
     }
     try {
       if (editingId) {
@@ -360,9 +412,23 @@ export default function VisitScheduling() {
                     <option value="none">One-off</option>
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
                   </select>
                 </div>
               </div>
+              {form.recurring !== 'none' && (
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 mb-1 block">Recurrence End Date (optional)</label>
+                  <input
+                    type="date"
+                    value={form.recurrenceEndDate}
+                    onChange={(e) => setForm((f) => ({ ...f, recurrenceEndDate: e.target.value }))}
+                    min={selectedDate}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-teal focus:ring-1 focus:ring-teal/20 transition-all"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Leave blank for open-ended recurrence. Visits will expand automatically within the viewed date range.</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-slate-500 mb-1 block">Time</label>
@@ -381,6 +447,55 @@ export default function VisitScheduling() {
                 <label className="text-xs font-semibold text-slate-500 mb-1 block">Flags (comma separated)</label>
                 <input value={form.flags} onChange={(e) => setForm((f) => ({ ...f, flags: e.target.value }))} className="w-full px-3 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-teal focus:ring-1 focus:ring-teal/20 transition-all" placeholder="e.g. Dementia risk, Sundowning" />
               </div>
+
+              {/* Clash Detection Warning */}
+              {form.carerId && clashChecking && (
+                <div className="flex items-center gap-2 text-[11px] text-slate-400 py-1">
+                  <div className="w-3 h-3 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
+                  Checking for scheduling conflicts...
+                </div>
+              )}
+              {form.carerId && !clashChecking && clashResult?.hasClash && (
+                <div className="rounded-xl p-3" style={{ background: 'rgba(255,90,95,0.06)', border: '1px solid rgba(255,90,95,0.15)' }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.red} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <span className="text-xs font-bold" style={{ color: COLORS.red }}>Scheduling Conflict Detected</span>
+                  </div>
+                  <div className="space-y-1">
+                    {clashResult.conflicts.map((c: any, i: number) => (
+                      <div key={i} className="text-[11px] text-slate-600">
+                        {c.type === 'double_booking' ? (
+                          <span>Overlaps with <strong>{c.clientName}</strong> at {c.time} ({c.overlapMinutes} min overlap)</span>
+                        ) : (
+                          <span>Only {c.gapMinutes} min gap with <strong>{c.clientName}</strong> at {c.time} (min: {clashResult.settings?.minGapMinutes || 15} min)</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {clashResult.settings?.allowOverride !== false && (
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={clashOverride}
+                        onChange={(e) => setClashOverride(e.target.checked)}
+                        className="w-4 h-4 rounded accent-red-500"
+                      />
+                      <span className="text-[11px] text-slate-500">Override and save anyway</span>
+                    </label>
+                  )}
+                </div>
+              )}
+              {form.carerId && !clashChecking && clashResult && !clashResult.hasClash && (
+                <div className="flex items-center gap-2 text-[11px] py-1" style={{ color: '#22C55E' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/>
+                  </svg>
+                  No scheduling conflicts
+                </div>
+              )}
+
               <button
                 onClick={handleSave}
                 disabled={saving || !form.clientId}

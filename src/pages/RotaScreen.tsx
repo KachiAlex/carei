@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { getSchedule } from '../api/client'
+import { getScheduledVisits } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -10,25 +10,24 @@ const COLORS = {
 
 interface ScheduleItem {
   id: string
-  client_name: string
-  visit_date: string
-  visit_time: string
+  clientName: string
+  visitDate: string
+  time: string
   status?: string
+  recurring?: string
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function formatDateKey(d: Date) {
+  return d.toISOString().split('T')[0]
+}
 
 export default function RotaScreen() {
   const [, setLocation] = useLocation()
   const [weekOffset, setWeekOffset] = useState(0)
   const [schedule, setSchedule] = useState<ScheduleItem[]>([])
   const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    getSchedule()
-      .then((data: any[]) => { setSchedule(data || []); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
 
   const startOfWeek = new Date()
   startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay() + 1 + weekOffset * 7)
@@ -39,10 +38,18 @@ export default function RotaScreen() {
     return d
   })
 
+  useEffect(() => {
+    const from = formatDateKey(weekDays[0])
+    const to = formatDateKey(weekDays[6])
+    getScheduledVisits(from, to)
+      .then((data: any) => { setSchedule(data?.visits || []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [weekOffset])
+
   const getVisitsForDay = (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatDateKey(date)
     return schedule.filter((s) => {
-      const sDate = s.visit_date ? new Date(s.visit_date).toISOString().split('T')[0] : ''
+      const sDate = s.visitDate ? formatDateKey(new Date(s.visitDate)) : ''
       return sDate === dateStr
     })
   }
@@ -101,8 +108,8 @@ export default function RotaScreen() {
             <div key={v.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm mb-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-bold text-slate-800">{v.client_name}</div>
-                  <div className="text-[10px] text-slate-500">{v.visit_time} · {DAYS[d.getDay() === 0 ? 6 : d.getDay() - 1]} {d.getDate()}</div>
+                  <div className="text-sm font-bold text-slate-800">{v.clientName}</div>
+                  <div className="text-[10px] text-slate-500">{v.time} · {DAYS[d.getDay() === 0 ? 6 : d.getDay() - 1]} {d.getDate()}</div>
                 </div>
                 <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'rgba(79,209,197,0.08)', color: COLORS.teal }}>Scheduled</span>
               </div>

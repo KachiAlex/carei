@@ -17,6 +17,7 @@ import {
 import { enqueue } from '../utils/offlineQueue'
 import BiometricsPrompt from '../components/BiometricsPrompt'
 import PullToRefresh from '../components/PullToRefresh'
+import { TravelSummary } from '../components/TravelSummary'
 import { sendVisitStartReminder, requestNotificationPermission } from '../utils/notifications'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { getToken, setToken } from '../utils/tokenCache'
@@ -55,6 +56,7 @@ function getStatusLabel(status: Visit['status']) {
 }
 
 interface UserProfile {
+  id?: string
   name: string
   email: string
   phone: string
@@ -420,6 +422,17 @@ export default function CarerDashboard() {
             </div>
             <div className="text-slate-500 text-sm font-medium mb-1">No visits scheduled</div>
             <div className="text-slate-400 text-xs">Your day is clear. Enjoy the break!</div>
+          </div>
+        )}
+
+        {!loading && visits.length >= 2 && user?.id && (
+          <div className="mb-4">
+            <TravelSummary
+              visits={visits}
+              assignedClients={assignedClients}
+              carerId={user.id}
+              visitDate={new Date().toISOString().split('T')[0]}
+            />
           </div>
         )}
 

@@ -8,6 +8,9 @@ import {
   updateProfile,
   getBiometricsStatus,
   updateBiometrics,
+  getRetentionPolicy,
+  updateRetentionPolicy,
+  triggerDataPurge,
 } from '../api/client'
 import { isBiometricAvailable, getBiometricEnabled, setBiometricEnabled, storeCredentialsWithBiometric, deleteBiometricCredentials } from '../utils/biometric'
 import { getRefreshToken, setRefreshToken, getToken, setToken } from '../utils/tokenCache'
@@ -83,6 +86,22 @@ export default function SettingsScreen() {
   const [darkMode, setDarkMode] = useState(() => {
     return localStorage.getItem('carei_dark_mode') === 'true'
   })
+
+  // Device ID for remote wipe identification
+  const [deviceId, setDeviceId] = useState('')
+  useEffect(() => {
+    secureGet('carei_device_id').then((id) => { if (id) setDeviceId(id) })
+  }, [])
+
+  // Data retention policy
+  const [retention, setRetention] = useState<any>(null)
+  const [retentionSaving, setRetentionSaving] = useState(false)
+  const [purgeResult, setPurgeResult] = useState<string | null>(null)
+  const [purging, setPurging] = useState(false)
+
+  useEffect(() => {
+    getRetentionPolicy().then((p: any) => { if (p) setRetention(p) }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     (async () => {
@@ -506,6 +525,127 @@ export default function SettingsScreen() {
             </div>
           </Section>
 
+          {/* Data Retention */}
+          {retention && (
+            <Section
+              title="Data Retention"
+              icon={
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>
+                </svg>
+              }
+            >
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-400 mb-1 block">Visit Drafts (days)</label>
+                    <input
+                      type="number"
+                      value={retention.visitDraftRetentionDays ?? 30}
+                      onChange={(e) => setRetention({ ...retention, visitDraftRetentionDays: parseInt(e.target.value) || 30 })}
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-teal transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-400 mb-1 block">Completed Visits (days)</label>
+                    <input
+                      type="number"
+                      value={retention.completedVisitRetentionDays ?? 365}
+                      onChange={(e) => setRetention({ ...retention, completedVisitRetentionDays: parseInt(e.target.value) || 365 })}
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-teal transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-400 mb-1 block">Medication Logs (days)</label>
+                    <input
+                      type="number"
+                      value={retention.medicationLogRetentionDays ?? 365}
+                      onChange={(e) => setRetention({ ...retention, medicationLogRetentionDays: parseInt(e.target.value) || 365 })}
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-teal transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-400 mb-1 block">Incidents (days)</label>
+                    <input
+                      type="number"
+                      value={retention.incidentRetentionDays ?? 2555}
+                      onChange={(e) => setRetention({ ...retention, incidentRetentionDays: parseInt(e.target.value) || 2555 })}
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-teal transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-400 mb-1 block">Voice Memos (days)</label>
+                    <input
+                      type="number"
+                      value={retention.voiceMemoRetentionDays ?? 90}
+                      onChange={(e) => setRetention({ ...retention, voiceMemoRetentionDays: parseInt(e.target.value) || 90 })}
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-teal transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-400 mb-1 block">Offline Queue (hours)</label>
+                    <input
+                      type="number"
+                      value={retention.offlineQueueRetentionHours ?? 72}
+                      onChange={(e) => setRetention({ ...retention, offlineQueueRetentionHours: parseInt(e.target.value) || 72 })}
+                      className="w-full px-3 py-2 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-teal transition-all"
+                    />
+                  </div>
+                </div>
+
+                <ToggleRow
+                  label="Auto-Purge"
+                  description="Automatically delete stale data based on retention policy"
+                  checked={retention.autoPurgeEnabled !== false}
+                  onChange={() => setRetention({ ...retention, autoPurgeEnabled: retention.autoPurgeEnabled === false })}
+                />
+
+                <button
+                  onClick={async () => {
+                    setRetentionSaving(true)
+                    try {
+                      await updateRetentionPolicy(retention)
+                    } catch { alert('Failed to save retention policy') }
+                    finally { setRetentionSaving(false) }
+                  }}
+                  disabled={retentionSaving}
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold text-white border-none cursor-pointer transition-all hover:opacity-90 disabled:opacity-50"
+                  style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+                >
+                  {retentionSaving ? 'Saving...' : 'Save Retention Policy'}
+                </button>
+
+                <button
+                  onClick={async () => {
+                    setPurging(true)
+                    setPurgeResult(null)
+                    try {
+                      const result: any = await triggerDataPurge()
+                      const r = result?.results || {}
+                      const parts: string[] = []
+                      if (r.visitDraftsPurged != null) parts.push(`${r.visitDraftsPurged} drafts`)
+                      if (r.visitsPurged != null) parts.push(`${r.visitsPurged} visits`)
+                      if (r.medicationLogsPurged != null) parts.push(`${r.medicationLogsPurged} med logs`)
+                      if (r.incidentsPurged != null) parts.push(`${r.incidentsPurged} incidents`)
+                      if (r.voiceMemosPurged != null) parts.push(`${r.voiceMemosPurged} voice memos`)
+                      setPurgeResult(parts.length ? `Purged: ${parts.join(', ')}` : 'No stale data found to purge')
+                    } catch { setPurgeResult('Purge failed') }
+                    finally { setPurging(false) }
+                  }}
+                  disabled={purging}
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold border cursor-pointer transition-all hover:bg-red-50 disabled:opacity-50"
+                  style={{ borderColor: `${COLORS.red}30`, color: COLORS.red, background: 'transparent' }}
+                >
+                  {purging ? 'Purging...' : 'Purge Stale Data Now'}
+                </button>
+
+                {purgeResult && (
+                  <div className="text-[10px] text-slate-500 text-center">{purgeResult}</div>
+                )}
+              </div>
+            </Section>
+          )}
+
           {/* About */}
           <Section
             title="About"
@@ -528,6 +668,12 @@ export default function SettingsScreen() {
                 <span className="text-slate-400">Platform</span>
                 <span className="font-medium">Web / PWA</span>
               </div>
+              {deviceId && (
+                <div className="flex justify-between py-1 items-center">
+                  <span className="text-slate-400">Device ID</span>
+                  <span className="font-mono text-[10px] text-slate-500 max-w-[160px] truncate" title={deviceId}>{deviceId}</span>
+                </div>
+              )}
             </div>
           </Section>
 

@@ -864,6 +864,295 @@ async function runMigrations() {
   await sql`CREATE INDEX IF NOT EXISTS idx_family_members_tenant ON family_members(tenant_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_family_members_client ON family_members(client_id)`
   await sql`CREATE INDEX IF NOT EXISTS idx_family_members_email ON family_members(email)`
+
+  await run(29, 'add_evv_geo_columns', async () => {
+    await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS clock_in_lat DOUBLE PRECISION`
+    await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS clock_in_lng DOUBLE PRECISION`
+    await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS clock_in_accuracy DOUBLE PRECISION`
+    await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS geo_verified BOOLEAN DEFAULT FALSE`
+    await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS geo_distance_m INTEGER`
+    await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS geo_override_reason TEXT`
+  })
+
+  await run(30, 'add_evv_tag_scan_columns', async () => {
+    await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS tag_scan_id TEXT`
+    await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS tag_scan_method TEXT`
+    await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS tag_scanned_at TIMESTAMPTZ`
+    await sql`ALTER TABLE visits ADD COLUMN IF NOT EXISTS tag_verified BOOLEAN DEFAULT FALSE`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS tag_id TEXT`
+  })
+
+  await run(31, 'add_recurrence_end_date', async () => {
+    await sql`ALTER TABLE scheduled_visits ADD COLUMN IF NOT EXISTS recurrence_end_date DATE`
+    await sql`ALTER TABLE scheduled_visits ADD COLUMN IF NOT EXISTS recurrence_parent_id TEXT`
+  })
+
+  await run(32, 'create_device_wipe_commands', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS device_wipe_commands (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        device_id TEXT NOT NULL,
+        user_id TEXT,
+        issued_by TEXT,
+        reason TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        executed_at TIMESTAMPTZ
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_wipe_device ON device_wipe_commands(device_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_wipe_status ON device_wipe_commands(status)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_wipe_tenant ON device_wipe_commands(tenant_id)`
+  })
+
+  await run(33, 'create_data_retention_policies', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS data_retention_policies (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT UNIQUE,
+        visit_draft_retention_days INT DEFAULT 30,
+        completed_visit_retention_days INT DEFAULT 365,
+        medication_log_retention_days INT DEFAULT 365,
+        incident_retention_days INT DEFAULT 2555,
+        voice_memo_retention_days INT DEFAULT 90,
+        offline_queue_retention_hours INT DEFAULT 72,
+        auto_purge_enabled BOOLEAN DEFAULT TRUE,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+  })
+
+  await run(34, 'create_carer_availability', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS carer_availability (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        carer_id TEXT NOT NULL,
+        day_of_week INT NOT NULL,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        is_available BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_avail_carer ON carer_availability(carer_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_avail_tenant ON carer_availability(tenant_id)`
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS leave_requests (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        carer_id TEXT NOT NULL,
+        carer_name TEXT,
+        leave_type TEXT NOT NULL,
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        reason TEXT,
+        status TEXT DEFAULT 'pending',
+        reviewed_by TEXT,
+        reviewed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_leave_carer ON leave_requests(carer_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_leave_status ON leave_requests(status)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_leave_tenant ON leave_requests(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_leave_dates ON leave_requests(start_date, end_date)`
+  })
+
+  await run(35, 'create_travel_logs', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS travel_logs (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        carer_id TEXT NOT NULL,
+        from_client_id TEXT,
+        from_client_name TEXT,
+        from_address TEXT,
+        to_client_id TEXT,
+        to_client_name TEXT,
+        to_address TEXT,
+        visit_date DATE NOT NULL,
+        distance_meters REAL,
+        travel_time_seconds INT,
+        estimated_mode TEXT DEFAULT 'driving',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_travel_carer ON travel_logs(carer_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_travel_date ON travel_logs(visit_date)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_travel_tenant ON travel_logs(tenant_id)`
+  })
+
+  await run(36, 'create_clash_detection_settings', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS clash_detection_settings (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT UNIQUE,
+        min_gap_minutes INT DEFAULT 15,
+        check_travel_time BOOLEAN DEFAULT FALSE,
+        allow_override BOOLEAN DEFAULT TRUE,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+  })
+
+  await run(37, 'create_dbs_checks', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS dbs_checks (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        carer_id TEXT NOT NULL,
+        carer_name TEXT,
+        dbs_type TEXT DEFAULT 'standard',
+        dbs_number TEXT,
+        issue_date DATE,
+        expiry_date DATE,
+        status TEXT DEFAULT 'valid',
+        update_service BOOLEAN DEFAULT FALSE,
+        update_service_last_checked DATE,
+        notes TEXT,
+        document_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_dbs_carer ON dbs_checks(carer_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_dbs_expiry ON dbs_checks(expiry_date)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_dbs_tenant ON dbs_checks(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_dbs_status ON dbs_checks(status)`
+  })
+
+  await run(38, 'create_training_certifications', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS training_certifications (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        carer_id TEXT NOT NULL,
+        carer_name TEXT,
+        course_name TEXT NOT NULL,
+        category TEXT,
+        provider TEXT,
+        completion_date DATE,
+        expiry_date DATE,
+        certificate_number TEXT,
+        status TEXT DEFAULT 'valid',
+        score TEXT,
+        notes TEXT,
+        document_url TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_train_carer ON training_certifications(carer_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_train_expiry ON training_certifications(expiry_date)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_train_tenant ON training_certifications(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_train_category ON training_certifications(category)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_train_status ON training_certifications(status)`
+  })
+
+  await run(39, 'create_right_to_work', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS right_to_work_checks (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        carer_id TEXT NOT NULL,
+        carer_name TEXT,
+        check_type TEXT,
+        passport_number TEXT,
+        passport_expiry DATE,
+        share_code TEXT,
+        share_code_expiry DATE,
+        nationality TEXT,
+        visa_type TEXT,
+        visa_expiry DATE,
+        work_restriction TEXT,
+        document_urls JSONB,
+        verification_status TEXT DEFAULT 'pending',
+        verified_by TEXT,
+        verified_at TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_rtw_carer ON right_to_work_checks(carer_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_rtw_status ON right_to_work_checks(verification_status)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_rtw_tenant ON right_to_work_checks(tenant_id)`
+  })
+
+  await run(40, 'create_supervisions', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS supervisions (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        carer_id TEXT NOT NULL,
+        carer_name TEXT,
+        manager_id TEXT,
+        manager_name TEXT,
+        type TEXT NOT NULL DEFAULT 'supervision',
+        scheduled_date DATE NOT NULL,
+        scheduled_time TEXT,
+        duration_minutes INT DEFAULT 60,
+        location TEXT,
+        status TEXT DEFAULT 'scheduled',
+        agenda TEXT,
+        notes TEXT,
+        action_items JSONB,
+        rating INT,
+        completed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_sup_carer ON supervisions(carer_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_sup_date ON supervisions(scheduled_date)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_sup_tenant ON supervisions(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_sup_status ON supervisions(status)`
+  })
+
+  await run(41, 'create_messages', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        participant1_id TEXT NOT NULL,
+        participant1_name TEXT,
+        participant1_role TEXT,
+        participant2_id TEXT NOT NULL,
+        participant2_name TEXT,
+        participant2_role TEXT,
+        last_message TEXT,
+        last_message_at TIMESTAMPTZ,
+        unread_count_1 INT DEFAULT 0,
+        unread_count_2 INT DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_conv_p1 ON conversations(participant1_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_conv_p2 ON conversations(participant2_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_conv_tenant ON conversations(tenant_id)`
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS messages (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        conversation_id TEXT NOT NULL,
+        sender_id TEXT NOT NULL,
+        sender_name TEXT,
+        sender_role TEXT,
+        body TEXT NOT NULL,
+        priority TEXT DEFAULT 'normal',
+        read_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_msg_sender ON messages(sender_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_msg_tenant ON messages(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_msg_created ON messages(created_at)`
+  })
 }
 
 const ALLOWED_ORIGINS = [

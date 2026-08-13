@@ -4,6 +4,7 @@ import { useLocation } from 'wouter'
 import { useTenant } from '../contexts/TenantContext'
 import {
   getManagerData,
+  getManagerOverview,
   createCaregiver,
   getClients,
   createClient,
@@ -59,6 +60,7 @@ export default function ManagerDashboard() {
   const [dbLogs, setDbLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [logClientId, setLogClientId] = useState<string>('')
+  const [overview, setOverview] = useState<any>(null)
 
   // Team tab state
   const [teamShowAdd, setTeamShowAdd] = useState(false)
@@ -119,6 +121,9 @@ export default function ManagerDashboard() {
       })
       .catch((err: any) => { console.error(err.message) })
       .finally(() => setLoading(false))
+    getManagerOverview()
+      .then((data) => { setOverview(data) })
+      .catch((err: any) => { console.error('overview fetch error', err.message) })
   }
 
   useEffect(() => {
@@ -314,10 +319,10 @@ export default function ManagerDashboard() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2.5">
         {[
-          { label: 'Visits Today', value: stats.total, sub: `${stats.completed} done · ${stats.inProgress} active`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg> },
-          { label: 'Medications', value: `${stats.medConfirmed}/${Math.max(dbMedications.length, 1)}`, sub: `${stats.medSkipped} skipped`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg> },
-          { label: 'Carers On Duty', value: dbCarers.length, sub: `${dbCarers.filter((c: any) => c.status === 'active').length} active · ${dbCarers.filter((c: any) => c.status === 'suspended').length} suspended`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
-          { label: 'Alerts', value: `${allIncidents.length}`, sub: `${highSeverityCount} high · ${allIncidents.length - highSeverityCount} medium`, alert: true, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> },
+          { label: 'Visits Today', value: overview?.kpis ? String(overview.kpis.visitsCompleted + overview.kpis.visitsInProgress) : String(stats.total), sub: overview?.kpis ? `${overview.kpis.visitsCompleted} done · ${overview.kpis.visitsInProgress} active` : `${stats.completed} done · ${stats.inProgress} active`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg> },
+          { label: 'Medications', value: overview?.kpis ? `${overview.kpis.medicationsConfirmed}/${Math.max(overview.kpis.medicationsTotal, 1)}` : `${stats.medConfirmed}/${Math.max(dbMedications.length, 1)}`, sub: overview?.kpis ? `${overview.kpis.medicationsSkipped} skipped` : `${stats.medSkipped} skipped`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 11-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l8.5 8.5 8-8Z"/></svg> },
+          { label: 'Carers On Duty', value: overview?.kpis ? String(overview.kpis.carersTotal) : String(dbCarers.length), sub: overview?.kpis ? `${overview.kpis.carersActive} active` : `${dbCarers.filter((c: any) => c.status === 'active').length} active · ${dbCarers.filter((c: any) => c.status === 'suspended').length} suspended`, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+          { label: 'Alerts', value: overview?.kpis ? String(overview.kpis.alertsCount) : String(allIncidents.length), sub: overview?.kpis ? `${overview.kpis.sosAlerts} SOS · ${overview.kpis.incidents} incidents` : `${highSeverityCount} high · ${allIncidents.length - highSeverityCount} medium`, alert: true, icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> },
         ].map((s, i) => (
           <motion.div
             key={s.label}
@@ -333,6 +338,128 @@ export default function ManagerDashboard() {
           </motion.div>
         ))}
       </div>
+
+      {/* Compliance Alerts */}
+      {overview?.alerts && overview.alerts.length > 0 && (
+        <motion.div custom={5} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+          <h3 className="font-bold text-sm text-slate-800 mb-3">Compliance Alerts</h3>
+          <div className="flex flex-col gap-2">
+            {overview.alerts.map((alert: any, idx: number) => (
+              <motion.button
+                key={alert.type}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + idx * 0.05, duration: 0.3 }}
+                onClick={() => {
+                  if (alert.type.startsWith('dbs')) setLocation(`/tenant/${tenantSlug}/dbs`)
+                  else if (alert.type.startsWith('train')) setLocation(`/tenant/${tenantSlug}/training`)
+                  else if (alert.type.startsWith('rtw')) setLocation(`/tenant/${tenantSlug}/right-to-work`)
+                  else if (alert.type === 'leave_pending') setLocation(`/tenant/${tenantSlug}/availability`)
+                }}
+                className="flex items-center gap-3 text-left p-2.5 rounded-xl cursor-pointer border-none transition-all hover:scale-[1.01]"
+                style={{ background: alert.severity === 'high' ? 'rgba(255,90,95,0.05)' : 'rgba(246,183,60,0.05)' }}
+              >
+                <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: alert.severity === 'high' ? 'rgba(255,90,95,0.1)' : 'rgba(246,183,60,0.1)' }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={alert.severity === 'high' ? COLORS.red : COLORS.amber} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </div>
+                <div className="flex-1 text-xs font-medium text-slate-600">{alert.message}</div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Compliance Quick Stats */}
+      {overview?.compliance && (
+        <motion.div custom={5} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+          <h3 className="font-bold text-sm text-slate-800 mb-3">Compliance Overview</h3>
+          <div className="grid grid-cols-3 gap-2">
+            <ComplianceCard
+              label="DBS"
+              rate={overview.compliance.dbs.complianceRate}
+              detail={`${overview.compliance.dbs.expired} exp · ${overview.compliance.dbs.expiring} soon`}
+              onClick={() => setLocation(`/tenant/${tenantSlug}/dbs`)}
+            />
+            <ComplianceCard
+              label="Training"
+              rate={overview.compliance.training.total > 0 ? Math.round((overview.compliance.training.valid / overview.compliance.training.total) * 100) : 100}
+              detail={`${overview.compliance.training.expired} exp · ${overview.compliance.training.expiring} soon`}
+              onClick={() => setLocation(`/tenant/${tenantSlug}/training`)}
+            />
+            <ComplianceCard
+              label="RTW"
+              rate={overview.compliance.rightToWork.total > 0 ? Math.round((overview.compliance.rightToWork.verified / overview.compliance.rightToWork.total) * 100) : 100}
+              detail={`${overview.compliance.rightToWork.pending} pend · ${overview.compliance.rightToWork.rejected} rej`}
+              onClick={() => setLocation(`/tenant/${tenantSlug}/right-to-work`)}
+            />
+          </div>
+        </motion.div>
+      )}
+
+      {/* Pending Leave Requests */}
+      {overview?.leaveRequests && overview.leaveRequests.length > 0 && (
+        <motion.div custom={6} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-sm text-slate-800">Pending Leave Requests</h3>
+            <button onClick={() => setLocation(`/tenant/${tenantSlug}/availability`)} className="text-[10px] font-semibold text-teal-600 bg-transparent border-none cursor-pointer">View all</button>
+          </div>
+          <div className="flex flex-col gap-2">
+            {overview.leaveRequests.slice(0, 3).map((lr: any, idx: number) => (
+              <div key={lr.id || idx} className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'rgba(246,183,60,0.04)' }}>
+                <div>
+                  <div className="text-xs font-semibold text-slate-700">{lr.carerName || 'Unknown'}</div>
+                  <div className="text-[10px] text-slate-400">{lr.type || 'Leave'} · {lr.startDate} to {lr.endDate}</div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(246,183,60,0.1)', color: COLORS.amber }}>Pending</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Upcoming Supervisions */}
+      {overview?.upcomingSupervisions && overview.upcomingSupervisions.length > 0 && (
+        <motion.div custom={6} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-sm text-slate-800">Upcoming Supervisions</h3>
+            <button onClick={() => setLocation(`/tenant/${tenantSlug}/supervisions`)} className="text-[10px] font-semibold text-teal-600 bg-transparent border-none cursor-pointer">View all</button>
+          </div>
+          <div className="flex flex-col gap-2">
+            {overview.upcomingSupervisions.slice(0, 3).map((sup: any, idx: number) => (
+              <div key={sup.id || idx} className="flex items-center justify-between p-2 rounded-lg bg-slate-50">
+                <div>
+                  <div className="text-xs font-semibold text-slate-700 capitalize">{sup.type || 'Supervision'} · {sup.carerName || 'Unknown'}</div>
+                  <div className="text-[10px] text-slate-400">{sup.scheduledDate}{sup.scheduledTime ? ` at ${sup.scheduledTime}` : ''}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Quick Links */}
+      <motion.div custom={6} variants={cardVariants} className="grid grid-cols-4 gap-2">
+        {[
+          { label: 'DBS', path: `/tenant/${tenantSlug}/dbs`, color: COLORS.teal },
+          { label: 'Training', path: `/tenant/${tenantSlug}/training`, color: COLORS.lavender },
+          { label: 'RTW', path: `/tenant/${tenantSlug}/right-to-work`, color: COLORS.amber },
+          { label: 'Messages', path: `/tenant/${tenantSlug}/messages`, color: COLORS.red },
+        ].map((link) => (
+          <button
+            key={link.label}
+            onClick={() => setLocation(link.path)}
+            className="bg-white rounded-xl p-2.5 border border-slate-100 shadow-sm cursor-pointer transition-all hover:shadow-md text-center border-none"
+          >
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center mx-auto mb-1" style={{ background: `${link.color}15` }}>
+              <div className="w-2.5 h-2.5 rounded-full" style={{ background: link.color }} />
+            </div>
+            <div className="text-[9px] font-semibold text-slate-500">{link.label}</div>
+          </button>
+        ))}
+      </motion.div>
 
       {/* Export */}
       <motion.div custom={6} variants={cardVariants} className="flex gap-2">
@@ -1254,5 +1381,16 @@ export default function ManagerDashboard() {
       <BiometricsPrompt />
       </div>
     </div>
+  )
+}
+
+function ComplianceCard({ label, rate, detail, onClick }: { label: string; rate: number; detail: string; onClick: () => void }) {
+  const color = rate >= 90 ? '#22C55E' : rate >= 70 ? '#F6B73C' : '#FF5A5F'
+  return (
+    <button onClick={onClick} className="text-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 cursor-pointer transition-all hover:shadow-sm border-none">
+      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{label}</div>
+      <div className="text-lg font-bold" style={{ color }}>{rate}%</div>
+      <div className="text-[9px] text-slate-400 mt-0.5">{detail}</div>
+    </button>
   )
 }
