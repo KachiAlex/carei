@@ -9,6 +9,7 @@ import { checkAllergy, checkMedicationOnList, checkDuplicateDose, checkTimeWindo
 import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
 import { verifyLocation, type GeoVerifyResult } from '../utils/geoVerify'
 import TagScanModal, { type TagScanResult } from '../components/TagScanModal'
+import { cacheClient, getCachedClient, cacheVisit, getCachedVisit } from '../utils/clientCache'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -163,16 +164,34 @@ export default function ActiveVisitScreen() {
 
     async function load() {
       try {
-        // Critical data: fetch visit and client in parallel
+        // 1. Try to load from cache first for immediate UI
+        const [cachedV, cachedC] = await Promise.all([
+          getCachedVisit(visitId),
+          visit?.clientId ? getCachedClient(visit.clientId) : null
+        ])
+
+        if (mounted) {
+          if (cachedV) setVisit(cachedV)
+          if (cachedC) setClient(cachedC)
+          if (cachedV || cachedC) setLoading(false)
+        }
+
+        // 2. Fetch fresh data from API
         const [v, c] = await Promise.all([
           fetchVisit(visitId).catch(() => null),
           fetchVisit(visitId).then((visit) => visit?.clientId ? fetchClient(visit.clientId).catch(() => null) : null).catch(() => null)
         ])
 
         if (!mounted) return
-        if (v && v.id) setVisit(v)
+        
+        // 3. Update state and cache with fresh data
+        if (v && v.id) {
+          setVisit(v)
+          cacheVisit(v)
+        }
         if (c) {
           setClient(c)
+          cacheClient(c)
           setLastSyncedAt(Date.now())
           // Fetch previous shift handover briefing
           if (c.id) {

@@ -10,6 +10,7 @@ import { secureGet, secureWipe } from './utils/secureStorage'
 import { setToken, setRefreshToken, setUser, clearAuthCache } from './utils/tokenCache'
 import { useAutoLock } from './hooks/useAutoLock'
 import { PWAInstallPrompt } from './components/PWAInstallPrompt'
+import SyncStatus from './components/SyncStatus'
 
 function lazyLoad<T extends React.ComponentType<any>>(importFn: () => Promise<{ default: T }>): React.LazyExoticComponent<T> {
   return lazy(() =>
@@ -266,6 +267,7 @@ function App() {
   return (
     <Router>
       <AutoLockGuard>
+        <SyncStatus />
         <Suspense fallback={<LoadingFallback />}>
           <PublicRoutes />
           <TenantRoutes />

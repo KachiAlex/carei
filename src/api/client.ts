@@ -1,5 +1,6 @@
 import { getToken, setToken, getRefreshToken, setRefreshToken, clearAuthCache } from '../utils/tokenCache'
 import { secureSet, secureGet, secureRemove } from '../utils/secureStorage'
+import { enqueue } from '../utils/offlineQueue'
 
 function getApiBase(): string {
   // 1. Environment override always wins
@@ -171,6 +172,16 @@ async function postWithRetry(path: string, body: unknown, retries = 3, extraHead
         throw err
       }
 
+      // OFFLINE HANDLING: If it's a network error and we're not online, or it's a fetch error
+      if (!navigator.onLine || err instanceof TypeError) {
+        const queueType = getQueueTypeForPath(path, 'POST')
+        if (queueType) {
+          console.log(`[Offline] Enqueuing ${queueType} for ${path}`)
+          await enqueue({ type: queueType as any, payload: body })
+          return { status: 'enqueued', offline: true }
+        }
+      }
+
       // Exponential backoff: wait longer between retries
       if (attempt < retries - 1) {
         await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
@@ -179,6 +190,24 @@ async function postWithRetry(path: string, body: unknown, retries = 3, extraHead
   }
 
   throw lastError || new Error('Network error after retries')
+}
+
+// Map API paths to offline queue types
+function getQueueTypeForPath(path: string, method: string): string | null {
+  if (path.includes('/medication-log')) return 'medication-log'
+  if (path.includes('/incidents')) return 'incident'
+  if (path.includes('/voice-memos')) return 'voice-memo'
+  if (path.includes('/sos')) return 'sos'
+  if (path.includes('/visit-detail')) return 'visit'
+  if (path.includes('/visit-draft')) return 'visit-draft'
+  if (path.includes('/body-map')) return 'body-map'
+  if (path.includes('/tasks/start')) return 'task-start'
+  if (path.includes('/tasks/complete')) return 'task-complete'
+  if (path.includes('/tasks/log')) return 'task-log'
+  if (path.includes('/messages') && method === 'POST') return 'family-message'
+  if (path.includes('/clients') && method === 'PATCH') return 'client-update'
+  if (path.includes('/clients') && method === 'POST') return 'client-create'
+  return null
 }
 
 export async function post(path: string, body: unknown, extraHeaders?: Record<string, string>) {
