@@ -81,6 +81,41 @@ function getPath(path: string): string {
   return path
 }
 
+function CircularProgress({ value, size = 48, strokeWidth = 4, color = COLORS.teal }: { value: number; size?: number; strokeWidth?: number; color?: string }) {
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (value / 100) * circumference
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="rgba(255,255,255,0.1)"
+          strokeWidth={strokeWidth}
+          fill="transparent"
+        />
+        <motion.circle
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 1, ease: 'easeOut' }}
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="absolute text-[10px] font-bold text-white">{Math.round(value)}%</div>
+    </div>
+  )
+}
+
 export default function CarerDashboard() {
   const [, setLocation] = useLocation()
   const [playingBrief, setPlayingBrief] = useState<string | null>(null)
@@ -333,23 +368,13 @@ export default function CarerDashboard() {
 
         <div className="relative z-10 flex items-center justify-between mb-4">
           <h1 className="font-serif text-2xl">Today's Care</h1>
-          <div className="text-right">
-            <div className="text-[11px] text-white/40 uppercase tracking-wider">Progress</div>
-            <div className="text-lg font-bold" style={{ color: COLORS.teal }}>
-              {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-[11px] text-white/40 uppercase tracking-wider">Compliance</div>
+              <div className="text-sm font-bold" style={{ color: COLORS.teal }}>Score</div>
             </div>
+            <CircularProgress value={stats.total > 0 ? (stats.completed / stats.total) * 100 : 0} size={54} strokeWidth={5} />
           </div>
-        </div>
-
-        {/* Progress bar */}
-        <div className="relative z-10 w-full h-1.5 rounded-full bg-white/10 mb-5 overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-700 ease-out"
-            style={{
-              width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%`,
-              background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
-            }}
-          />
         </div>
 
         {/* Stats */}
@@ -595,7 +620,7 @@ export default function CarerDashboard() {
                     }
                   }}
                 >
-                  {visit.status === 'in-progress' ? 'Continue Visit' : visit.status === 'completed' ? 'View Summary' : 'Start Visit'}
+                  {visit.status === 'in-progress' ? 'Continue Visit' : visit.status === 'completed' ? 'ContinuCare+ Summary' : 'Start Visit'}
                 </button>
               </div>
             </motion.div>

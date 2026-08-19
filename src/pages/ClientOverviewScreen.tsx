@@ -115,7 +115,7 @@ export default function ClientOverviewScreen() {
               </svg>
               <span className="text-sm font-medium">Back</span>
             </motion.button>
-            <div className="text-[11px] text-white/40 uppercase tracking-wider">Pre-Visit Brief</div>
+            <div className="text-[11px] text-white/40 uppercase tracking-wider">ContinuCare+ Brief</div>
           </div>
 
           <div className="relative z-10 flex items-center gap-4 mb-4">

@@ -486,8 +486,13 @@ export default function ActiveVisitScreen() {
 
     const med = meds.find((m) => m.name === selectedMedForAdmin)
     const [hours, minutes] = adminTime.split(':').map(Number)
-    const administeredAt = new Date()
+    let administeredAt = new Date()
     administeredAt.setHours(hours, minutes, 0, 0)
+
+    // AUDIT HARDENING: Clamp time to clock-in time
+    if (clockInAt && administeredAt.getTime() < clockInAt) {
+      administeredAt = new Date(clockInAt)
+    }
 
     // ─── Offline Safety Checks (warn-do-not-decide) ───
 

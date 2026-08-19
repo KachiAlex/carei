@@ -29,10 +29,33 @@ export default function ManagerApprovalsScreen() {
   const [filter, setFilter] = useState<'pending' | 'approved' | 'released'>('pending')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Track checklist per visit ID
+  const [checklists, setChecklists] = useState<Record<string, {
+    notes: boolean,
+    concerns: boolean,
+    meds: boolean,
+    safeguarding: boolean
+  }>>({})
 
   useEffect(() => {
     loadApprovals()
   }, [filter])
+
+  const toggleCheck = (visitId: string, point: keyof typeof checklists[string]) => {
+    setChecklists(prev => ({
+      ...prev,
+      [visitId]: {
+        ...(prev[visitId] || { notes: false, concerns: false, meds: false, safeguarding: false }),
+        [point]: !prev[visitId]?.[point]
+      }
+    }))
+  }
+
+  const isChecklistComplete = (visitId: string) => {
+    const c = checklists[visitId]
+    return c && c.notes && c.concerns && c.meds && c.safeguarding
+  }
 
   const loadApprovals = async () => {
     setLoading(true)
@@ -48,6 +71,10 @@ export default function ManagerApprovalsScreen() {
   }
 
   const updateStatus = async (visitId: string, newStatus: string) => {
+    if (newStatus === 'released' && !isChecklistComplete(visitId)) {
+      alert('Please complete the safety checklist before releasing to family.')
+      return
+    }
     try {
       await updateVisitApproval({ visitId, approvalStatus: newStatus })
       setVisits((prev) => prev.map((v) => v.id === visitId ? { ...v, approval_status: newStatus } : v))
@@ -65,21 +92,21 @@ export default function ManagerApprovalsScreen() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           Dashboard
         </button>
-        <h1 className="font-serif text-lg font-bold">Approvals</h1>
+        <h1 className="font-serif text-lg font-bold">ContinuCare+ Approvals</h1>
       </div>
 
       {/* Filters + Export */}
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-200 shrink-0">
         <div className="flex gap-0 flex-1">
         {[
-          { key: 'pending' as const, label: 'Pending' },
-          { key: 'approved' as const, label: 'Approved' },
-          { key: 'released' as const, label: 'Released' },
+          { key: 'pending' as const, label: 'Pending Review' },
+          { key: 'approved' as const, label: 'Approved (Audit Only)' },
+          { key: 'released' as const, label: 'Released to Family' },
         ].map((f) => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
-            className="flex-1 py-3 text-xs font-semibold border-none bg-transparent cursor-pointer transition-colors"
+            className="flex-1 py-3 text-[10px] font-bold border-none bg-transparent cursor-pointer transition-all uppercase tracking-tight"
             style={{
               color: filter === f.key ? COLORS.teal : '#94a3b8',
               borderBottom: `2px solid ${filter === f.key ? COLORS.teal : 'transparent'}`,
@@ -89,9 +116,6 @@ export default function ManagerApprovalsScreen() {
           </button>
         ))}
         </div>
-        <button onClick={() => exportVisits(filtered)} className="ml-2 px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
-          Export
-        </button>
       </div>
 
       {error && (
@@ -110,32 +134,59 @@ export default function ManagerApprovalsScreen() {
         )}
         {filtered.map((v) => {
           const date = v.submitted_at ? new Date(v.submitted_at) : new Date()
+          const check = checklists[v.id] || { notes: false, concerns: false, meds: false, safeguarding: false }
+          
           return (
-            <div key={v.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm mb-2.5">
+            <div key={v.id} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm mb-4">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm font-bold text-slate-800">{v.client_name || 'Unknown'}</span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${v.approval_status === 'released' ? 'bg-green-100 text-green-700' : v.approval_status === 'approved' ? 'bg-teal-100 text-teal-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {v.approval_status === 'released' ? 'Released' : v.approval_status === 'approved' ? 'Approved' : 'Pending'}
+                  {v.approval_status === 'released' ? 'Released ✓' : v.approval_status === 'approved' ? 'Approved' : 'Awaiting Review'}
                 </span>
               </div>
-              <div className="text-xs text-slate-500 mb-2">{v.carer_name || 'Unknown carer'} · {date.toLocaleDateString('en-GB')}</div>
-              {v.elapsed && <div className="text-[10px] text-slate-400 mb-2">Duration: {Math.floor(v.elapsed / 60)} min</div>}
+              <div className="text-xs text-slate-500 mb-2">{v.carer_name || 'Unknown carer'} · {date.toLocaleDateString('en-GB')} at {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+              
               {filter === 'pending' && (
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={() => updateStatus(v.id, 'approved')}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold text-white border-none cursor-pointer"
-                    style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => updateStatus(v.id, 'released')}
-                    className="flex-1 py-2 rounded-xl text-xs font-semibold text-white border-none cursor-pointer bg-green-500"
-                  >
-                    Release to Family
-                  </button>
-                </div>
+                <>
+                  <div className="my-3 py-3 border-y border-slate-50">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pre-Release Clinical Checklist</div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {[
+                        { id: 'notes', label: "Notes appropriate for family reading" },
+                        { id: 'concerns', label: "No clinical concerns requiring call first" },
+                        { id: 'meds', label: "Medication log complete and accurate" },
+                        { id: 'safeguarding', label: "No safeguarding issues flagged" }
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => toggleCheck(v.id, item.id as any)}
+                          className="flex items-center gap-2 text-left bg-transparent border-none cursor-pointer group"
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${check[item.id as keyof typeof check] ? 'bg-teal border-teal' : 'border-slate-300 group-hover:border-teal'}`}>
+                            {check[item.id as keyof typeof check] && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                          <span className={`text-[11px] ${check[item.id as keyof typeof check] ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => updateStatus(v.id, 'approved')}
+                      className="flex-1 py-2.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-100 cursor-pointer"
+                    >
+                      Audit Approve
+                    </button>
+                    <button
+                      onClick={() => updateStatus(v.id, 'released')}
+                      disabled={!isChecklistComplete(v.id)}
+                      className={`flex-[2] py-2.5 rounded-xl text-xs font-bold text-white border-none cursor-pointer transition-all ${isChecklistComplete(v.id) ? 'bg-green-500 shadow-md shadow-green-500/20' : 'bg-slate-300 cursor-not-allowed opacity-60'}`}
+                    >
+                      Release to Family
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           )

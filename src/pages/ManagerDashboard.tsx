@@ -208,6 +208,51 @@ export default function ManagerDashboard() {
     visible: (i: number) => ({ opacity: 1, y: 0, scale: 1, transition: { delay: i * 0.06, duration: 0.4, ease: 'easeOut' as const } }),
   }
 
+  function CircularProgress({ value, size = 48, strokeWidth = 4, color = COLORS.teal }: { value: number; size?: number; strokeWidth?: number; color?: string }) {
+    const radius = (size - strokeWidth) / 2
+    const circumference = radius * 2 * Math.PI
+    const offset = circumference - (value / 100) * circumference
+
+    return (
+      <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="rgba(0,0,0,0.05)"
+            strokeWidth={strokeWidth}
+            fill="transparent"
+          />
+          <motion.circle
+            initial={{ strokeDashoffset: circumference }}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 1, ease: 'easeOut' }}
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={color}
+            strokeWidth={strokeWidth}
+            fill="transparent"
+            strokeDasharray={circumference}
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute text-[10px] font-bold text-slate-800">{Math.round(value)}%</div>
+      </div>
+    )
+  }
+
+  function ComplianceCard({ label, rate, detail, onClick }: { label: string; rate: number; detail: string; onClick: () => void }) {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-1.5 text-slate-300 mb-1.5">{label}</div>
+        <CircularProgress value={rate} />
+        <div className="text-[10px] text-slate-400">{detail}</div>
+      </div>
+    )
+  }
+
   const renderSkeleton = () => (
     <div className="flex flex-col gap-3">
       {[0, 1, 2, 3].map((i) => (
@@ -234,25 +279,14 @@ export default function ManagerDashboard() {
     <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
       {/* Completion Rate */}
       <motion.div custom={0} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm hover:shadow-md transition-shadow duration-300">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-bold text-sm text-slate-800">Today's Completion</h3>
+            <h3 className="font-bold text-sm text-slate-800">Daily Compliance</h3>
             <p className="text-[11px] text-slate-400">{stats.completed} of {stats.total} visits completed</p>
           </div>
-          <div className="text-lg font-bold" style={{ color: COLORS.teal }}>
-            {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
-          </div>
+          <CircularProgress value={stats.total > 0 ? (stats.completed / stats.total) * 100 : 0} size={54} strokeWidth={5} />
         </div>
-        <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden mb-4">
-          <div
-            className="h-full rounded-full transition-all duration-700 ease-out"
-            style={{
-              width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%`,
-              background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`,
-            }}
-          />
-        </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-50">
           {[
             { label: 'Completed', value: stats.completed, color: COLORS.teal },
             { label: 'In Progress', value: stats.inProgress, color: COLORS.amber },
@@ -1381,16 +1415,5 @@ export default function ManagerDashboard() {
       <BiometricsPrompt />
       </div>
     </div>
-  )
-}
-
-function ComplianceCard({ label, rate, detail, onClick }: { label: string; rate: number; detail: string; onClick: () => void }) {
-  const color = rate >= 90 ? '#22C55E' : rate >= 70 ? '#F6B73C' : '#FF5A5F'
-  return (
-    <button onClick={onClick} className="text-center p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 cursor-pointer transition-all hover:shadow-sm border-none">
-      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{label}</div>
-      <div className="text-lg font-bold" style={{ color }}>{rate}%</div>
-      <div className="text-[9px] text-slate-400 mt-0.5">{detail}</div>
-    </button>
   )
 }

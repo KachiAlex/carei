@@ -274,7 +274,7 @@ export default function VisitSummaryScreen() {
             {snapshot.clientName.split(' ').map((n) => n[0]).join('')}
           </div>
           <div>
-            <h1 className="font-serif text-xl font-bold">Visit Summary</h1>
+            <h1 className="font-serif text-xl font-bold">ContinuCare+ Summary</h1>
             <p className="text-white/50 text-sm">{snapshot.clientName} · {snapshot.visitTime} · {snapshot.visitDuration}</p>
           </div>
         </div>
@@ -510,10 +510,10 @@ export default function VisitSummaryScreen() {
           </div>
         )}
 
-        {/* Phase 5: Structured Handover Form */}
+        {/* Phase 5: ContinuCare+ Handover Form */}
         <div className="bg-white rounded-2xl p-4 border border-slate-100 mb-3 shadow-sm">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-sm text-slate-800">Structured Handover</h3>
+            <h3 className="font-bold text-sm text-slate-800">ContinuCare+ Handover</h3>
             <button
               onClick={generateHandover}
               disabled={generating}
