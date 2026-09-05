@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useLocation, useSearch } from 'wouter'
-import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, updateTenantPrice, deleteTenant, createTenant, getPlans, updatePlan } from '../api/client'
+import { getMe, getAllTenantsAdmin, updateTenantPlan, updateTenantActive, updateTenantPrice, deleteTenant, createTenant, getPlans, updatePlan, createPlan, deletePlan } from '../api/client'
 import { getToken, setToken, clearAuthCache } from '../utils/tokenCache'
 import { secureGet, secureRemove } from '../utils/secureStorage'
 
@@ -12,6 +12,7 @@ interface Plan {
   max_clients: number
   price_per_carer: number
   billing_model: string
+  is_default: boolean
 }
 
 interface Tenant {
@@ -155,6 +156,50 @@ export default function SuperAdminScreen() {
         price_per_carer: Number(plan.price_per_carer),
         billing_model: plan.billing_model,
       })
+      await loadPlans()
+    } catch (err: any) {
+      setPlansError(err.message)
+    }
+  }
+
+  const [showAddPlanModal, setShowAddPlanModal] = useState(false)
+  const [newPlanForm, setNewPlanForm] = useState({
+    slug: '',
+    name: '',
+    max_users: 10,
+    max_clients: 20,
+    price_per_carer: 10,
+    billing_model: 'per-carer',
+  })
+  const [addPlanLoading, setAddPlanLoading] = useState(false)
+
+  const handlePlanCreate = async () => {
+    setPlansError(null)
+    setAddPlanLoading(true)
+    try {
+      await createPlan({
+        slug: newPlanForm.slug.toLowerCase().replace(/\s+/g, '-'),
+        name: newPlanForm.name,
+        max_users: Number(newPlanForm.max_users),
+        max_clients: Number(newPlanForm.max_clients),
+        price_per_carer: Number(newPlanForm.price_per_carer),
+        billing_model: newPlanForm.billing_model,
+      })
+      setShowAddPlanModal(false)
+      setNewPlanForm({ slug: '', name: '', max_users: 10, max_clients: 20, price_per_carer: 10, billing_model: 'per-carer' })
+      await loadPlans()
+    } catch (err: any) {
+      setPlansError(err.message)
+    } finally {
+      setAddPlanLoading(false)
+    }
+  }
+
+  const handlePlanDelete = async (slug: string) => {
+    setPlansError(null)
+    if (!confirm(`Delete plan "${slug}"? This cannot be undone.`)) return
+    try {
+      await deletePlan(slug)
       await loadPlans()
     } catch (err: any) {
       setPlansError(err.message)
@@ -393,7 +438,15 @@ export default function SuperAdminScreen() {
         {activeTab === 'plans' && (
           <>
             <div className="bg-white/5 rounded-xl border border-white/10 p-6">
-              <h2 className="font-semibold text-white mb-4">Configure Plans</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-white">Configure Plans</h2>
+                <button
+                  onClick={() => { setShowAddPlanModal(true); setPlansError(null) }}
+                  className="text-sm px-3 py-1.5 rounded-lg bg-teal-500/20 text-teal-400 hover:bg-teal-500/30 transition-colors flex items-center gap-1.5"
+                >
+                  <span>+</span> Add Plan
+                </button>
+              </div>
               {plansError && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
                   <p className="text-red-400 text-sm">{plansError}</p>
@@ -406,7 +459,8 @@ export default function SuperAdminScreen() {
                   <table className="w-full text-left text-sm">
                     <thead className="bg-white/5 text-white/50 text-xs uppercase">
                       <tr>
-                        <th className="px-4 py-2">Plan</th>
+                        <th className="px-4 py-2">Plan Name</th>
+                        <th className="px-4 py-2">Slug</th>
                         <th className="px-4 py-2">Max Users</th>
                         <th className="px-4 py-2">Max Clients</th>
                         <th className="px-4 py-2">Price / Carer (£)</th>
@@ -424,6 +478,10 @@ export default function SuperAdminScreen() {
                               onChange={(e) => handlePlanUpdate(idx, 'name', e.target.value)}
                               className="w-full bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm outline-none focus:border-teal-400"
                             />
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-white/50 text-xs font-mono">{plan.slug}</span>
+                            {plan.is_default && <span className="ml-2 text-xs text-teal-400">(default)</span>}
                           </td>
                           <td className="px-4 py-3">
                             <input
@@ -461,20 +519,124 @@ export default function SuperAdminScreen() {
                             >
                               <option value="per-carer">Per Carer</option>
                               <option value="flat">Flat Rate</option>
+                              <option value="custom">Custom</option>
                             </select>
                           </td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() => handlePlanSave(idx)}
-                              className="text-xs px-3 py-1.5 rounded-lg bg-teal-500 text-slate-900 hover:bg-teal-400 transition-colors font-medium"
-                            >
-                              Save
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handlePlanSave(idx)}
+                                className="text-xs px-3 py-1.5 rounded-lg bg-teal-500 text-slate-900 hover:bg-teal-400 transition-colors font-medium"
+                              >
+                                Save
+                              </button>
+                              {!plan.is_default && (
+                                <button
+                                  onClick={() => handlePlanDelete(plan.slug)}
+                                  className="text-xs px-2 py-1.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors font-medium"
+                                >
+                                  Delete
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* Add Plan Modal */}
+              {showAddPlanModal && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+                  <div className="bg-slate-900 rounded-xl border border-white/10 p-6 w-full max-w-md">
+                    <h3 className="text-white font-semibold mb-4">Add New Plan</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-white/50 text-xs block mb-1">Plan Name</label>
+                        <input
+                          type="text"
+                          value={newPlanForm.name}
+                          onChange={(e) => setNewPlanForm({ ...newPlanForm, name: e.target.value })}
+                          placeholder="e.g. Premium"
+                          className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-teal-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-white/50 text-xs block mb-1">Slug (unique identifier)</label>
+                        <input
+                          type="text"
+                          value={newPlanForm.slug}
+                          onChange={(e) => setNewPlanForm({ ...newPlanForm, slug: e.target.value.toLowerCase().replace(/\s+/g, '-') })}
+                          placeholder="e.g. premium"
+                          className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-teal-400 font-mono"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-white/50 text-xs block mb-1">Max Users</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={newPlanForm.max_users}
+                            onChange={(e) => setNewPlanForm({ ...newPlanForm, max_users: Number(e.target.value) })}
+                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-teal-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-white/50 text-xs block mb-1">Max Clients</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={newPlanForm.max_clients}
+                            onChange={(e) => setNewPlanForm({ ...newPlanForm, max_clients: Number(e.target.value) })}
+                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-teal-400"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-white/50 text-xs block mb-1">Price / Carer (£)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={newPlanForm.price_per_carer}
+                            onChange={(e) => setNewPlanForm({ ...newPlanForm, price_per_carer: Number(e.target.value) })}
+                            className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-white text-sm outline-none focus:border-teal-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-white/50 text-xs block mb-1">Billing Model</label>
+                          <select
+                            value={newPlanForm.billing_model}
+                            onChange={(e) => setNewPlanForm({ ...newPlanForm, billing_model: e.target.value })}
+                            className="w-full bg-slate-800 text-white text-sm rounded px-3 py-2 border border-white/10 outline-none"
+                          >
+                            <option value="per-carer">Per Carer</option>
+                            <option value="flat">Flat Rate</option>
+                            <option value="custom">Custom</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-3 mt-6">
+                      <button
+                        onClick={() => setShowAddPlanModal(false)}
+                        className="text-sm px-4 py-2 rounded-lg text-white/60 hover:text-white transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handlePlanCreate}
+                        disabled={!newPlanForm.name || !newPlanForm.slug || addPlanLoading}
+                        className="text-sm px-4 py-2 rounded-lg bg-teal-500 text-slate-900 hover:bg-teal-400 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {addPlanLoading ? 'Creating...' : 'Create Plan'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
