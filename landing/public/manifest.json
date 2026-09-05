@@ -1,43 +1,29 @@
 {
-  "name": "CAREi",
+  "name": "CAREi — AI-powered care management",
   "short_name": "CAREi",
-  "description": "AI-powered care management for frontline carers",
+  "description": "AI-powered care management for frontline UK carers. Voice notes, digital MAR, instant handovers — CQC-ready from day one.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f1a2e",
-  "theme_color": "#0f1a2e",
+  "background_color": "#ffffff",
+  "theme_color": "#0ecfb0",
   "orientation": "portrait",
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
   "scope": "/",
-  "shortcuts": [
-    {
-      "name": "Family Login",
-      "short_name": "Family",
-      "description": "Access your loved one's care information",
-      "url": "/family/login",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Family Dashboard",
-      "short_name": "Dashboard",
-      "description": "View care updates and notifications",
-      "url": "/family/dashboard",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-    }
-  ],
-  "categories": ["medical", "health", "productivity"],
-  "lang": "en",
+  "categories": ["medical", "health", "productivity", "business"],
+  "lang": "en-GB",
   "dir": "ltr",
   "prefer_related_applications": false
 }
