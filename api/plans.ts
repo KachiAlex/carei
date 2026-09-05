@@ -26,7 +26,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    // PUT /api/plans
+    // PUT /api/plans — update existing plan
     if (req.method === 'PUT') {
       const { slug, name, max_users, max_clients, price_per_carer, billing_model } = req.body || {}
       if (!slug || !name || typeof max_users !== 'number' || typeof max_clients !== 'number') {
@@ -51,6 +51,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         WHERE slug = ${slug}
       `
       res.status(200).json({ message: 'Plan updated' })
+      return
+    }
+
+    // POST /api/plans — create new plan
+    if (req.method === 'POST') {
+      const { slug, name, max_users, max_clients, price_per_carer, billing_model } = req.body || {}
+      if (!slug || !name || typeof max_users !== 'number' || typeof max_clients !== 'number') {
+        res.status(400).json({ error: 'slug, name, max_users, max_clients required' })
+        return
+      }
+
+      const existing = await sql`SELECT id FROM plans WHERE slug = ${slug}` as any[]
+      if (existing.length > 0) {
+        res.status(409).json({ error: 'Plan with this slug already exists' })
+        return
+      }
+
+      const id = `plan-${slug}`
+      await sql`
+        INSERT INTO plans (id, slug, name, max_users, max_clients, price_per_carer, billing_model, is_default)
+        VALUES (${id}, ${slug}, ${name}, ${max_users}, ${max_clients}, ${price_per_carer ?? 0}, ${billing_model || 'per-carer'}, FALSE)
+      `
+      res.status(201).json({ message: 'Plan created', plan: { id, slug, name, max_users, max_clients, price_per_carer: price_per_carer ?? 0, billing_model: billing_model || 'per-carer' } })
+      return
+    }
+
+    // DELETE /api/plans — delete plan
+    if (req.method === 'DELETE') {
+      const { slug } = req.body || req.query || {}
+      if (!slug) {
+        res.status(400).json({ error: 'slug required' })
+        return
+      }
+
+      const planRows = await sql`SELECT id, is_default FROM plans WHERE slug = ${slug}` as any[]
+      if (planRows.length === 0) {
+        res.status(404).json({ error: 'Plan not found' })
+        return
+      }
+      if (planRows[0].is_default) {
+        res.status(400).json({ error: 'Cannot delete the default plan' })
+        return
+      }
+
+      await sql`DELETE FROM plans WHERE slug = ${slug}`
+      res.status(200).json({ message: 'Plan deleted' })
       return
     }
 

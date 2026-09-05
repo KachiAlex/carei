@@ -1294,6 +1294,14 @@ export async function updatePlan(data: { slug: string; name: string; max_users: 
   return put('/plans', data)
 }
 
+export async function createPlan(data: { slug: string; name: string; max_users: number; max_clients: number; price_per_carer: number; billing_model: string }) {
+  return post('/plans', data)
+}
+
+export async function deletePlan(slug: string) {
+  return del('/plans', { slug })
+}
+
 // ─── Care Plans ───
 
 export interface CarePlanData {
