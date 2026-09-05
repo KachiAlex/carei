@@ -18,8 +18,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureTables()
     const sql = getSql()
 
-    const email = 'superadmin@careiapp.com'
-    const password = 'superadmin123'
+    const email = 'admin@careiapp.com'
+    const password = 'admin123'
 
     // Remove any existing superadmin accounts
     await sql`DELETE FROM users WHERE role = ${'superadmin'}`
