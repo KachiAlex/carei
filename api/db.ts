@@ -801,9 +801,9 @@ async function runMigrations() {
     await sql`
       INSERT INTO plans (id, slug, name, max_users, max_clients, price_per_carer, billing_model, is_default)
       VALUES
-        ('plan-trial', 'trial', 'Trial', 3, 10, 0, 'per-carer', TRUE),
-        ('plan-professional', 'professional', 'Professional', 15, 100, 7, 'per-carer', FALSE),
-        ('plan-enterprise', 'enterprise', 'Enterprise', 100, 500, 4, 'per-carer', FALSE)
+        ('plan-trial', 'trial', 'Starter', 5, 10, 8, 'per-carer', TRUE),
+        ('plan-professional', 'professional', 'Professional', 25, 50, 14, 'per-carer', FALSE),
+        ('plan-enterprise', 'enterprise', 'Enterprise', 100, 500, 0, 'custom', FALSE)
       ON CONFLICT (slug) DO NOTHING
     `
   })
