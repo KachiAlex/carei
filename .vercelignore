@@ -1,0 +1,10 @@
+server/
+api/
+*.mjs
+*.sh
+deploy-features.sh
+rebuild-test.sh
+test-docker*.sh
+find-port.sh
+android/
+ios/

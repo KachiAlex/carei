@@ -1,0 +1,16 @@
+node_modules
+*.log
+*.sh
+setup-db*.sh
+migrate-db.sh
+reimport-db.sh
+verify-db.sh
+deploy.sh
+setup-server.sh
+export-neon.mjs
+pg-compat.ts
+tsconfig.json
+ecosystem.config.cjs
+nginx-carei-api*.conf
+.git
+.gitignore
