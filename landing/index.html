@@ -1,32 +1,105 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
   <head>
     <meta charset="UTF-8" />
+
+    <!-- Favicon set -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Core meta -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0ecfb0" />
-    <meta name="description" content="AI-powered care management for frontline carers. Voice notes, digital MAR, instant handovers — all in one place." />
-    <meta name="robots" content="index, follow" />
+    <meta name="author" content="CAREi" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
     <link rel="canonical" href="https://careiapp.com/" />
-    <meta property="og:title" content="CAREi — AI-powered care management" />
-    <meta property="og:description" content="Voice notes, digital MAR, instant handovers and lone-worker SOS for frontline carers." />
+
+    <!-- Primary SEO -->
+    <title>CAREi — AI Care Management Software for UK Carers | Digital MAR & Voice Notes</title>
+    <meta name="description" content="CAREi is the AI-powered care management platform for UK care homes. Voice documentation, digital MAR, lone-worker SOS, and CQC-ready compliance — all in one app. Start a 30-day free trial." />
+    <meta name="keywords" content="care management software, care home software, digital MAR, electronic medication administration records, AI care documentation, voice notes for carers, CQC compliance software, lone worker safety, UK care home technology, home care software, domiciliary care software, care planning software, EVV care, shift handover app, care worker app, NHS data hosting, GDPR care software" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="CAREi — AI Care Management Software for UK Carers" />
+    <meta property="og:description" content="Voice documentation, digital MAR, instant handovers and lone-worker SOS for frontline UK carers. CQC-ready from day one. Start a 30-day free trial." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://careiapp.com/" />
     <meta property="og:image" content="https://careiapp.com/careiapp-cover.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="CAREi — AI-powered care management platform" />
     <meta property="og:site_name" content="CAREi" />
     <meta property="og:locale" content="en_GB" />
+
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="CAREi — AI-powered care management" />
-    <meta name="twitter:description" content="Voice notes, digital MAR, instant handovers and lone-worker SOS for frontline carers." />
+    <meta name="twitter:title" content="CAREi — AI Care Management Software for UK Carers" />
+    <meta name="twitter:description" content="Voice documentation, digital MAR, instant handovers and lone-worker SOS for frontline UK carers. CQC-ready from day one." />
     <meta name="twitter:image" content="https://careiapp.com/careiapp-cover.png" />
+    <meta name="twitter:image:alt" content="CAREi — AI-powered care management platform" />
+
+    <!-- PWA / Mobile -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="CAREi" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet" />
-    <title>CAREi — Care that documents itself</title>
+
+    <!-- Structured Data: Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "CAREi",
+      "url": "https://careiapp.com",
+      "logo": "https://careiapp.com/icon-512.png",
+      "description": "AI-powered care management platform for UK care homes and domiciliary care providers.",
+      "sameAs": [
+        "https://careiapp.com"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "sales",
+        "email": "sales@careiapp.com",
+        "availableLanguage": "English"
+      }
+    }
+    </script>
+
+    <!-- Structured Data: Software Application -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "CAREi",
+      "applicationCategory": "HealthApplication",
+      "operatingSystem": "Web, iOS, Android",
+      "description": "AI-powered care management software with voice documentation, digital MAR, lone-worker SOS, and CQC-ready compliance for UK care providers.",
+      "url": "https://careiapp.com",
+      "offers": {
+        "@type": "AggregateOffer",
+        "priceCurrency": "GBP",
+        "lowPrice": "8",
+        "highPrice": "14",
+        "offerCount": "2",
+        "availability": "https://schema.org/InStock"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "reviewCount": "200"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
