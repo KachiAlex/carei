@@ -7,26 +7,8 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
-function moduleLogger() {
-  return {
-    name: 'module-logger',
-    enforce: 'pre',
-    resolveId(id: string) {
-      if (id === 'react' || id === 'react-dom' || id === 'react-dom/client' || id.includes('use-sync-external-store')) {
-        console.log(`[resolve] ${id}`)
-      }
-    },
-    load(id: string) {
-      if (id.includes('react.development.js') || id.includes('react-dom.development.js')) {
-        console.log(`[load] ${id}`)
-      }
-    },
-  }
-}
-
 export default defineConfig({
   plugins: [
-    moduleLogger(),
     react(),
     tailwindcss(),
     VitePWA({
@@ -50,7 +32,7 @@ export default defineConfig({
       manifest: false, // Use existing public/manifest.json
     }),
   ],
-  logLevel: 'info',
+  logLevel: 'warn',
   server: {
     proxy: {
       '/api': {
@@ -61,16 +43,20 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      react: 'react',
-      'react-dom': 'react-dom',
-      'react-dom/client': 'react-dom/client',
-      'use-sync-external-store': 'use-sync-external-store',
-    },
     dedupe: ['react', 'react-dom', 'use-sync-external-store'],
   },
-  optimizeDeps: {
-    include: ['react', 'react-dom', 'wouter', 'use-sync-external-store/shim'],
-    force: true,
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'wouter', 'use-sync-external-store'],
+          'animation': ['framer-motion'],
+          'charts': ['recharts'],
+          'aws-s3': ['@aws-sdk/client-s3'],
+          'icons': ['lucide-react'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 500,
   },
 })
