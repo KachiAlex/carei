@@ -62,10 +62,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      react: path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
-      'react-dom/client': path.resolve(__dirname, 'node_modules/react-dom/client.js'),
-      'use-sync-external-store': path.resolve(__dirname, 'node_modules/use-sync-external-store'),
+      react: 'react',
+      'react-dom': 'react-dom',
+      'react-dom/client': 'react-dom/client',
+      'use-sync-external-store': 'use-sync-external-store',
     },
     dedupe: ['react', 'react-dom', 'use-sync-external-store'],
   },
