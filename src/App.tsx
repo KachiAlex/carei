@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Route, Router, Switch, useLocation } from 'wouter'
 import SplashScreen from './pages/SplashScreen'
-import HomePage from './pages/HomePage'
 import { useOnlineSync } from './hooks/useOnlineSync'
 import { useRemoteWipe } from './hooks/useRemoteWipe'
 import { useDataMinimisation } from './hooks/useDataMinimisation'
