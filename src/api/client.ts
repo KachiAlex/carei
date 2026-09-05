@@ -23,7 +23,7 @@ function getApiBase(): string {
   }
 
   // 3. Production web (deployed on Vercel) → VPS API absolute URL
-  //    Points to the VPS backend instead of Vercel serverless functions
+  //    Points to the VPS backend directly (bypassing Cloudflare 520 issues)
   if (!import.meta.env.DEV) {
     return 'https://api.careiapp.com/api'
   }
