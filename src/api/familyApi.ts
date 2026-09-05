@@ -111,7 +111,7 @@ export interface FamilyClientDetails {
 
 // Family Authentication API
 export async function familyLogin(credentials: FamilyLoginRequest): Promise<FamilyLoginResponse> {
-  const response = await post('/family/auth/login', credentials) as any
+  const response = await post('/family/auth/login', credentials)
   if (response.token) {
     localStorage.setItem('familyToken', response.token)
     localStorage.setItem('familyRefreshToken', response.refreshToken)
@@ -124,7 +124,7 @@ export async function familyLogin(credentials: FamilyLoginRequest): Promise<Fami
 }
 
 export async function familyRegister(data: FamilyRegistrationRequest): Promise<FamilyMember> {
-  return post('/family/auth/register', data) as any
+  return post('/family/auth/register', data)
 }
 
 export async function familyLogout(): Promise<void> {
@@ -144,7 +144,7 @@ export async function refreshFamilyToken(): Promise<string> {
     throw new Error('No refresh token available')
   }
   
-  const response = await post('/family/auth/refresh', { refreshToken }, getFamilyAuthHeaders()) as any
+  const response = await post('/family/auth/refresh', { refreshToken }, getFamilyAuthHeaders())
   if (response.token) {
     localStorage.setItem('familyToken', response.token)
     localStorage.setItem('familyRefreshToken', response.refreshToken)
@@ -162,16 +162,16 @@ export async function resetFamilyPassword(token: string, pin: string): Promise<v
 
 // Family Dashboard API
 export async function getFamilyDashboard(): Promise<FamilyDashboard> {
-  return get('/family/dashboard', getFamilyAuthHeaders()) as any
+  return get('/family/dashboard', getFamilyAuthHeaders())
 }
 
 export async function getFamilyClientDetails(clientId: string): Promise<FamilyClientDetails> {
-  return get(`/family/clients/${clientId}`, getFamilyAuthHeaders()) as any
+  return get(`/family/clients/${clientId}`, getFamilyAuthHeaders())
 }
 
 // Family Member Management
 export async function getFamilyMembers(clientId: string): Promise<FamilyMember[]> {
-  return get(`/family/members?clientId=${clientId}`, getFamilyAuthHeaders()) as any
+  return get(`/family/members?clientId=${clientId}`, getFamilyAuthHeaders())
 }
 
 export async function inviteFamilyMember(data: {
@@ -181,11 +181,11 @@ export async function inviteFamilyMember(data: {
   role: 'primary' | 'secondary' | 'limited'
   clientId: string
 }): Promise<FamilyMember> {
-  return post('/family/members/invite', data, getFamilyAuthHeaders()) as any
+  return post('/family/members/invite', data, getFamilyAuthHeaders())
 }
 
 export async function updateFamilyMember(memberId: string, updates: Partial<FamilyMember>): Promise<FamilyMember> {
-  return put(`/family/members/${memberId}`, updates, getFamilyAuthHeaders()) as any
+  return put(`/family/members/${memberId}`, updates, getFamilyAuthHeaders())
 }
 
 export async function removeFamilyMember(memberId: string): Promise<void> {
@@ -201,7 +201,7 @@ export async function getFamilyTasks(clientId: string): Promise<Array<{
   dueDate?: string
   assignedTo?: string
 }>> {
-  return get(`/family/clients/${clientId}/tasks`, getFamilyAuthHeaders()) as any
+  return get(`/family/clients/${clientId}/tasks`, getFamilyAuthHeaders())
 }
 
 export async function updateFamilyTask(clientId: string, taskId: string, updates: {
@@ -220,7 +220,7 @@ export async function getFamilyMessages(clientId: string): Promise<Array<{
   timestamp: string
   isFromFamily: boolean
 }>> {
-  return get(`/family/clients/${clientId}/messages`, getFamilyAuthHeaders()) as any
+  return get(`/family/clients/${clientId}/messages`, getFamilyAuthHeaders())
 }
 
 export async function sendFamilyMessage(clientId: string, message: string): Promise<void> {
@@ -237,7 +237,7 @@ export async function getFamilyNotifications(): Promise<Array<{
   read: boolean
   clientId?: string
 }>> {
-  return get('/family/notifications', getFamilyAuthHeaders()) as any
+  return get('/family/notifications', getFamilyAuthHeaders())
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
@@ -259,7 +259,7 @@ export async function getFamilyVisits(clientId: string): Promise<Array<{
   summary: string
   status: 'completed' | 'scheduled' | 'cancelled'
 }>> {
-  return get(`/family/clients/${clientId}/visits`, getFamilyAuthHeaders()) as any
+  return get(`/family/clients/${clientId}/visits`, getFamilyAuthHeaders())
 }
 
 // Utility Functions
