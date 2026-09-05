@@ -75,7 +75,7 @@ export default function SuperAdminScreen() {
   }, [])
 
   useEffect(() => {
-    if ((activeTab === 'plans' || activeTab === 'organizations') && plans.length === 0) {
+    if ((activeTab === 'plans' || activeTab === 'organizations' || activeTab === 'licensing') && plans.length === 0) {
       loadPlans()
     }
   }, [activeTab])
@@ -413,25 +413,140 @@ export default function SuperAdminScreen() {
 
         {activeTab === 'licensing' && (
           <>
-            {/* Licensing Recommendation */}
+            {/* Licensing — driven by actual plans from database */}
             <div className="bg-white/5 rounded-xl p-4 border border-white/10 mb-8">
-          <h3 className="font-semibold text-white mb-2">Recommended Per-Carer Licensing Structure</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-sm">
-            {[
-              { name: 'Micro', carers: '1-5', price: '£9', note: 'No minimum' },
-              { name: 'Starter', carers: '6-15', price: '£7', note: 'Small agency sweet spot' },
-              { name: 'Growth', carers: '16-40', price: '£5', note: 'Volume discount' },
-              { name: 'Enterprise', carers: '41+', price: '£4', note: 'Custom negotiation' },
-            ].map((tier) => (
-              <div key={tier.name} className="rounded-lg p-3 border border-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                <div className="text-white font-medium text-sm">{tier.name}</div>
-                <div className="text-teal-400 font-bold text-lg">{tier.price}<span className="text-white/40 text-xs font-normal">/carer/mo</span></div>
-                <div className="text-white/40 text-xs">{tier.carers} carers</div>
-                <div className="text-white/30 text-[10px] mt-0.5">{tier.note}</div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-white">Per-Carer Licensing Structure</h3>
+                <span className="text-white/40 text-xs">Synced with Plans configuration</span>
               </div>
-            ))}
-          </div>
-        </div>
+              {plansError && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-4">
+                  <p className="text-red-400 text-sm">{plansError}</p>
+                </div>
+              )}
+              {plansLoading ? (
+                <div className="text-white/50 text-sm">Loading plans...</div>
+              ) : plans.length === 0 ? (
+                <div className="text-white/50 text-sm">No plans configured. Go to the Plans tab to create one.</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                    {plans.map((plan, idx) => {
+                      const isCustom = plan.billing_model === 'custom' || Number(plan.price_per_carer) === 0
+                      const priceDisplay = isCustom ? 'Custom' : `£${plan.price_per_carer}`
+                      const carerRange = plan.max_users >= 100 ? `${plan.max_users}+` : `1-${plan.max_users}`
+                      return (
+                        <div key={plan.slug} className="rounded-lg p-3 border border-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                          <div className="text-white font-medium text-sm">{plan.name}</div>
+                          <div className="text-teal-400 font-bold text-lg">
+                            {priceDisplay}
+                            {!isCustom && <span className="text-white/40 text-xs font-normal">/carer/mo</span>}
+                          </div>
+                          <div className="text-white/40 text-xs">Up to {carerRange} carers</div>
+                          <div className="text-white/40 text-xs">Up to {plan.max_clients} clients</div>
+                          <div className="text-white/30 text-[10px] mt-0.5">
+                            {plan.billing_model === 'per-carer' ? 'Per-carer billing' : plan.billing_model === 'flat' ? 'Flat rate' : 'Custom negotiation'}
+                          </div>
+                          {plan.is_default && <div className="text-teal-400 text-[10px] mt-1">Default plan</div>}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Quick price editor */}
+                  <div className="mt-6 pt-4 border-t border-white/10">
+                    <h4 className="text-white/70 text-sm font-medium mb-3">Quick Price Editor</h4>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="text-white/40 text-xs uppercase">
+                          <tr>
+                            <th className="px-3 py-2">Plan</th>
+                            <th className="px-3 py-2">Price / Carer (£)</th>
+                            <th className="px-3 py-2">Billing Model</th>
+                            <th className="px-3 py-2">Max Carers</th>
+                            <th className="px-3 py-2">Max Clients</th>
+                            <th className="px-3 py-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5">
+                          {plans.map((plan, idx) => (
+                            <tr key={plan.slug} className="hover:bg-white/5 transition-colors">
+                              <td className="px-3 py-2 text-white">{plan.name}</td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={0.01}
+                                  value={plan.price_per_carer}
+                                  onChange={(e) => handlePlanUpdate(idx, 'price_per_carer', e.target.value)}
+                                  className="w-24 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm outline-none focus:border-teal-400"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <select
+                                  value={plan.billing_model}
+                                  onChange={(e) => handlePlanUpdate(idx, 'billing_model', e.target.value)}
+                                  className="bg-slate-800 text-white text-xs rounded px-2 py-1 border border-white/10 outline-none"
+                                >
+                                  <option value="per-carer">Per Carer</option>
+                                  <option value="flat">Flat Rate</option>
+                                  <option value="custom">Custom</option>
+                                </select>
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={plan.max_users}
+                                  onChange={(e) => handlePlanUpdate(idx, 'max_users', e.target.value)}
+                                  className="w-20 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm outline-none focus:border-teal-400"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={plan.max_clients}
+                                  onChange={(e) => handlePlanUpdate(idx, 'max_clients', e.target.value)}
+                                  className="w-20 bg-white/5 border border-white/10 rounded px-2 py-1 text-white text-sm outline-none focus:border-teal-400"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <button
+                                  onClick={() => handlePlanSave(idx)}
+                                  className="text-xs px-3 py-1.5 rounded-lg bg-teal-500 text-slate-900 hover:bg-teal-400 transition-colors font-medium"
+                                >
+                                  Save
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* MRR Summary */}
+                  <div className="mt-6 pt-4 border-t border-white/10">
+                    <h4 className="text-white/70 text-sm font-medium mb-3">Estimated Monthly Revenue</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="rounded-lg p-3 border border-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <div className="text-white/40 text-xs">Active Organizations</div>
+                        <div className="text-white font-bold text-xl">{stats.totalTenants}</div>
+                      </div>
+                      <div className="rounded-lg p-3 border border-white/5" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                        <div className="text-white/40 text-xs">Total Carers</div>
+                        <div className="text-white font-bold text-xl">{stats.totalUsers}</div>
+                      </div>
+                      <div className="rounded-lg p-3 border border-white/5" style={{ background: 'rgba(14,207,176,0.08)' }}>
+                        <div className="text-white/40 text-xs">Est. MRR</div>
+                        <div className="text-teal-400 font-bold text-xl">£{stats.estimatedMrr.toLocaleString()}</div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </>
         )}
 
