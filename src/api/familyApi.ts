@@ -14,6 +14,7 @@ export interface FamilyMember {
   createdAt: string
   lastLogin?: string
   invitedBy?: string
+  aiUpdateConsent?: boolean
 }
 
 export interface FamilyLoginRequest {
