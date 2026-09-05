@@ -1,10 +1,84 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 const APP_URL = 'https://app.careiapp.com'
+const API_BASE = 'https://api.careiapp.com/api'
+
+interface Plan {
+  slug: string
+  name: string
+  max_users: number
+  max_clients: number
+  price_per_carer: number
+  billing_model: string
+  is_default: boolean
+}
+
+const FALLBACK_PLANS: Plan[] = [
+  { slug: 'trial', name: 'Starter', max_users: 5, max_clients: 10, price_per_carer: 8, billing_model: 'per-carer', is_default: true },
+  { slug: 'professional', name: 'Professional', max_users: 25, max_clients: 50, price_per_carer: 14, billing_model: 'per-carer', is_default: false },
+  { slug: 'enterprise', name: 'Enterprise', max_users: 100, max_clients: 500, price_per_carer: 0, billing_model: 'custom', is_default: false },
+]
+
+const PLAN_FEATURES: Record<string, string[]> = {
+  trial: [
+    'Digital MAR and handover',
+    'Lone worker SOS',
+    'Vital signs and fluid tracking',
+    'Supervisor dashboard',
+    'UK data hosting',
+  ],
+  professional: [
+    'Everything in Starter',
+    'AI Copilot and voice documentation',
+    'AI care plan creator',
+    'Audio shift briefing',
+    'Passive lone worker monitoring',
+    'CQC audit export and reporting',
+  ],
+  enterprise: [
+    'Everything in Professional',
+    'Dedicated account manager',
+    'Custom integrations (EMIS, SystmOne)',
+    'SLA-backed uptime',
+    'On-site training and DSPT support',
+  ],
+}
+
+const PLAN_DESCRIPTIONS: Record<string, string> = {
+  trial: 'For small care teams making the move to digital records.',
+  professional: 'For providers who need AI documentation and full compliance tools.',
+  enterprise: 'For multi-site providers and NHS Integrated Care Boards.',
+}
+
+function getPricingDisplay(plan: Plan): { price: string; unit: string } {
+  if (plan.billing_model === 'custom' || plan.price_per_carer === 0) {
+    return { price: 'Custom', unit: '' }
+  }
+  const priceStr = `\u00a3${plan.price_per_carer}`
+  const unitStr = plan.billing_model === 'per-carer' ? '/ carer / mo' : `/ ${plan.billing_model}`
+  return { price: priceStr, unit: unitStr }
+}
 
 export default function LandingPage() {
+  const [plans, setPlans] = useState<Plan[]>(FALLBACK_PLANS)
+  const [plansLoading, setPlansLoading] = useState(true)
+
   useEffect(() => {
     window.scrollTo(0, 0)
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/public-plans`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.plans && Array.isArray(data.plans) && data.plans.length > 0) {
+          setPlans(data.plans)
+        }
+      })
+      .catch(() => {
+        // Keep fallback plans on error
+      })
+      .finally(() => setPlansLoading(false))
   }, [])
 
   return (
@@ -530,50 +604,49 @@ svg.icon-check{display:block;}
             <p className="sec-sub">No setup fees. No long contracts. Cancel anytime. Every plan includes GDPR-compliant UK hosting.</p>
           </div>
           <div className="pricing-grid">
-            <div className="pcard">
-              <div className="p-plan">Starter</div>
-              <div className="p-price">£8 <span className="p-unit">/ carer / mo</span></div>
-              <div className="p-desc">For small care teams making the move to digital records.</div>
-              <div className="p-divider"></div>
-              <ul className="p-feats">
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>Digital MAR and handover</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>Lone worker SOS</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>Vital signs and fluid tracking</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>Supervisor dashboard</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>UK data hosting</li>
-              </ul>
-              <a href={`${APP_URL}/login`}><button className="pbtn pbtn-outline">Start free trial</button></a>
-            </div>
-            <div className="pcard feat">
-              <div className="p-pop">Most popular</div>
-              <div className="p-plan">Professional</div>
-              <div className="p-price">£14 <span className="p-unit">/ carer / mo</span></div>
-              <div className="p-desc">For providers who need AI documentation and full compliance tools.</div>
-              <div className="p-divider"></div>
-              <ul className="p-feats">
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke="#0ecfb0"/></svg>Everything in Starter</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke="#0ecfb0"/></svg>AI Copilot and voice documentation</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke="#0ecfb0"/></svg>AI care plan creator</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke="#0ecfb0"/></svg>Audio shift briefing</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke="#0ecfb0"/></svg>Passive lone worker monitoring</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke="#0ecfb0"/></svg>CQC audit export and reporting</li>
-              </ul>
-              <a href={`${APP_URL}/login`}><button className="pbtn pbtn-white">Start free trial</button></a>
-            </div>
-            <div className="pcard">
-              <div className="p-plan">Enterprise</div>
-              <div className="p-price" style={{ fontSize: '32px', paddingTop: '6px' }}>Custom</div>
-              <div className="p-desc">For multi-site providers and NHS Integrated Care Boards.</div>
-              <div className="p-divider"></div>
-              <ul className="p-feats">
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>Everything in Professional</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>Dedicated account manager</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>Custom integrations (EMIS, SystmOne)</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>SLA-backed uptime</li>
-                <li><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round"/></svg>On-site training and DSPT support</li>
-              </ul>
-              <a href="mailto:sales@careiapp.com"><button className="pbtn pbtn-outline">Talk to sales</button></a>
-            </div>
+            {plans.map((plan, idx) => {
+              const isFeatured = idx === 1 || (plans.length === 2 && idx === 1)
+              const isCustom = plan.billing_model === 'custom' || plan.price_per_carer === 0
+              const { price, unit } = getPricingDisplay(plan)
+              const features = PLAN_FEATURES[plan.slug] || PLAN_FEATURES[plan.name.toLowerCase()] || []
+              const description = PLAN_DESCRIPTIONS[plan.slug] || PLAN_DESCRIPTIONS[plan.name.toLowerCase()] || ''
+              const isTrial = plan.slug === 'trial' || plan.name.toLowerCase() === 'starter'
+              const btnClass = isFeatured ? 'pbtn pbtn-white' : isCustom ? 'pbtn pbtn-outline' : 'pbtn pbtn-outline'
+              const btnText = isCustom ? 'Talk to sales' : 'Start free trial'
+              const btnHref = isCustom ? 'mailto:sales@careiapp.com' : `${APP_URL}/login`
+              return (
+                <div key={plan.slug} className={`pcard${isFeatured ? ' feat' : ''}`}>
+                  {isFeatured && <div className="p-pop">Most popular</div>}
+                  <div className="p-plan">{plan.name}</div>
+                  <div className="p-price" style={isCustom ? { fontSize: '32px', paddingTop: '6px' } : undefined}>
+                    {price}{!isCustom && unit && <span className="p-unit"> {unit}</span>}
+                  </div>
+                  <div className="p-desc">{description}</div>
+                  <div className="p-divider"></div>
+                  <ul className="p-feats">
+                    {features.map((feat, i) => (
+                      <li key={i}>
+                        <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke={isFeatured ? '#0ecfb0' : 'currentColor'}/></svg>
+                        {feat}
+                      </li>
+                    ))}
+                    {!isCustom && (
+                      <>
+                        <li>
+                          <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke={isFeatured ? '#0ecfb0' : 'currentColor'}/></svg>
+                          Up to {plan.max_users} carers
+                        </li>
+                        <li>
+                          <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke={isFeatured ? '#0ecfb0' : 'currentColor'}/></svg>
+                          Up to {plan.max_clients} clients
+                        </li>
+                      </>
+                    )}
+                  </ul>
+                  <a href={btnHref}><button className={btnClass}>{btnText}</button></a>
+                </div>
+              )
+            })}
           </div>
         </div>
       </section>
