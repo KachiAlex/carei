@@ -1,0 +1,87 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug } from '../db.js'
+import { generateSecureToken, hashToken } from '../hash.js'
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(req, res)
+  if (req.method === 'OPTIONS') { res.status(200).end(); return }
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' })
+    return
+  }
+
+  const { email, credentialId } = req.body || {}
+  if (!email || !credentialId) {
+    res.status(400).json({ error: 'email and credentialId required' })
+    return
+  }
+
+  try {
+    await ensureTables()
+    const sql = getSql()
+
+    const rows = await sql`
+      SELECT id, name, email, phone, region, role, biometrics_enabled, webauthn_credential
+      FROM users
+      WHERE email = ${email.toLowerCase()}
+      LIMIT 1
+    ` as any[]
+
+    const user = rows[0]
+    if (!user) {
+      res.status(401).json({ error: 'Invalid credentials' })
+      return
+    }
+
+    if (!user.biometrics_enabled) {
+      res.status(403).json({ error: 'Biometrics not enabled for this account' })
+      return
+    }
+
+    const storedCredential = user.webauthn_credential
+    if (!storedCredential || storedCredential.id !== credentialId) {
+      res.status(403).json({ error: 'Biometric credential mismatch' })
+      return
+    }
+
+    const token = generateSecureToken()
+    const tokenHash = await hashToken(token)
+    const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+    await sql`UPDATE users SET token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
+
+    // Auto-link orphaned users to carei tenant so they can access tenant-scoped endpoints
+    const tenantRows = await sql`
+      SELECT 1 FROM tenant_users WHERE user_id = ${user.id} LIMIT 1
+    ` as any[]
+    if (tenantRows.length === 0) {
+      let careiTenant = await getTenantFromSlug('carei')
+      if (!careiTenant) {
+        const tenantId = 'tenant-carei'
+        await sql`
+          INSERT INTO tenants (id, slug, name, plan)
+          VALUES (${tenantId}, 'carei', 'Carei', 'professional')
+          ON CONFLICT (slug) DO NOTHING
+        `
+        careiTenant = await getTenantFromSlug('carei')
+      }
+      if (careiTenant) {
+        await addUserToTenant(user.id, careiTenant.id, user.role || 'carer')
+      }
+    }
+
+    res.setHeader('Set-Cookie', `carei_token=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`)
+    res.status(200).json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        region: user.region,
+        role: user.role,
+      },
+    })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+}

@@ -1,0 +1,406 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node'
+import {
+  getSql, setCors, getAuthToken, ensureTables, getTenantFromSlug,
+  getUserTenants, verifyTenantAccess, createTenant, addUserToTenant,
+  getTenantSlug, getUserFromToken, getTenantMembers, getTenantStats,
+  getTenantMemberCount, getAllTenantsWithStats, getTenantClientCount,
+} from './db.js'
+import { generateSecureToken, hashToken } from './hash.js'
+
+async function getPlanDefaults(plan: string): Promise<{ max_users: number; max_clients: number; price_per_carer: number; billing_model: string } | null> {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT max_users, max_clients, price_per_carer, billing_model
+    FROM plans
+    WHERE slug = ${plan.toLowerCase()}
+    LIMIT 1
+  ` as any[]
+  if (rows.length === 0) return null
+  const r = rows[0]
+  return {
+    max_users: r.max_users,
+    max_clients: r.max_clients,
+    price_per_carer: r.price_per_carer ? parseFloat(r.price_per_carer) : 0,
+    billing_model: r.billing_model,
+  }
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(req, res)
+  if (req.method === 'OPTIONS') { res.status(200).end(); return }
+
+  try {
+    await ensureTables()
+    const sql = getSql()
+
+    // ──────────────────────────────────────────
+    // GET /api/tenants
+    // ──────────────────────────────────────────
+    if (req.method === 'GET') {
+      const token = getAuthToken(req)
+      const slug = req.query?.slug as string
+      const members = req.query?.members as string
+      const stats = req.query?.stats as string
+      const admin = req.query?.admin as string
+
+      // If admin flag, verify superadmin and return all tenants
+      if (admin === 'true') {
+        if (!token) { res.status(401).json({ error: 'Authentication required' }); return }
+        const user = await getUserFromToken(sql, token)
+        if (!user) { res.status(401).json({ error: 'Invalid token' }); return }
+        if (user.role !== 'superadmin') { res.status(403).json({ error: 'Superadmin access required' }); return }
+
+        const tenants = await getAllTenantsWithStats()
+        res.status(200).json({ tenants })
+        return
+      }
+
+      // If members requested, list tenant members
+      if (members) {
+        if (!token) { res.status(401).json({ error: 'Authentication required' }); return }
+        const user = await getUserFromToken(sql, token)
+        if (!user) { res.status(401).json({ error: 'Invalid token' }); return }
+
+        const tenant = await getTenantFromSlug(members)
+        if (!tenant) { res.status(404).json({ error: 'Tenant not found' }); return }
+
+        const access = await verifyTenantAccess(user.id, tenant.id)
+        if (!access.hasAccess) { res.status(403).json({ error: 'Access denied' }); return }
+
+        const memberList = await getTenantMembers(tenant.id)
+        res.status(200).json({ members: memberList })
+        return
+      }
+
+      // If stats requested, return tenant stats
+      if (stats) {
+        if (!token) { res.status(401).json({ error: 'Authentication required' }); return }
+        const user = await getUserFromToken(sql, token)
+        if (!user) { res.status(401).json({ error: 'Invalid token' }); return }
+
+        const tenant = await getTenantFromSlug(stats)
+        if (!tenant) { res.status(404).json({ error: 'Tenant not found' }); return }
+
+        const access = await verifyTenantAccess(user.id, tenant.id)
+        if (!access.hasAccess) { res.status(403).json({ error: 'Access denied' }); return }
+
+        const tenantStats = await getTenantStats(tenant.id)
+        res.status(200).json(tenantStats)
+        return
+      }
+
+      // If slug provided, get specific tenant details
+      if (slug) {
+        const tenant = await getTenantFromSlug(slug)
+        if (!tenant) {
+          res.status(404).json({ error: 'Tenant not found' })
+          return
+        }
+        res.status(200).json(tenant)
+        return
+      }
+
+      // Otherwise list all tenants for authenticated user
+      if (!token) {
+        res.status(401).json({ error: 'Authentication required' })
+        return
+      }
+
+      const user = await getUserFromToken(sql, token)
+      if (!user) {
+        res.status(401).json({ error: 'Invalid token' })
+        return
+      }
+
+      const tenants = await getUserTenants(user.id)
+      res.status(200).json({ tenants })
+      return
+    }
+
+    // ──────────────────────────────────────────
+    // POST /api/tenants - Create new tenant
+    // ──────────────────────────────────────────
+    if (req.method === 'POST') {
+      const token = getAuthToken(req)
+      if (!token) {
+        res.status(401).json({ error: 'Authentication required' })
+        return
+      }
+
+      const user = await getUserFromToken(sql, token)
+      if (!user) {
+        res.status(401).json({ error: 'Invalid token' })
+        return
+      }
+
+      const { slug, name, domain, plan, manager } = req.body || {}
+
+      if (!slug || !name) {
+        res.status(400).json({ error: 'slug and name are required' })
+        return
+      }
+
+      // Validate slug format (lowercase, alphanumeric, hyphens)
+      if (!/^[a-z0-9-]+$/.test(slug)) {
+        res.status(400).json({ error: 'Slug must be lowercase alphanumeric with hyphens only' })
+        return
+      }
+
+      const resolvedPlan = (plan || 'trial').toLowerCase()
+      const defaults = (await getPlanDefaults(resolvedPlan)) || { max_users: 3, max_clients: 10, price_per_carer: 0, billing_model: 'per-carer' }
+
+      try {
+        const tenant = await createTenant({ slug, name, domain, plan: resolvedPlan })
+        // Apply plan defaults
+        await sql`
+          UPDATE tenants
+          SET max_users = ${defaults.max_users},
+              max_clients = ${defaults.max_clients},
+              price_per_carer = ${defaults.price_per_carer},
+              billing_model = ${defaults.billing_model}
+          WHERE id = ${tenant.id}
+        `
+
+        let managerUser: { id: string; name: string; email: string; token: string } | null = null
+
+        if (manager && manager.name && manager.email) {
+          const managerId = 'u-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7)
+          const managerToken = generateSecureToken()
+          const tokenHash = await hashToken(managerToken)
+          const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+          await sql`
+            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_expires_at, email_verified)
+            VALUES (
+              ${managerId},
+              ${manager.name},
+              ${manager.email.toLowerCase()},
+              ${manager.phone || ''},
+              ${manager.region || ''},
+              ${manager.pin || ''},
+              ${manager.role || 'admin'},
+              ${tokenHash},
+              ${tokenExpiresAt},
+              TRUE
+            )
+          `
+          await addUserToTenant(managerId, tenant.id, manager.role || 'admin')
+          managerUser = {
+            id: managerId,
+            name: manager.name,
+            email: manager.email.toLowerCase(),
+            token: managerToken,
+          }
+        } else {
+          // Fallback: add creator as admin if no manager provided
+          await addUserToTenant(user.id, tenant.id, 'admin')
+        }
+
+        res.status(201).json({
+          id: tenant.id,
+          slug,
+          name,
+          plan: resolvedPlan,
+          max_users: defaults.max_users,
+          max_clients: defaults.max_clients,
+          manager: managerUser,
+          message: 'Tenant created successfully',
+        })
+      } catch (err: any) {
+        if (err.message?.includes('unique constraint') || err.message?.includes('duplicate')) {
+          if (err.message?.includes('users_email')) {
+            res.status(409).json({ error: 'Manager email already registered' })
+          } else {
+            res.status(409).json({ error: 'Tenant slug already exists' })
+          }
+          return
+        }
+        throw err
+      }
+      return
+    }
+
+    // ──────────────────────────────────────────
+    // PUT /api/tenants - Update tenant settings
+    // ──────────────────────────────────────────
+    if (req.method === 'PUT') {
+      const token = getAuthToken(req)
+      if (!token) { res.status(401).json({ error: 'Authentication required' }); return }
+
+      const user = await getUserFromToken(sql, token)
+      if (!user) { res.status(401).json({ error: 'Invalid token' }); return }
+
+      const targetSlug = req.query?.slug as string
+      if (!targetSlug) { res.status(400).json({ error: 'slug query param required' }); return }
+
+      const tenant = await getTenantFromSlug(targetSlug)
+      if (!tenant) { res.status(404).json({ error: 'Tenant not found' }); return }
+
+      const access = await verifyTenantAccess(user.id, tenant.id)
+      if (!access.hasAccess) { res.status(403).json({ error: 'Access denied' }); return }
+      if (access.role !== 'admin') { res.status(403).json({ error: 'Admin access required' }); return }
+
+      const { name, settings } = req.body || {}
+      let hasField = false
+
+      if (name !== undefined) {
+        await sql`UPDATE tenants SET name = ${name}, updated_at = NOW() WHERE id = ${tenant.id}`
+        hasField = true
+      }
+      if (settings !== undefined) {
+        await sql`UPDATE tenants SET settings = ${JSON.stringify(settings)}, updated_at = NOW() WHERE id = ${tenant.id}`
+        hasField = true
+      }
+
+      if (!hasField) { res.status(400).json({ error: 'No fields to update' }); return }
+
+      res.status(200).json({ message: 'Tenant updated successfully' })
+      return
+    }
+
+    // ──────────────────────────────────────────
+    // PATCH /api/tenants - Plan / Active / Join
+    // ──────────────────────────────────────────
+    if (req.method === 'PATCH') {
+      const token = getAuthToken(req)
+      if (!token) { res.status(401).json({ error: 'Authentication required' }); return }
+
+      const user = await getUserFromToken(sql, token)
+      if (!user) { res.status(401).json({ error: 'Invalid token' }); return }
+
+      const action = req.query?.action as string
+      const targetSlug = req.query?.slug as string
+
+      // Join tenant
+      if (action === 'join') {
+        const { tenantId, role = 'carer' } = req.body || {}
+        if (!tenantId) { res.status(400).json({ error: 'tenantId is required' }); return }
+
+        // Check tenant active and not expired
+        const tenantRows = await sql`SELECT active, expires_at, max_users, plan FROM tenants WHERE id = ${tenantId}` as any[]
+        if (tenantRows.length === 0) { res.status(404).json({ error: 'Tenant not found' }); return }
+        const t = tenantRows[0]
+        if (t.active === false) { res.status(403).json({ error: 'Tenant is inactive' }); return }
+        if (t.expires_at && new Date(t.expires_at) < new Date()) { res.status(403).json({ error: 'Tenant subscription expired' }); return }
+
+        // Check plan limit
+        const currentCount = await getTenantMemberCount(tenantId)
+        if (t.max_users && currentCount >= t.max_users) {
+          res.status(403).json({ error: 'Tenant user limit reached. Upgrade plan to add more members.' })
+          return
+        }
+
+        await addUserToTenant(user.id, tenantId, role)
+        res.status(200).json({ message: 'Joined tenant successfully' })
+        return
+      }
+
+      // Update plan (superadmin only)
+      if (action === 'plan') {
+        if (user.role !== 'superadmin') { res.status(403).json({ error: 'Superadmin access required' }); return }
+        if (!targetSlug) { res.status(400).json({ error: 'slug query param required' }); return }
+
+        const tenant = await getTenantFromSlug(targetSlug)
+        if (!tenant) { res.status(404).json({ error: 'Tenant not found' }); return }
+
+        const { plan } = req.body || {}
+        if (!plan) { res.status(400).json({ error: 'plan is required' }); return }
+
+        const resolvedPlan = plan.toLowerCase()
+        const defaults = (await getPlanDefaults(resolvedPlan)) || { max_users: 3, max_clients: 10, price_per_carer: 0, billing_model: 'per-carer' }
+
+        await sql`
+          UPDATE tenants
+          SET plan = ${resolvedPlan},
+              max_users = ${defaults.max_users},
+              max_clients = ${defaults.max_clients},
+              price_per_carer = ${defaults.price_per_carer},
+              billing_model = ${defaults.billing_model}
+          WHERE id = ${tenant.id}
+        `
+        res.status(200).json({
+          message: 'Plan updated successfully',
+          plan: resolvedPlan,
+          max_users: defaults.max_users,
+          max_clients: defaults.max_clients,
+        })
+        return
+      }
+
+      // Toggle active (superadmin only)
+      if (action === 'active') {
+        if (user.role !== 'superadmin') { res.status(403).json({ error: 'Superadmin access required' }); return }
+        if (!targetSlug) { res.status(400).json({ error: 'slug query param required' }); return }
+
+        const tenant = await getTenantFromSlug(targetSlug)
+        if (!tenant) { res.status(404).json({ error: 'Tenant not found' }); return }
+
+        const { active } = req.body || {}
+        if (typeof active !== 'boolean') { res.status(400).json({ error: 'active boolean is required' }); return }
+
+        await sql`UPDATE tenants SET active = ${active}, updated_at = NOW() WHERE id = ${tenant.id}`
+        res.status(200).json({ message: `Tenant ${active ? 'activated' : 'deactivated'}`, active })
+        return
+      }
+
+      // Update price per carer (superadmin only)
+      if (action === 'price') {
+        if (user.role !== 'superadmin') { res.status(403).json({ error: 'Superadmin access required' }); return }
+        if (!targetSlug) { res.status(400).json({ error: 'slug query param required' }); return }
+
+        const tenant = await getTenantFromSlug(targetSlug)
+        if (!tenant) { res.status(404).json({ error: 'Tenant not found' }); return }
+
+        const { pricePerCarer, billingModel } = req.body || {}
+        if (pricePerCarer !== undefined && (typeof pricePerCarer !== 'number' || pricePerCarer < 0)) {
+          res.status(400).json({ error: 'pricePerCarer must be a non-negative number' })
+          return
+        }
+
+        if (pricePerCarer !== undefined) {
+          await sql`UPDATE tenants SET price_per_carer = ${pricePerCarer}, updated_at = NOW() WHERE id = ${tenant.id}`
+        }
+        if (billingModel !== undefined) {
+          await sql`UPDATE tenants SET billing_model = ${billingModel}, updated_at = NOW() WHERE id = ${tenant.id}`
+        }
+
+        res.status(200).json({
+          message: 'Pricing updated successfully',
+          pricePerCarer: pricePerCarer ?? tenant.price_per_carer,
+          billingModel: billingModel ?? tenant.billing_model,
+        })
+        return
+      }
+
+      res.status(400).json({ error: 'Unknown patch action' })
+      return
+    }
+
+    // ──────────────────────────────────────────
+    // DELETE /api/tenants - Delete tenant
+    // ──────────────────────────────────────────
+    if (req.method === 'DELETE') {
+      const token = getAuthToken(req)
+      if (!token) { res.status(401).json({ error: 'Authentication required' }); return }
+
+      const user = await getUserFromToken(sql, token)
+      if (!user) { res.status(401).json({ error: 'Invalid token' }); return }
+
+      if (user.role !== 'superadmin') { res.status(403).json({ error: 'Superadmin access required' }); return }
+
+      const targetSlug = req.query?.slug as string
+      if (!targetSlug) { res.status(400).json({ error: 'slug query param required' }); return }
+
+      const tenant = await getTenantFromSlug(targetSlug)
+      if (!tenant) { res.status(404).json({ error: 'Tenant not found' }); return }
+
+      await sql`DELETE FROM tenants WHERE id = ${tenant.id}`
+      res.status(200).json({ message: 'Tenant deleted successfully' })
+      return
+    }
+
+    res.status(405).json({ error: 'Method not allowed' })
+  } catch (err: any) {
+    console.error('Tenants API error:', err)
+    res.status(500).json({ error: err.message || 'Internal server error' })
+  }
+}

@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: carei-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: carei
+      POSTGRES_PASSWORD: CareiDB2026!Secure
+      POSTGRES_DB: carei
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - carei_pgdata:/var/lib/postgresql/data
+      - ./export_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./export_data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U carei -d carei"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - carei-net
+
+  api:
+    build: .
+    container_name: carei-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://carei:CareiDB2026!Secure@db:5432/carei
+    ports:
+      - "127.0.0.1:3012:3001"
+    volumes:
+      - ./logs:/var/log/carei
+    networks:
+      - carei-net
+
+volumes:
+  carei_pgdata:
+
+networks:
+  carei-net:
+    driver: bridge
+
