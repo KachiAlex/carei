@@ -172,7 +172,7 @@ export default function ComplianceDashboardScreen() {
 
             {/* Items by Category */}
             <div className="space-y-6">
-              {Object.entries(groupedItems).map(([category, catItems]: [string, any[]]) => (
+              {Object.entries(groupedItems).map(([category, catItems]: [string, any]) => (
                 <motion.div
                   key={category}
                   initial={{ opacity: 0, y: 20 }}
@@ -183,7 +183,7 @@ export default function ComplianceDashboardScreen() {
                     <h3 className="text-white font-semibold capitalize">{category.replace(/_/g, ' ')}</h3>
                   </div>
                   <div className="divide-y divide-white/5">
-                    {catItems.map((item, idx) => (
+                    {(catItems as any[]).map((item: any, idx: number) => (
                       <div key={idx} className="p-4 flex items-start gap-3 hover:bg-white/5">
                         <div className="mt-1">{statusIcon(item.status)}</div>
                         <div className="flex-1">
