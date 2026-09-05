@@ -14,7 +14,9 @@ import {
   addTaskLog,
   startTask,
   updateClient,
-  createClient
+  createClient,
+  updateProfile,
+  createCaregiver
 } from '../api/client'
 
 // Track sync status globally
@@ -54,7 +56,7 @@ export function useOnlineSync() {
           
           switch (item.type) {
             case 'visit':
-              await saveVisit((item.payload as any).visitId, item.payload)
+              await saveVisit((item.payload as { visitId: string }).visitId, item.payload)
               break
               
             case 'sos':
@@ -113,9 +115,11 @@ export function useOnlineSync() {
               break
               
             case 'caregiver-update':
+              await updateProfile(item.payload as { name?: string; phone?: string; region?: string })
+              break
+              
             case 'caregiver-create':
-              // These require special handling - skip for now
-              console.warn(`[Sync] ${item.type} not yet implemented`)
+              await createCaregiver(item.payload as { name: string; email: string; phone: string; region: string; pin: string; role?: string })
               break
               
             default:

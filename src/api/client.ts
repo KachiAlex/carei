@@ -767,7 +767,7 @@ export async function registerUser(data: {
   pin: string
   role?: string
 }) {
-  const res = await post('/auth/register', data) as any
+  const res = await post('/auth/register', data)
   if (res.token) {
     setToken(res.token)
     await secureSet('token', res.token)
@@ -776,7 +776,7 @@ export async function registerUser(data: {
 }
 
 export async function loginUser(data: { email: string; pin: string }) {
-  const res = await post('/auth/login', data) as any
+  const res = await post('/auth/login', data)
   if (res.token) {
     setToken(res.token)
     await secureSet('token', res.token)
@@ -789,7 +789,7 @@ export async function loginUser(data: { email: string; pin: string }) {
 }
 
 export async function loginWithPassword(data: { email: string; password: string }) {
-  const res = await post('/auth/login-password', data) as any
+  const res = await post('/auth/login-password', data)
   if (res.token) {
     setToken(res.token)
     await secureSet('token', res.token)
@@ -806,7 +806,7 @@ export async function seedSuperAdmin() {
 }
 
 export async function resetPin(data: { email: string; newPin: string; otp: string }) {
-  const res = await post('/auth/reset-pin', data) as any
+  const res = await post('/auth/reset-pin', data)
   return res
 }
 
@@ -839,7 +839,7 @@ export async function updateProfile(data: { name?: string; phone?: string; regio
 }
 
 export async function biometricLogin(data: { email: string; credentialId: string }) {
-  const res = await post('/auth/biometric-login', data) as any
+  const res = await post('/auth/biometric-login', data)
   if (res.token) {
     setToken(res.token)
     await secureSet('token', res.token)
@@ -848,7 +848,7 @@ export async function biometricLogin(data: { email: string; credentialId: string
 }
 
 export async function biometricTokenLogin(data: { email: string; token: string }) {
-  const res = await post('/auth/biometric-token-login', data) as any
+  const res = await post('/auth/biometric-token-login', data)
   if (res.token) {
     setToken(res.token)
     await secureSet('token', res.token)
@@ -1005,7 +1005,7 @@ export async function saveVoiceMemo(data: {
 }
 
 export async function uploadFile(fileData: string, fileName: string, folder: string): Promise<string> {
-  const res = await post('/upload', { fileData, fileName, folder }) as any
+  const res = await post('/upload', { fileData, fileName, folder })
   return res.url
 }
 
@@ -1115,7 +1115,7 @@ export async function verifyOtp(data: { email: string; code: string; purpose?: s
 
 // Family Authentication API
 export async function familyLogin(data: { email: string; pin: string }) {
-  const res = await post('/family/auth/login', data) as any
+  const res = await post('/family/auth/login', data)
   if (res.token) {
     setToken(res.token)
     localStorage.setItem('familyToken', res.token)
@@ -1148,7 +1148,7 @@ export async function familyLogout() {
 }
 
 export async function refreshFamilyToken(refreshToken: string) {
-  const res = await post('/family/auth/refresh', { refreshToken }) as any
+  const res = await post('/family/auth/refresh', { refreshToken })
   if (res.token) {
     localStorage.setItem('familyToken', res.token)
     localStorage.setItem('familyRefreshToken', res.refreshToken)

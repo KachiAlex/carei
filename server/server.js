@@ -8,8 +8,24 @@ const app = express()
 const PORT = process.env.PORT || 3001
 
 // ─── Middleware ───
+const ALLOWED_ORIGINS = [
+  'https://careiapp.com',
+  'https://www.careiapp.com',
+  'https://app.careiapp.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'capacitor://localhost',
+  'https://localhost',
+]
 app.use(cors({
-  origin: true,
+  origin(origin, callback) {
+    // Allow same-origin / no-origin requests (curl, server-to-server, Capacitor)
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error(`CORS blocked origin: ${origin}`))
+    }
+  },
   credentials: true,
 }))
 app.use(express.json({ limit: '50mb' }))
@@ -45,6 +61,9 @@ async function load(routePath) {
 // ─── Register all routes ───
 // We register routes in an async IIFE so we can dynamically import
 async function setupRoutes() {
+  const failedRoutes = []
+  const loadedRoutes = []
+
   // ─── Top-level API routes ───
   const topRoutes = [
     'agencies', 'audit-logs', 'availability', 'body-map', 'bulk-invites',
@@ -67,9 +86,11 @@ async function setupRoutes() {
       if (handler) {
         app.all(`/api/${name}`, route(handler))
         app.all(`/api/${name}/*`, route(handler))
+        loadedRoutes.push(`top/${name}`)
       }
     } catch (err) {
       console.error(`Failed to load route: ${name}`, err.message)
+      failedRoutes.push(`top/${name}`)
     }
   }
 
@@ -85,9 +106,11 @@ async function setupRoutes() {
       const handler = await load(`./dist/api/auth/${name}.js`)
       if (handler) {
         app.all(`/api/auth/${name}`, route(handler))
+        loadedRoutes.push(`auth/${name}`)
       }
     } catch (err) {
       console.error(`Failed to load auth route: ${name}`, err.message)
+      failedRoutes.push(`auth/${name}`)
     }
   }
 
@@ -99,9 +122,11 @@ async function setupRoutes() {
       const handler = await load(`./dist/api/manager/${name}.js`)
       if (handler) {
         app.all(`/api/manager/${name}`, route(handler))
+        loadedRoutes.push(`manager/${name}`)
       }
     } catch (err) {
       console.error(`Failed to load manager route: ${name}`, err.message)
+      failedRoutes.push(`manager/${name}`)
     }
   }
 
@@ -113,9 +138,11 @@ async function setupRoutes() {
       const handler = await load(`./dist/api/caregiver/${name}.js`)
       if (handler) {
         app.all(`/api/caregiver/${name}`, route(handler))
+        loadedRoutes.push(`caregiver/${name}`)
       }
     } catch (err) {
       console.error(`Failed to load caregiver route: ${name}`, err.message)
+      failedRoutes.push(`caregiver/${name}`)
     }
   }
 
@@ -127,9 +154,11 @@ async function setupRoutes() {
       const handler = await load(`./dist/api/tasks/${name}.js`)
       if (handler) {
         app.all(`/api/tasks/${name}`, route(handler))
+        loadedRoutes.push(`tasks/${name}`)
       }
     } catch (err) {
       console.error(`Failed to load task route: ${name}`, err.message)
+      failedRoutes.push(`tasks/${name}`)
     }
   }
 
@@ -141,9 +170,11 @@ async function setupRoutes() {
       const handler = await load(`./dist/api/anthropic/${name}.js`)
       if (handler) {
         app.all(`/api/anthropic/${name}`, route(handler))
+        loadedRoutes.push(`anthropic/${name}`)
       }
     } catch (err) {
       console.error(`Failed to load anthropic route: ${name}`, err.message)
+      failedRoutes.push(`anthropic/${name}`)
     }
   }
 
@@ -155,9 +186,11 @@ async function setupRoutes() {
       const handler = await load(`./dist/api/copilot/${name}.js`)
       if (handler) {
         app.all(`/api/copilot/${name}`, route(handler))
+        loadedRoutes.push(`copilot/${name}`)
       }
     } catch (err) {
       console.error(`Failed to load copilot route: ${name}`, err.message)
+      failedRoutes.push(`copilot/${name}`)
     }
   }
 
@@ -167,14 +200,26 @@ async function setupRoutes() {
     if (familyHandler) {
       app.all('/api/family', route(familyHandler))
       app.all('/api/family/*', route(familyHandler))
+      loadedRoutes.push('family/catch-all')
     }
   } catch (err) {
     console.error('Failed to load family route:', err.message)
+    failedRoutes.push('family/catch-all')
+  }
+
+  // ─── Route registration summary ───
+  console.log(`\n[Routes] Loaded ${loadedRoutes.length} routes, ${failedRoutes.length} failed`)
+  if (failedRoutes.length > 0) {
+    console.warn('[Routes] FAILED routes:', failedRoutes.join(', '))
   }
 
   // ─── Health check ───
   app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() })
+    res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      routes: { loaded: loadedRoutes.length, failed: failedRoutes.length, failedList: failedRoutes },
+    })
   })
 
   // ─── 404 handler ───

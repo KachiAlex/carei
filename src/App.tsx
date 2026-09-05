@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Route, Router, Switch, useLocation } from 'wouter'
 import SplashScreen from './pages/SplashScreen'
 import { useOnlineSync } from './hooks/useOnlineSync'
@@ -8,6 +8,7 @@ import { TenantProvider } from './contexts/TenantContext'
 import { secureGet, secureWipe } from './utils/secureStorage'
 import { setToken, setRefreshToken, setUser, clearAuthCache } from './utils/tokenCache'
 import { useAutoLock } from './hooks/useAutoLock'
+import { refreshSession } from './api/client'
 const PWAInstallPrompt = lazyLoad(() => import('./components/PWAInstallPrompt'))
 const SyncStatus = lazyLoad(() => import('./components/SyncStatus'))
 
@@ -56,9 +57,15 @@ function useSecureBoot() {
         const payload = decodeJwtPayload(token)
         if (payload?.exp && payload.exp * 1000 < Date.now()) {
           // Access token expired — try to refresh using refresh token
-          secureGet('refreshToken').then((refreshToken) => {
+          secureGet('refreshToken').then(async (refreshToken) => {
             if (refreshToken) {
               setRefreshToken(refreshToken)
+              // Actually call the refresh endpoint to get a new access token
+              const refreshed = await refreshSession()
+              if (!refreshed) {
+                secureWipe()
+                clearAuthCache()
+              }
             } else {
               secureWipe()
               clearAuthCache()
@@ -132,8 +139,6 @@ const TrainingScreen = lazyLoad(() => import('./pages/TrainingScreen'))
 const RightToWorkScreen = lazyLoad(() => import('./pages/RightToWorkScreen'))
 const SupervisionScreen = lazyLoad(() => import('./pages/SupervisionScreen'))
 const MessagesScreen = lazyLoad(() => import('./pages/MessagesScreen'))
-const ManagerCarePlanEditScreen = lazyLoad(() => import('./pages/ManagerCarePlanEditScreen'))
-const EnhancedManagerCarePlanEditScreen = lazyLoad(() => import('./pages/EnhancedManagerCarePlanEditScreen'))
 const FinalEnhancedCarePlanEditScreen = lazyLoad(() => import('./pages/FinalEnhancedCarePlanEditScreen'))
 const AIReportScreen = lazyLoad(() => import('./pages/AIReportScreen'))
 const ComplianceDashboardScreen = lazyLoad(() => import('./pages/ComplianceDashboardScreen'))
@@ -180,7 +185,18 @@ function PublicRoutes() {
       <Route path="/settings" component={SettingsScreen} />
       <Route path="/availability" component={AvailabilityScreen} />
       <Route path="/messages" component={MessagesScreen} />
+      <Route path="/:rest*" component={NotFoundPage} />
     </Switch>
+  )
+}
+
+function NotFoundPage() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center" style={{ background: '#0f1a2e', color: '#fff' }}>
+      <h1 className="text-4xl font-bold mb-2">404</h1>
+      <p className="text-white/50 mb-6">Page not found</p>
+      <a href="/" className="px-6 py-2 rounded-lg text-sm font-semibold" style={{ background: '#4FD1C5', color: '#0f1a2e' }}>Go home</a>
+    </div>
   )
 }
 
@@ -209,8 +225,8 @@ function TenantRoutes() {
         {/* Manager routes within tenant */}
         <Route path="/tenant/:slug/manager" component={ManagerDashboard} />
         <Route path="/tenant/:slug/manager/clients" component={ClientManagement} />
-        <Route path="/tenant/:slug/manager/clients/:id/care-plan/edit" component={ManagerCarePlanEditScreen} />
-        <Route path="/tenant/:slug/manager/clients/:id/care-plan/enhanced" component={EnhancedManagerCarePlanEditScreen} />
+        <Route path="/tenant/:slug/manager/clients/:id/care-plan/edit" component={FinalEnhancedCarePlanEditScreen} />
+        <Route path="/tenant/:slug/manager/clients/:id/care-plan/enhanced" component={FinalEnhancedCarePlanEditScreen} />
         <Route path="/tenant/:slug/manager/clients/:id/care-plan/final" component={FinalEnhancedCarePlanEditScreen} />
         <Route path="/tenant/:slug/manager/schedule" component={VisitScheduling} />
         <Route path="/tenant/:slug/manager/approvals" component={ManagerApprovalsScreen} />
