@@ -580,8 +580,8 @@ svg.icon-check{display:block;}
         </div>
       </section>
 
-      {/* TESTIMONIALS — temporarily disabled */}
-      {false && (<section className="sec-wide sec-bg2">
+      {/* TESTIMONIALS — temporarily disabled
+      <section className="sec-wide sec-bg2">
         <div className="sec-inner">
           <div className="testi-intro">
             <div><div className="sec-tag">What care homes say</div><h2 className="sec-h" style={{ marginBottom: '0' }}>Trusted across 200+ care homes</h2></div>
@@ -593,10 +593,11 @@ svg.icon-check{display:block;}
             <div className="tcard"><p className="tquote">Our last CQC inspection went without a single documentation query. The auditor said our MAR records were the most complete they'd seen from a provider our size.</p><div className="t-auth"><div className="t-av">AM</div><div><div className="t-name">Amara Mensah</div><div className="t-role">Registered Manager · London</div></div></div></div>
           </div>
         </div>
-      </section>)}
+      </section>
+      */}
 
-      {/* PRICING — temporarily disabled */}
-      {false && (<section id="pricing" className="sec-wide">
+      {/* PRICING — temporarily disabled
+      <section id="pricing" className="sec-wide">
         <div className="sec-inner">
           <div style={{ maxWidth: '520px' }}>
             <div className="sec-tag">Pricing</div>
@@ -649,7 +650,8 @@ svg.icon-check{display:block;}
             })}
           </div>
         </div>
-      </section>)}
+      </section>
+      */}
 
       {/* CTA BAND */}
       <div id="demo" className="cta-banner">
