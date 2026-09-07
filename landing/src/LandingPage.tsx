@@ -440,13 +440,14 @@ svg.icon-check{display:block;}
         </div>
       </section>
 
-      {/* STATS BAND */}
+      {/* STATS BAND — temporarily disabled
       <div className="graphic-band">
         <div className="gb-item"><div className="gb-num">200+</div><div className="gb-label">Care homes</div><div className="gb-sub">Live across the UK</div></div>
         <div className="gb-item"><div className="gb-num">15K+</div><div className="gb-label">Shifts logged</div><div className="gb-sub">Every month</div></div>
         <div className="gb-item"><div className="gb-num">99.9%</div><div className="gb-label">Uptime</div><div className="gb-sub">SLA-backed</div></div>
         <div className="gb-item"><div className="gb-num">4.9★</div><div className="gb-label">App Store</div><div className="gb-sub">From 1,200 carers</div></div>
       </div>
+      */}
 
       {/* FEATURES */}
       <section id="features" className="sec-wide sec-bg">
