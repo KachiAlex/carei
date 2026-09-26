@@ -256,7 +256,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    const { message, history = [] } = req.body || {}
+    const { message, history = [], sessionId } = req.body || {}
     if (!message || typeof message !== 'string') {
       res.status(400).json({ error: 'Message is required' })
       return
@@ -306,8 +306,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const data = await response.json()
     const reply = data.content?.[0]?.text || 'No response from AI.'
 
+    // Persist the conversation into an assistant session so it survives reloads
+    let activeSessionId: string | null = sessionId || null
+    try {
+      const tenantRows = await sql`SELECT tenant_id FROM tenant_users WHERE user_id = ${user.id} LIMIT 1` as any[]
+      const tenantId = tenantRows[0]?.tenant_id || null
+      const newMessages = [
+        { role: 'user', content: message, at: new Date().toISOString() },
+        { role: 'assistant', content: reply, at: new Date().toISOString() },
+      ]
+      if (activeSessionId) {
+        const updated = await sql`
+          UPDATE assistant_sessions
+          SET messages = messages || ${JSON.stringify(newMessages)}::jsonb, updated_at = NOW()
+          WHERE id = ${activeSessionId} AND user_id = ${user.id}
+          RETURNING id
+        ` as any[]
+        if (!updated[0]) activeSessionId = null
+      }
+      if (!activeSessionId) {
+        activeSessionId = 'asst-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
+        const title = message.length > 60 ? message.slice(0, 57) + '…' : message
+        await sql`
+          INSERT INTO assistant_sessions (id, tenant_id, user_id, title, messages)
+          VALUES (${activeSessionId}, ${tenantId}, ${user.id}, ${title}, ${JSON.stringify(newMessages)})
+        `
+      }
+    } catch (e: any) {
+      console.error('[copilot/chat] session persist failed:', e.message)
+    }
+
     res.status(200).json({
       reply,
+      sessionId: activeSessionId,
       tokens: data.usage?.output_tokens,
       today: context.today,
       clientCount: context.clients.length,

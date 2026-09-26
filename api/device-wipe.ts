@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, withTenant, getTenantSlug } from './db.js'
+import { getSql, setCors, ensureTables, withTenant, getTenantSlug, logSecurityEvent } from './db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -81,12 +81,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (body.action === 'acknowledge' && body.commandId) {
         const { commandId } = body
         if (tenantSlug) {
-          await withTenant(req, res, async ({ sql: tenantSql }) => {
+          await withTenant(req, res, async ({ tenantId, userId: actorId, sql: tenantSql }) => {
             await tenantSql`
               UPDATE device_wipe_commands
               SET status = 'executed', executed_at = NOW()
               WHERE id = ${commandId}
             `
+            await logSecurityEvent({
+              tenantId, eventType: 'device_wipe_executed', actorId,
+              metadata: { commandId },
+            })
             res.status(200).json({ status: 'acknowledged', commandId })
           })
           return
@@ -109,11 +113,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const commandId = 'wipe_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
 
       if (tenantSlug) {
-        await withTenant(req, res, async ({ tenantId, sql: tenantSql }) => {
+        await withTenant(req, res, async ({ tenantId, userId: actorId, sql: tenantSql }) => {
           await tenantSql`
             INSERT INTO device_wipe_commands (id, tenant_id, device_id, user_id, issued_by, reason)
             VALUES (${commandId}, ${tenantId}, ${deviceId}, ${userId || null}, ${issuedBy || null}, ${reason || 'Remote wipe issued by manager'})
           `
+          await logSecurityEvent({
+            tenantId, eventType: 'device_wipe_issued', actorId,
+            deviceId, metadata: { commandId, targetUserId: userId || null, reason: reason || null },
+          })
           res.status(201).json({ status: 'issued', commandId, deviceId })
         })
         return

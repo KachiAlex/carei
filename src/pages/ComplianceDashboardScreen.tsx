@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRoute, useLocation } from 'wouter'
 import { motion } from 'framer-motion'
-import { getComplianceDashboard } from '../api/client'
+import { getComplianceDashboard, getComplianceRules } from '../api/client'
 import { getToken, setToken } from '../utils/tokenCache'
 import { secureGet } from '../utils/secureStorage'
 import { Shield, AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react'
@@ -20,6 +20,7 @@ export default function ComplianceDashboardScreen() {
   const [match, params] = useRoute('/tenant/:slug/manager/compliance')
 
   const [data, setData] = useState<any>(null)
+  const [rules, setRules] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -29,6 +30,7 @@ export default function ComplianceDashboardScreen() {
     try {
       const res = await getComplianceDashboard() as any
       setData(res)
+      getComplianceRules().then(setRules).catch(() => setRules(null))
     } catch (err: any) {
       setError(err.message || 'Failed to load compliance data')
     } finally {
@@ -167,6 +169,48 @@ export default function ComplianceDashboardScreen() {
                     <p className="text-white font-semibold">{val}</p>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Rules engine results */}
+            {rules && (
+              <div className="mb-8">
+                <h3 className="text-white font-semibold mb-3">Compliance Rules</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  {(rules.areas || []).map((area: any) => {
+                    const c = area.status === 'green' ? COLORS.green
+                      : area.status === 'amber' ? COLORS.amber
+                      : area.status === 'red' ? COLORS.red : '#94A3B8'
+                    return (
+                      <div key={area.key} className="bg-white/5 rounded-lg p-4 border-l-4" style={{ borderColor: c }}>
+                        <p className="text-white/60 text-xs mb-1">{area.label}</p>
+                        <p className="text-white font-semibold capitalize flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ background: c }} />
+                          {area.status}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+                {(rules.flags || []).length > 0 && (
+                  <div className="bg-white/5 backdrop-blur rounded-xl divide-y divide-white/5">
+                    {rules.flags.map((f: any, i: number) => (
+                      <div key={i} className="p-4 flex items-start gap-3">
+                        <span
+                          className="mt-1 w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{
+                            background: f.rule.startsWith('red:') ? COLORS.red
+                              : f.rule.startsWith('amber:') ? COLORS.amber : '#94A3B8',
+                          }}
+                        />
+                        <div className="flex-1">
+                          <p className="text-white text-sm">{f.reason}</p>
+                          <p className="text-teal/80 text-xs mt-1">{f.action}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

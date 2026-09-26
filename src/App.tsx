@@ -141,6 +141,7 @@ const SupervisionScreen = lazyLoad(() => import('./pages/SupervisionScreen'))
 const MessagesScreen = lazyLoad(() => import('./pages/MessagesScreen'))
 const FinalEnhancedCarePlanEditScreen = lazyLoad(() => import('./pages/FinalEnhancedCarePlanEditScreen'))
 const AIReportScreen = lazyLoad(() => import('./pages/AIReportScreen'))
+const DocumentsScreen = lazyLoad(() => import('./pages/DocumentsScreen'))
 const ComplianceDashboardScreen = lazyLoad(() => import('./pages/ComplianceDashboardScreen'))
 const RiskAlertsScreen = lazyLoad(() => import('./pages/RiskAlertsScreen'))
 const StaffMatchingScreen = lazyLoad(() => import('./pages/StaffMatchingScreen'))
@@ -232,6 +233,7 @@ function TenantRoutes() {
         <Route path="/tenant/:slug/manager/approvals" component={ManagerApprovalsScreen} />
         <Route path="/tenant/:slug/manager/audit" component={ManagerAuditScreen} />
         <Route path="/tenant/:slug/manager/reports" component={AIReportScreen} />
+        <Route path="/tenant/:slug/manager/documents" component={DocumentsScreen} />
         <Route path="/tenant/:slug/manager/compliance" component={ComplianceDashboardScreen} />
         <Route path="/tenant/:slug/manager/risk-alerts" component={RiskAlertsScreen} />
         <Route path="/tenant/:slug/manager/staff-matching" component={StaffMatchingScreen} />

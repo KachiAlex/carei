@@ -38,6 +38,7 @@ type QueueItemType =
   | 'caregiver-create'
   | 'ai-copilot'
   | 'ai-summary'
+  | 'api-request'
 
 interface QueueItem {
   id?: number

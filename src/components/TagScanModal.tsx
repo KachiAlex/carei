@@ -67,7 +67,10 @@ export default function TagScanModal({
         clientId = decodedText.replace('CAREi:client:', '')
       }
 
-      if (clientId === expectedClientId) {
+      // QR codes we issue encode CAREi:client:<id> and can be checked locally.
+      // Raw NFC tags only expose a UID — the server verifies it against the
+      // client's registered tag_id, so accept the scan and record the evidence.
+      if (clientId === expectedClientId || method === 'nfc') {
         setScanStatus('success')
         stopScanner()
         onScanSuccess({

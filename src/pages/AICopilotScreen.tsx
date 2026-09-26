@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useLocation } from 'wouter'
-import { chatWithAI, getCopilotContext } from '../api/client'
+import { chatWithAI, getCopilotContext, getCopilotSessions, getCopilotSession, deleteCopilotSession } from '../api/client'
 import { enqueue } from '../utils/offlineQueue'
 
 const COLORS = {
@@ -51,6 +51,10 @@ export default function AICopilotScreen() {
   const [isRecording, setIsRecording] = useState(false)
   const [context, setContext] = useState<any>(null)
   const [contextLoading, setContextLoading] = useState(true)
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined)
+  const [showHistory, setShowHistory] = useState(false)
+  const [sessions, setSessions] = useState<any[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const recognitionRef = useRef<any>(null)
 
@@ -109,7 +113,8 @@ export default function AICopilotScreen() {
       const history = messages
         .filter((m) => !m.pending)
         .map((m) => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
-      const data = await chatWithAI(trimmed, context, history.slice(-6))
+      const data = await chatWithAI(trimmed, context, history.slice(-6), sessionId)
+      if (data.sessionId && data.sessionId !== sessionId) setSessionId(data.sessionId)
       const aiMsg: Message = { role: 'ai', text: data.reply || 'No response from AI.', timestamp: new Date() }
       setMessages((prev) => [...prev, aiMsg])
     } catch {
@@ -150,8 +155,57 @@ export default function AICopilotScreen() {
     setIsRecording(false)
   }
 
+  const openHistory = async () => {
+    setShowHistory(true)
+    setSessionsLoading(true)
+    try {
+      const res: any = await getCopilotSessions()
+      setSessions(res.sessions || [])
+    } catch {
+      setSessions([])
+    } finally {
+      setSessionsLoading(false)
+    }
+  }
+
+  const loadSession = async (id: string) => {
+    try {
+      const res: any = await getCopilotSession(id)
+      const s = res.session
+      if (!s) return
+      setSessionId(s.id)
+      const restored: Message[] = (s.messages || []).map((m: any) => ({
+        role: m.role === 'user' ? 'user' : 'ai',
+        text: m.content ?? m.text ?? '',
+        timestamp: new Date(s.updated_at || Date.now()),
+      }))
+      setMessages(restored.length ? restored : [
+        { role: 'ai', text: "Hello, I'm CAREi. Ask me about your clients, visits, tasks, or care plans.", timestamp: new Date() },
+      ])
+      setShowHistory(false)
+    } catch {
+      // leave current state
+    }
+  }
+
+  const removeSession = async (id: string) => {
+    try {
+      await deleteCopilotSession(id)
+      setSessions((prev) => prev.filter((s) => s.id !== id))
+      if (id === sessionId) {
+        setSessionId(undefined)
+      }
+    } catch {}
+  }
+
+  const startNewChat = () => {
+    setSessionId(undefined)
+    setMessages([{ role: 'ai', text: "Hello, I'm CAREi. Ask me about your clients, visits, tasks, or care plans.", timestamp: new Date() }])
+    setShowHistory(false)
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans relative">
       {/* Header */}
       <div
         className="px-4 py-4 text-white shrink-0 flex items-center justify-between"
@@ -178,8 +232,71 @@ export default function AICopilotScreen() {
             ) : null}
           </div>
         </div>
-        <div className="w-8" />
+        <button
+          onClick={openHistory}
+          className="text-white/60 hover:text-white bg-transparent border-none cursor-pointer p-1 rounded-lg"
+          aria-label="Chat history"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M12 7v5l4 2" />
+          </svg>
+        </button>
       </div>
+
+      {/* Session history drawer */}
+      {showHistory && (
+        <div className="absolute inset-0 z-40 bg-black/40" onClick={() => setShowHistory(false)}>
+          <div
+            className="absolute right-0 top-0 bottom-0 w-72 bg-white shadow-xl flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+              <span className="font-semibold text-sm text-slate-800">Chat history</span>
+              <button
+                onClick={startNewChat}
+                className="text-xs font-medium text-teal bg-teal/10 px-2.5 py-1 rounded-lg border-none cursor-pointer"
+              >
+                New chat
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              {sessionsLoading ? (
+                <div className="p-4 text-xs text-slate-400">Loading…</div>
+              ) : sessions.length === 0 ? (
+                <div className="p-4 text-xs text-slate-400">No previous conversations.</div>
+              ) : (
+                sessions.map((s) => (
+                  <div
+                    key={s.id}
+                    className={`px-4 py-3 border-b border-slate-100 flex items-center gap-2 cursor-pointer hover:bg-slate-50 ${
+                      s.id === sessionId ? 'bg-teal/5' : ''
+                    }`}
+                    onClick={() => loadSession(s.id)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-medium text-slate-800 truncate">{s.title || 'Conversation'}</div>
+                      <div className="text-[10px] text-slate-400">
+                        {s.message_count ?? 0} messages · {new Date(s.updated_at).toLocaleDateString('en-GB')}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeSession(s.id) }}
+                      className="text-slate-300 hover:text-red-400 bg-transparent border-none cursor-pointer p-1"
+                      aria-label="Delete conversation"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                        <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick actions */}
       {!loading && (

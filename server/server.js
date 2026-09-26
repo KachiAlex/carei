@@ -78,6 +78,7 @@ async function setupRoutes() {
     'user-type', 'visit-approvals', 'visit-detail', 'visit-draft',
     'visit-start', 'visits', 'voice-memos',
     'compliance-dashboard', 'risk-alerts', 'staff-matching', 'outcome-indicators',
+    'documents', 'reports', 'family-consent', 'compliance-rules', 'security-events',
   ]
 
   for (const name of topRoutes) {
@@ -97,7 +98,7 @@ async function setupRoutes() {
   // ─── Auth routes (/api/auth/*) ───
   const authRoutes = [
     'biometric-login', 'biometric-token-login', 'biometrics',
-    'change-password', 'login-password', 'login', 'logout',
+    'change-password', 'deactivate', 'login-password', 'login', 'logout',
     'me', 'refresh', 'register', 'reset-pin', 'update-profile',
   ]
 
@@ -179,7 +180,7 @@ async function setupRoutes() {
   }
 
   // ─── Copilot routes (/api/copilot/*) ───
-  const copilotRoutes = ['chat', 'context']
+  const copilotRoutes = ['chat', 'context', 'sessions']
 
   for (const name of copilotRoutes) {
     try {

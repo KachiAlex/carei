@@ -1,6 +1,7 @@
 import { getToken, setToken, getRefreshToken, setRefreshToken, clearAuthCache } from '../utils/tokenCache'
 import { secureSet, secureGet, secureRemove } from '../utils/secureStorage'
 import { enqueue } from '../utils/offlineQueue'
+import { getApiCache, setApiCache } from '../utils/apiCache'
 
 function getApiBase(): string {
   // 1. Environment override always wins
@@ -116,13 +117,8 @@ export async function refreshSession(): Promise<boolean> {
   return tryRefreshToken()
 }
 
-export function authHeaders(): Record<string, string> {
-  const token = getToken()
+function currentTenantSlug(): string {
   const tenant = localStorage.getItem('carei_current_tenant')
-  const headers: Record<string, string> = {}
-
-  if (token) headers.Authorization = `Bearer ${token}`
-
   let slug = ''
   if (tenant) {
     try {
@@ -130,13 +126,26 @@ export function authHeaders(): Record<string, string> {
       if (parsed.slug) slug = parsed.slug
     } catch { /* ignore */ }
   }
-
-  // Fallback: extract tenant slug from URL path /tenant/:slug/...
   if (!slug && typeof window !== 'undefined') {
     const match = window.location.pathname.match(/\/tenant\/([^\/]+)/)
     if (match) slug = match[1]
   }
+  return slug
+}
 
+// Cache key scopes GET responses to the active org — one org's data must
+// never be served to another
+function apiCacheKey(path: string): string {
+  return `${currentTenantSlug()}|${path}`
+}
+
+export function authHeaders(): Record<string, string> {
+  const token = getToken()
+  const headers: Record<string, string> = {}
+
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const slug = currentTenantSlug()
   if (slug) headers['X-Tenant-Slug'] = slug
 
   return headers
@@ -174,12 +183,7 @@ async function postWithRetry(path: string, body: unknown, retries = 3, extraHead
 
       // OFFLINE HANDLING: If it's a network error and we're not online, or it's a fetch error
       if (!navigator.onLine || err instanceof TypeError) {
-        const queueType = getQueueTypeForPath(path, 'POST')
-        if (queueType) {
-          console.log(`[Offline] Enqueuing ${queueType} for ${path}`)
-          await enqueue({ type: queueType as any, payload: body })
-          return { status: 'enqueued', offline: true }
-        }
+        return queueMutation(path, 'POST', body)
       }
 
       // Exponential backoff: wait longer between retries
@@ -205,9 +209,24 @@ function getQueueTypeForPath(path: string, method: string): string | null {
   if (path.includes('/tasks/complete')) return 'task-complete'
   if (path.includes('/tasks/log')) return 'task-log'
   if (path.includes('/messages') && method === 'POST') return 'family-message'
-  if (path.includes('/clients') && method === 'PATCH') return 'client-update'
+  if (path.includes('/clients') && (method === 'PATCH' || method === 'PUT')) return 'client-update'
   if (path.includes('/clients') && method === 'POST') return 'client-create'
   return null
+}
+
+// Queue a failed mutation for replay when connectivity returns.
+// Prefer the semantically-mapped queue type; unmapped mutations still
+// get queued verbatim so no write is ever silently lost offline.
+async function queueMutation(path: string, method: string, body: unknown): Promise<any> {
+  const queueType = getQueueTypeForPath(path, method)
+  if (queueType) {
+    console.log(`[Offline] Enqueuing ${queueType} for ${path}`)
+    await enqueue({ type: queueType as any, payload: body })
+  } else {
+    console.log(`[Offline] Enqueuing generic ${method} ${path}`)
+    await enqueue({ type: 'api-request' as any, payload: { path, method, body } })
+  }
+  return { status: 'enqueued', offline: true }
 }
 
 export async function post(path: string, body: unknown, extraHeaders?: Record<string, string>) {
@@ -233,7 +252,10 @@ async function getWithRetry(path: string, retries = 3, extraHeaders?: Record<str
         throw new Error(err.error || `HTTP ${res.status}`)
       }
 
-      return await parseJsonResponse(res)
+      const data = await parseJsonResponse(res)
+      // Write-through: keep the last good response for offline reads
+      void setApiCache(apiCacheKey(path), data)
+      return data
     } catch (err) {
       lastError = err as Error
 
@@ -242,10 +264,26 @@ async function getWithRetry(path: string, retries = 3, extraHeaders?: Record<str
         throw err
       }
 
+      // OFFLINE READ: serve the last cached response for this path
+      if (!navigator.onLine || err instanceof TypeError) {
+        const cached = await getApiCache(apiCacheKey(path))
+        if (cached) {
+          console.log(`[Offline] Serving cached response for ${path}`)
+          return cached.data
+        }
+      }
+
       if (attempt < retries - 1) {
         await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
       }
     }
+  }
+
+  // Last resort before giving up: try cache one final time
+  const cached = await getApiCache(apiCacheKey(path))
+  if (cached) {
+    console.log(`[Offline] Serving cached response for ${path}`)
+    return cached.data
   }
 
   throw lastError || new Error('Network error after retries')
@@ -277,6 +315,9 @@ async function putWithRetry(path: string, body: unknown, retries = 3, extraHeade
     } catch (err) {
       lastError = err as Error
       if (err instanceof Error && err.message.includes('HTTP 4')) throw err
+      if (!navigator.onLine || err instanceof TypeError) {
+        return queueMutation(path, 'PUT', body)
+      }
       if (attempt < retries - 1) {
         await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
       }
@@ -312,6 +353,9 @@ async function patchWithRetry(path: string, body?: unknown, retries = 3, extraHe
     } catch (err) {
       lastError = err as Error
       if (err instanceof Error && err.message.includes('HTTP 4')) throw err
+      if (!navigator.onLine || err instanceof TypeError) {
+        return queueMutation(path, 'PATCH', body)
+      }
       if (attempt < retries - 1) {
         await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
       }
@@ -341,6 +385,9 @@ async function delWithRetry(path: string, retries = 3, extraHeaders?: Record<str
     } catch (err) {
       lastError = err as Error
       if (err instanceof Error && err.message.includes('HTTP 4')) throw err
+      if (!navigator.onLine || err instanceof TypeError) {
+        return queueMutation(path, 'DELETE', undefined)
+      }
       if (attempt < retries - 1) {
         await new Promise(r => setTimeout(r, Math.pow(2, attempt) * 1000))
       }
@@ -353,8 +400,20 @@ export async function del(path: string, extraHeaders?: Record<string, string>) {
   return delWithRetry(path, 3, extraHeaders)
 }
 
-export async function chatWithAI(message: string, context?: any, history?: { role: string; content: string }[]) {
-  return post('/copilot/chat', { message, context, history })
+// Replay a queued offline mutation verbatim (no re-enqueue on failure).
+// Used by the sync loop for generic 'api-request' queue items.
+export async function replayApiRequest(path: string, method: string, body: unknown) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: { ...jsonHeaders, ...authHeaders() },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return parseJsonResponse(res)
+}
+
+export async function chatWithAI(message: string, context?: any, history?: { role: string; content: string }[], sessionId?: string) {
+  return post('/copilot/chat', { message, context, history, sessionId })
 }
 
 export async function getCopilotContext() {
@@ -373,8 +432,18 @@ export async function saveVisit(visitId: string, data: unknown) {
   return post(`/visit-detail?id=${encodeURIComponent(visitId)}`, data)
 }
 
-export async function startVisit(clientId: string) {
-  return post('/visit-start', { clientId })
+export interface EvvData {
+  lat?: number
+  lng?: number
+  accuracy?: number
+  distanceM?: number
+  geoOverrideReason?: string
+  tagId?: string
+  tagMethod?: string
+}
+
+export async function startVisit(clientId: string, evv?: EvvData) {
+  return post('/visit-start', { clientId, evv })
 }
 
 export async function getManagerData() {
@@ -1368,6 +1437,77 @@ export async function structureVoiceNotes(data: { transcript: string; visitId?: 
 
 export async function getComplianceDashboard() {
   return get('/compliance-dashboard')
+}
+
+export async function getComplianceRules() {
+  return get('/compliance-rules')
+}
+
+export async function getDocuments(clientId?: string, status?: string) {
+  const params = new URLSearchParams()
+  if (clientId) params.set('clientId', clientId)
+  if (status) params.set('status', status)
+  const qs = params.toString()
+  return get(`/documents${qs ? `?${qs}` : ''}`)
+}
+
+export async function generateDocument(data: {
+  templateType: 'incident_report' | 'care_assessment_summary' | 'general_letter'
+  input: string
+  clientId?: string
+  visitId?: string
+}) {
+  return post('/documents/generate', data)
+}
+
+export async function saveDocument(data: {
+  templateType: string
+  title: string
+  content: Record<string, unknown>
+  clientId?: string
+  visitId?: string
+  documentId?: string
+  confirm?: boolean
+}) {
+  return post('/documents', data)
+}
+
+export async function getReports(clientId?: string) {
+  return get(`/reports${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`)
+}
+
+export async function getFamilyConsent(clientId: string) {
+  return get(`/family-consent?clientId=${encodeURIComponent(clientId)}`)
+}
+
+export async function setFamilyConsent(clientId: string, consent: boolean) {
+  const res = await fetch(`${API_BASE}/family-consent`, {
+    method: 'PUT',
+    headers: { ...jsonHeaders, ...authHeaders() },
+    body: JSON.stringify({ clientId, consent }),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+export async function getCopilotSessions() {
+  return get('/copilot/sessions')
+}
+
+export async function getCopilotSession(id: string) {
+  return get(`/copilot/sessions?id=${encodeURIComponent(id)}`)
+}
+
+export async function deleteCopilotSession(id: string) {
+  const res = await fetch(`${API_BASE}/copilot/sessions?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
 }
 
 export async function getRiskAlerts() {

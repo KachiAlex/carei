@@ -67,6 +67,10 @@
     <!-- Audio (for voice memos) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     
+    <!-- NFC (for EVV tag check-in) -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+
     <!-- Notifications (for alerts) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug, checkRateLimit } from '../db.js'
+import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug, checkRateLimit, logSecurityEvent } from '../db.js'
 import crypto from 'crypto'
 import { verifyCredential, generateSecureToken, hashToken } from '../hash.js'
 
@@ -33,14 +33,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureTables()
     const sql = getSql()
     const rows = await sql`
-      SELECT id, name, email, phone, region, pin, role, password_hash, password_hash_scrypt
+      SELECT id, name, email, phone, region, pin, role, status, password_hash, password_hash_scrypt
       FROM users
       WHERE LOWER(email) = ${email.toLowerCase()}
       LIMIT 1
     ` as any[]
 
     const user = rows[0]
+    if (user && user.status === 'deactivated') {
+      await logSecurityEvent({
+        eventType: 'login_blocked_deactivated',
+        actorEmail: email,
+        metadata: { reason: 'account deactivated' },
+      })
+      res.status(403).json({ error: 'This account has been deactivated' })
+      return
+    }
     if (!user || (!user.password_hash && !user.password_hash_scrypt)) {
+      await logSecurityEvent({ eventType: 'login_failed', actorEmail: email })
       res.status(401).json({ error: 'Invalid email or password' })
       return
     }
@@ -53,6 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       valid = user.password_hash === legacyHashPassword(password)
     }
     if (!valid) {
+      await logSecurityEvent({ eventType: 'login_failed_bad_password', actorEmail: email })
       res.status(401).json({ error: 'Invalid email or password' })
       return
     }
