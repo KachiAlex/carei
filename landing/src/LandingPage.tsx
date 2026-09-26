@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const APP_URL = 'https://app.careiapp.com'
 const API_BASE = 'https://api.careiapp.com/api'
@@ -8,11 +8,13 @@ interface Plan {
   name: string
   max_users: number
   max_clients: number
-  price_per_carer: number
+  price_per_carer: number | string
   billing_model: string
   is_default: boolean
 }
 
+// Mirrors the live rows in the `plans` table (verified via /api/public-plans).
+// Used only when the endpoint is unreachable.
 const FALLBACK_PLANS: Plan[] = [
   { slug: 'trial', name: 'Starter', max_users: 5, max_clients: 10, price_per_carer: 8, billing_model: 'per-carer', is_default: true },
   { slug: 'professional', name: 'Professional', max_users: 25, max_clients: 50, price_per_carer: 14, billing_model: 'per-carer', is_default: false },
@@ -23,48 +25,117 @@ const PLAN_FEATURES: Record<string, string[]> = {
   trial: [
     'Digital MAR and handover',
     'Lone worker SOS',
-    'Vital signs and fluid tracking',
+    'Vitals and fluid tracking',
     'Supervisor dashboard',
     'UK data hosting',
   ],
   professional: [
     'Everything in Starter',
     'AI Copilot and voice documentation',
-    'AI care plan creator',
+    'AI care-plan creator',
     'Audio shift briefing',
-    'Passive lone worker monitoring',
-    'CQC audit export and reporting',
+    'Passive lone-worker monitoring',
+    'Audit export and reporting',
   ],
   enterprise: [
     'Everything in Professional',
-    'Dedicated account manager',
-    'Custom integrations (EMIS, SystmOne)',
-    'SLA-backed uptime',
-    'On-site training and DSPT support',
+    'Dedicated account support',
+    'Custom integrations',
+    'Service-level options',
+    'Implementation and training support',
   ],
 }
 
 const PLAN_DESCRIPTIONS: Record<string, string> = {
-  trial: 'For small care teams making the move to digital records.',
-  professional: 'For providers who need AI documentation and full compliance tools.',
-  enterprise: 'For multi-site providers and NHS Integrated Care Boards.',
+  trial: 'For small care teams moving from paper or fragmented tools to one digital workflow.',
+  professional: 'For providers that want AI-assisted documentation and a fuller compliance workflow.',
+  enterprise: 'For multi-site organisations that need broader controls, implementation support and integrations.',
+}
+
+const PLAN_CTA: Record<string, string> = {
+  trial: 'Start free trial',
+  professional: 'Start free trial',
+  enterprise: 'Talk to sales',
 }
 
 function getPricingDisplay(plan: Plan): { price: string; unit: string } {
-  if (plan.billing_model === 'custom' || plan.price_per_carer === 0) {
+  if (plan.billing_model === 'custom') {
     return { price: 'Custom', unit: '' }
   }
-  const priceStr = `\u00a3${plan.price_per_carer}`
-  const unitStr = plan.billing_model === 'per-carer' ? '/ carer / mo' : `/ ${plan.billing_model}`
+  // price_per_carer is a NUMERIC column — the API serialises it as a string
+  const price = typeof plan.price_per_carer === 'string'
+    ? parseFloat(plan.price_per_carer)
+    : Number(plan.price_per_carer)
+  if (!Number.isFinite(price) || price <= 0) {
+    return { price: 'Free', unit: '' }
+  }
+  const priceStr = `£${Number.isInteger(price) ? price : price.toFixed(2)}`
+  const unitStr = plan.billing_model === 'per-carer' ? '/ carer / month' : `/ ${plan.billing_model}`
   return { price: priceStr, unit: unitStr }
 }
 
+type TabKey = 'visit' | 'meds' | 'handover' | 'oversight'
+
+const FEATURE_COPY: Record<TabKey, { k: string; t: string; x: string; b: string[] }> = {
+  visit: {
+    k: 'Frontline workflow',
+    t: 'Everything the carer needs, exactly when they need it.',
+    x: 'CAREi keeps the active visit focused: client context, tasks, medication, observations, notes and safety tools are all available without jumping between disconnected screens.',
+    b: ['Client briefing before care starts', 'Voice and structured documentation', 'Safety tools always within reach'],
+  },
+  meds: {
+    k: 'Digital MAR',
+    t: 'Medication records that are fast for carers and clear for managers.',
+    x: 'Confirm each medication individually, capture exceptions and keep the administration record connected to the visit, user and time it happened.',
+    b: ['Per-medication confirmation', 'Clear pending and exception states', 'Structured record for later review'],
+  },
+  handover: {
+    k: 'Continuity of care',
+    t: 'The next carer should not have to reconstruct the previous visit.',
+    x: 'CAREi turns the important observations, completed actions and follow-ups from one visit into a concise handover for the next person.',
+    b: ['Key observations summarised', 'Outstanding actions carried forward', 'Less reliance on memory and phone calls'],
+  },
+  oversight: {
+    k: 'Operational visibility',
+    t: 'Supervisors see what needs attention without hovering over every visit.',
+    x: 'Active visits, medication issues, safety status and exceptions can be surfaced in one operational view so managers can focus on what actually needs intervention.',
+    b: ['Live visit visibility', 'Priority exceptions and alerts', 'Shared operational picture'],
+  },
+}
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'visit', label: 'During a visit' },
+  { key: 'meds', label: 'Medication' },
+  { key: 'handover', label: 'Handover' },
+  { key: 'oversight', label: 'Oversight' },
+]
+
+const COPILOT_PROMPT = 'What should I know before I complete Margaret’s visit?'
+
 export default function LandingPage() {
   const [plans, setPlans] = useState<Plan[]>(FALLBACK_PLANS)
-  const [plansLoading, setPlansLoading] = useState(true)
+  const [scrolled, setScrolled] = useState(false)
+  const [tab, setTab] = useState<TabKey>('visit')
+  const [typed, setTyped] = useState('')
+  const [showAnswer, setShowAnswer] = useState(false)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const demoRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     window.scrollTo(0, 0)
+    const onScroll = () => setScrolled(window.scrollY > 12)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  useEffect(() => {
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) e.target.classList.add('show') }),
+      { threshold: 0.12 }
+    )
+    document.querySelectorAll('.reveal').forEach((el) => io.observe(el))
+    return () => io.disconnect()
   }, [])
 
   useEffect(() => {
@@ -78,632 +149,602 @@ export default function LandingPage() {
       .catch(() => {
         // Keep fallback plans on error
       })
-      .finally(() => setPlansLoading(false))
   }, [])
 
+  // Count-up animation for hero dashboard metrics
+  useEffect(() => {
+    const els = document.querySelectorAll<HTMLElement>('[data-count]')
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return
+        const el = e.target as HTMLElement
+        io.unobserve(el)
+        const target = parseInt(el.dataset.count || '0', 10)
+        const t0 = performance.now()
+        const dur = 1300
+        const tick = (t: number) => {
+          const p = Math.min((t - t0) / dur, 1)
+          el.textContent = String(Math.round(target * (1 - Math.pow(1 - p, 3))))
+          if (p < 1) requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      })
+    }, { threshold: 0.4 })
+    els.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [])
+
+  // Copilot prompt typing effect, triggered when the demo card scrolls into view
+  useEffect(() => {
+    const el = demoRef.current
+    if (!el) return
+    let iv: ReturnType<typeof setInterval> | undefined
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return
+        io.disconnect()
+        let i = 0
+        iv = setInterval(() => {
+          i++
+          setTyped(COPILOT_PROMPT.slice(0, i))
+          if (i >= COPILOT_PROMPT.length) {
+            clearInterval(iv)
+            setTimeout(() => setShowAnswer(true), 400)
+          }
+        }, 30)
+      })
+    }, { threshold: 0.35 })
+    io.observe(el)
+    return () => { io.disconnect(); if (iv) clearInterval(iv) }
+  }, [])
+
+  // Cursor parallax tilt on the hero product stage
+  const handleStageMove = (e: React.MouseEvent) => {
+    const el = stageRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const x = (e.clientX - (r.left + r.width / 2)) / r.width
+    const y = (e.clientY - (r.top + r.height / 2)) / r.height
+    el.style.setProperty('--ry', `${x * 5}deg`)
+    el.style.setProperty('--rx', `${-y * 4}deg`)
+    el.style.setProperty('--tx', `${x * 16}px`)
+    el.style.setProperty('--ty', `${y * 12}px`)
+  }
+  const resetStageTilt = () => {
+    const el = stageRef.current
+    if (!el) return
+    el.style.setProperty('--ry', '0deg')
+    el.style.setProperty('--rx', '0deg')
+    el.style.setProperty('--tx', '0px')
+    el.style.setProperty('--ty', '0px')
+  }
+
+  const feature = FEATURE_COPY[tab]
+
   return (
-    <div className="min-h-screen" style={{ background: '#ffffff' }}>
+    <div style={{ background: '#ffffff' }}>
       <style>{`
-*{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --g:#0ecfb0;--gd:#09b89c;--gdk:#085041;
-  --gl:#e8faf7;--gll:#f3fdfb;--gm:#c5f5ed;
-  --ink:#0b1f18;--ink2:#1e3d30;--muted:#4d7266;
-  --white:#ffffff;--off:#f8fdfb;
-  --f:'DM Sans',sans-serif;--fd:'Playfair Display',serif;
+  --ink:#0b1f18;--ink2:#15372b;--muted:#60776f;--line:#dfe9e5;
+  --green:#18d0ae;--green2:#0fb798;--deep:#073e34;--mint:#e9fbf7;--mint2:#f5fcfa;
+  --white:#fff;--off:#f7fbfa;--danger:#e64949;--amber:#f2b84b;
+  --shadow:0 24px 70px rgba(8,52,43,.12);--shadow2:0 12px 35px rgba(8,52,43,.09);
+  --radius:28px;--radius-sm:18px;
+  --f:'DM Sans',sans-serif;--fd:'Manrope',sans-serif;
 }
-html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
-body{font-family:var(--f);background:var(--white);color:var(--ink);overflow-x:hidden;line-height:1.5;}
-
+*{box-sizing:border-box} html{scroll-behavior:smooth} body{margin:0;font-family:var(--f);color:var(--ink);background:#fff;overflow-x:hidden;-webkit-font-smoothing:antialiased} a{text-decoration:none;color:inherit} button{font:inherit}
+.container{width:min(1200px,calc(100% - 40px));margin:auto}.section{padding:112px 0}.eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--deep)}.eyebrow:before{content:'';width:26px;height:2px;background:var(--green);border-radius:9px}.h2{font-family:var(--fd);font-size:clamp(38px,5vw,64px);line-height:1.02;letter-spacing:-.045em;margin:16px 0 18px}.lead{font-size:17px;line-height:1.75;color:var(--muted);max-width:680px}.reveal{opacity:0;transform:translateY(20px);transition:.7s ease}.reveal.show{opacity:1;transform:none}
 /* NAV */
-nav{display:flex;align-items:center;justify-content:space-between;padding:0 56px;height:68px;border-bottom:1px solid rgba(14,207,176,0.15);background:rgba(255,255,255,0.96);position:sticky;top:0;z-index:100;backdrop-filter:blur(8px);}
-.logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
-.logo-mark{
-  width:38px;height:38px;border-radius:10px;
-  background:var(--g);
-  display:flex;align-items:center;justify-content:center;
-  overflow:hidden;flex-shrink:0;
-}
-.logo-mark img{width:100%;height:100%;object-fit:cover;}
-.logo-name{font-size:19px;font-weight:700;color:var(--ink);letter-spacing:-0.4px;}
-.logo-name sup{font-size:10px;font-weight:400;color:var(--muted);}
-.nav-links{display:flex;gap:32px;list-style:none;}
-.nav-links a{font-size:13.5px;color:var(--muted);text-decoration:none;font-weight:500;transition:color .2s;}
-.nav-links a:hover{color:var(--ink);}
-.nav-cta{display:flex;gap:10px;align-items:center;}
-.btn-ghost{
-  background:transparent;border:1.5px solid rgba(14,207,176,0.5);
-  color:var(--gdk);padding:8px 20px;border-radius:9px;
-  font-size:13.5px;font-weight:600;font-family:var(--f);cursor:pointer;
-  transition:border-color .25s ease,box-shadow .25s ease;
-}
-.btn-ghost:hover{border-color:var(--g);box-shadow:0 2px 12px rgba(14,207,176,0.15);}
-.btn-primary{
-  background:var(--g);color:var(--ink);padding:9px 22px;border-radius:9px;
-  font-size:13.5px;font-weight:700;border:none;font-family:var(--f);cursor:pointer;
-  transition:background .25s ease,box-shadow .25s ease;
-}
-.btn-primary:hover{background:var(--gd);box-shadow:0 4px 16px rgba(14,207,176,0.3);}
-
+.site-nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 0;transition:.3s}.site-nav.scrolled{background:rgba(255,255,255,.88);backdrop-filter:blur(18px);border-bottom:1px solid rgba(223,233,229,.9);padding:10px 0}.nav{display:flex;align-items:center;justify-content:space-between;gap:24px}.brand{display:flex;align-items:center;gap:11px;font-family:var(--fd);font-weight:800;font-size:20px}.brand-mark{width:42px;height:42px;border-radius:14px;background:linear-gradient(145deg,var(--green),#71efd8);display:grid;place-items:center;box-shadow:0 12px 30px rgba(24,208,174,.26)}.brand-mark svg{width:23px;height:23px}.nav-links{display:flex;gap:28px;align-items:center;font-size:14px;font-weight:600;color:#425c53}.nav-links a{position:relative}.nav-links a:after{content:'';position:absolute;height:2px;left:0;right:100%;bottom:-8px;background:var(--green);transition:.25s}.nav-links a:hover:after{right:0}.nav-actions{display:flex;align-items:center;gap:10px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border:0;border-radius:14px;padding:13px 19px;font-weight:800;cursor:pointer;transition:.25s}.btn:hover{transform:translateY(-2px)}.btn-ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}.btn-primary{background:var(--ink);color:#fff;box-shadow:0 12px 28px rgba(11,31,24,.18)}.mobile-toggle{display:none;border:0;background:#fff;width:44px;height:44px;border-radius:12px;font-size:20px}
 /* HERO */
-.hero{
-  background:linear-gradient(180deg,var(--off) 0%,var(--white) 100%);
-  padding:80px 56px 80px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;min-height:600px;overflow:hidden;position:relative;
-}
-.hero-left{display:flex;flex-direction:column;justify-content:center;}
-.hero-eyebrow{
-  display:inline-flex;align-items:center;gap:8px;background:var(--white);border:1.5px solid var(--gm);padding:6px 15px;border-radius:24px;font-size:12px;font-weight:600;color:var(--gdk);letter-spacing:0.3px;margin-bottom:28px;box-shadow:0 1px 8px rgba(14,207,176,0.06);
-}
-.hero-eyebrow span{width:7px;height:7px;border-radius:50%;background:var(--g);display:block;}
-h1{font-family:var(--fd);font-size:62px;line-height:1.05;color:var(--ink);letter-spacing:-1.5px;margin-bottom:22px;}
-h1 em{font-style:italic;color:var(--gdk);}
-.hero-sub{font-size:17px;color:var(--muted);line-height:1.7;max-width:420px;font-weight:300;margin-bottom:36px;}
-.hero-actions{display:flex;gap:14px;align-items:center;margin-bottom:44px;}
-.btn-hero{
-  background:var(--ink);color:var(--white);padding:15px 32px;border-radius:12px;font-size:15px;font-weight:700;border:none;font-family:var(--f);cursor:pointer;transition:transform .2s ease,box-shadow .2s ease;
-}
-.btn-hero:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(11,31,24,0.25);}
-.btn-hero-out{
-  background:transparent;border:1.5px solid var(--gm);color:var(--gdk);padding:15px 26px;border-radius:12px;font-size:15px;font-weight:600;font-family:var(--f);cursor:pointer;transition:border-color .25s ease,background .25s ease;
-}
-.btn-hero-out:hover{border-color:var(--g);background:var(--gll);}
-.trust-badges{display:flex;gap:10px;flex-wrap:wrap;}
-.tbadge{
-  display:flex;align-items:center;gap:6px;background:var(--white);border:1px solid rgba(14,207,176,0.2);padding:7px 13px;border-radius:8px;font-size:12px;font-weight:500;color:var(--ink2);transition:border-color .2s ease;box-shadow:0 1px 4px rgba(0,0,0,0.03);
-}
-.tbadge:hover{border-color:var(--g);}
-.tbadge svg{width:14px;height:14px;flex-shrink:0;}
-.hero-right{position:relative;display:flex;align-items:center;justify-content:center;min-height:480px;}
-.hg-bg-shape{position:absolute;right:-20px;bottom:-40px;width:440px;height:440px;background:var(--gll);border-radius:50% 50% 0 0 / 60% 60% 0 0;}
-.hg-circle-ring{position:absolute;right:20px;top:-10px;width:300px;height:300px;border-radius:50%;border:1.5px solid rgba(14,207,176,0.2);}
-.hg-circle-ring2{position:absolute;right:50px;top:10px;width:240px;height:240px;border-radius:50%;border:1px solid rgba(14,207,176,0.1);}
-.app-card{
-  position:relative;z-index:2;background:var(--white);border-radius:22px;border:1px solid rgba(14,207,176,0.2);overflow:hidden;margin:0 24px;box-shadow:0 12px 48px rgba(14,207,176,0.12),0 2px 8px rgba(0,0,0,0.04);
-}
-.app-header{background:var(--g);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;}
-.app-header-left{display:flex;align-items:center;gap:10px;}
-.app-av{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--ink);}
-.app-title{font-size:13px;font-weight:700;color:var(--ink);}
-.app-sub{font-size:11px;color:rgba(8,80,65,0.7);}
-.live-dot{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--gdk);background:rgba(255,255,255,0.85);padding:4px 10px;border-radius:20px;}
-.live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--gd);}
-.app-body{padding:16px;}
-.client-row{display:flex;align-items:center;justify-content:space-between;background:var(--gll);border:1px solid rgba(14,207,176,0.15);border-radius:12px;padding:12px 14px;margin-bottom:12px;}
-.cr-name{font-size:13px;font-weight:600;color:var(--ink);}
-.cr-addr{font-size:11px;color:var(--muted);margin-top:2px;}
-.cr-time{background:var(--g);color:var(--gdk);font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;}
-.meds-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;}
-.meds-row{display:flex;gap:7px;margin-bottom:12px;}
-.med{flex:1;border-radius:10px;padding:9px 10px;text-align:center;border:1px solid rgba(0,0,0,0.06);}
-.med.done{background:var(--gl);border-color:rgba(14,207,176,0.25);}
-.med.pend{background:#fafafa;}
-.med-name{font-size:10px;font-weight:600;color:var(--ink2);}
-.med-dose{font-size:9px;color:var(--muted);margin-top:2px;}
-.med-tick{width:16px;height:16px;border-radius:50%;background:var(--g);display:flex;align-items:center;justify-content:center;margin:0 auto 4px;}
-.med-tick svg{width:9px;height:9px;}
-.med-wait{width:16px;height:16px;border-radius:50%;border:1.5px solid rgba(0,0,0,0.12);margin:0 auto 4px;}
-.ai-banner{background:var(--gll);border:1px solid rgba(14,207,176,0.25);border-radius:12px;padding:11px 13px;}
-.ai-label{font-size:9px;font-weight:700;color:var(--gdk);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;display:flex;align-items:center;gap:4px;}
-.ai-text{font-size:11px;color:var(--ink2);line-height:1.55;}
-.float-card{
-  position:absolute;background:var(--white);border:1px solid rgba(14,207,176,0.2);border-radius:14px;padding:12px 14px;z-index:10;box-shadow:0 8px 32px rgba(14,207,176,0.12),0 2px 8px rgba(0,0,0,0.06);
-}
-.fc-sos{top:20px;right:-10px;display:flex;align-items:center;gap:9px;}
-.sos-btn{width:36px;height:36px;border-radius:50%;background:#fee2e2;border:1.5px solid #fca5a5;display:flex;align-items:center;justify-content:center;}
-.sos-btn svg{width:16px;height:16px;stroke:#dc2626;stroke-width:2;fill:none;}
-.fc-sos-text p{font-size:12px;font-weight:600;color:var(--ink);}
-.fc-sos-text span{font-size:10px;color:var(--muted);}
-.fc-stat{bottom:60px;left:-20px;}
-.fc-stat-n{font-size:22px;font-weight:700;color:var(--g);font-family:var(--fd);}
-.fc-stat-l{font-size:10px;color:var(--muted);font-weight:500;}
-.graphic-band{
-  background:linear-gradient(135deg,var(--g) 0%,var(--gd) 100%);padding:64px 56px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;
-}
-.gb-item{padding:0 32px;text-align:center;}
-.gb-item+.gb-item{border-left:1px solid rgba(8,80,65,0.15);}
-.gb-num{font-family:var(--fd);font-size:52px;font-weight:900;color:var(--ink);line-height:1;}
-.gb-label{font-size:13px;font-weight:600;color:var(--gdk);margin-top:6px;}
-.gb-sub{font-size:12px;color:rgba(8,80,65,0.6);margin-top:3px;}
-.sec-wide{padding:88px 0;}
-.sec-wide .sec-inner{padding:0 56px;max-width:1200px;margin:0 auto;}
-.sec-bg{background:var(--off);}
-.sec-bg2{background:var(--gl);}
-.sec-tag{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--gdk);letter-spacing:.5px;margin-bottom:14px;}
-.sec-tag::before{content:'';width:24px;height:2px;background:var(--g);border-radius:1px;}
-.sec-h{font-family:var(--fd);font-size:44px;line-height:1.1;color:var(--ink);letter-spacing:-1px;margin-bottom:14px;}
-.sec-sub{font-size:16px;color:var(--muted);line-height:1.7;font-weight:300;max-width:520px;}
-.feat-layout{display:grid;grid-template-columns:380px 1fr;gap:64px;align-items:start;}
-.feat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.feat-card{
-  background:var(--white);border:1px solid rgba(0,0,0,0.06);border-radius:16px;padding:24px;transition:border-color .3s ease,transform .3s ease,box-shadow .3s ease;box-shadow:0 1px 4px rgba(0,0,0,0.02);
-}
-.feat-card:hover{border-color:var(--g);transform:translateY(-3px);box-shadow:0 8px 28px rgba(14,207,176,0.1);}
-.feat-card.highlight{background:var(--ink);border-color:var(--ink);}
-.feat-card.highlight h3{color:var(--white);}
-.feat-card.highlight p{color:rgba(255,255,255,0.55);}
-.feat-icon{
-  width:44px;height:44px;border-radius:12px;background:var(--gl);border:1px solid rgba(14,207,176,0.2);display:flex;align-items:center;justify-content:center;margin-bottom:16px;transition:background .3s ease;
-}
-.feat-card:hover .feat-icon{background:var(--gm);}
-.feat-icon.dark{background:rgba(14,207,176,0.15);border-color:rgba(14,207,176,0.3);}
-.feat-icon svg{width:20px;height:20px;stroke:var(--gdk);stroke-width:1.8;fill:none;}
-.feat-icon.dark svg{stroke:var(--g);}
-.new-badge{display:inline-block;background:var(--gm);color:var(--gdk);font-size:10px;font-weight:700;padding:2px 9px;border-radius:5px;margin-bottom:10px;letter-spacing:.2px;}
-.feat-card h3{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:7px;}
-.feat-card p{font-size:13px;color:var(--muted);line-height:1.6;}
-.how-wrap{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center;}
-.steps-list{display:flex;flex-direction:column;gap:0;}
-.step-item{display:flex;gap:20px;padding:24px 0;border-bottom:1px solid rgba(14,207,176,0.12);}
-.step-item:first-child{padding-top:0;}
-.step-item:last-child{border-bottom:none;}
-.step-num{width:40px;height:40px;border-radius:50%;background:var(--g);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:var(--fd);font-size:16px;font-weight:700;color:var(--ink);}
-.step-content h3{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:6px;}
-.step-content p{font-size:13.5px;color:var(--muted);line-height:1.6;}
-.how-visual{
-  background:var(--gll);border-radius:24px;border:1px solid rgba(14,207,176,0.15);padding:32px;display:flex;flex-direction:column;gap:12px;box-shadow:0 4px 24px rgba(14,207,176,0.06);
-}
-.flow-row{
-  background:var(--white);border-radius:12px;padding:14px 16px;border:1px solid rgba(0,0,0,0.05);display:flex;align-items:center;gap:12px;transition:border-color .25s ease,box-shadow .25s ease;
-}
-.flow-row:hover{border-color:rgba(14,207,176,0.3);box-shadow:0 2px 12px rgba(14,207,176,0.06);}
-.flow-icon{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
-.flow-icon.g{background:var(--g);}
-.flow-icon.gl{background:var(--gl);border:1px solid rgba(14,207,176,0.2);}
-.flow-icon svg{width:16px;height:16px;stroke-width:2;fill:none;}
-.flow-icon.g svg{stroke:var(--ink);}
-.flow-icon.gl svg{stroke:var(--gdk);}
-.flow-text p{font-size:13px;font-weight:600;color:var(--ink);}
-.flow-text span{font-size:11px;color:var(--muted);}
-.flow-arrow{margin:0 auto;width:1px;height:14px;background:rgba(14,207,176,0.3);}
-.flow-row.active{border-color:var(--g);background:var(--gll);}
-.personas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:52px;}
-.persona{border-radius:20px;padding:32px;border:1px solid rgba(0,0,0,0.06);transition:transform .3s ease,box-shadow .3s ease;}
-.persona:hover{transform:translateY(-3px);box-shadow:0 12px 36px rgba(14,207,176,0.1);}
-.persona.p-carer{background:var(--ink);color:var(--white);}
-.persona.p-sup{background:var(--white);}
-.persona.p-mgr{background:var(--gl);}
-.p-role-tag{font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:14px;display:inline-block;}
-.p-carer .p-role-tag{color:var(--g);}
-.p-sup .p-role-tag,.p-mgr .p-role-tag{color:var(--gdk);}
-.persona h3{font-size:22px;font-weight:700;font-family:var(--fd);margin-bottom:10px;line-height:1.2;}
-.p-carer h3{color:var(--white);}
-.p-sup h3,.p-mgr h3{color:var(--ink);}
-.persona-desc{font-size:13.5px;line-height:1.65;margin-bottom:22px;font-weight:300;}
-.p-carer .persona-desc{color:rgba(255,255,255,0.6);}
-.p-sup .persona-desc,.p-mgr .persona-desc{color:var(--muted);}
-.p-list{list-style:none;}
-.p-list li{font-size:13px;padding:6px 0;display:flex;gap:9px;align-items:flex-start;border-bottom:1px solid rgba(255,255,255,0.07);}
-.p-sup .p-list li,.p-mgr .p-list li{border-color:rgba(14,207,176,0.1);}
-.p-list li:last-child{border-bottom:none;}
-.p-carer .p-list li{color:rgba(255,255,255,0.8);}
-.p-sup .p-list li,.p-mgr .p-list li{color:var(--ink2);}
-.p-check{flex-shrink:0;margin-top:2px;}
-.p-carer .p-check svg{stroke:var(--g);}
-.p-sup .p-check svg,.p-mgr .p-check svg{stroke:var(--gdk);}
-.comp-layout{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;}
-.comp-visual{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.comp-card{background:var(--white);border-radius:16px;border:1px solid rgba(0,0,0,0.06);padding:22px;transition:border-color .25s ease;box-shadow:0 1px 4px rgba(0,0,0,0.02);}
-.comp-card:hover{border-color:rgba(14,207,176,0.3);}
-.comp-card.big{grid-column:1/-1;background:var(--ink);border-color:var(--ink);}
-.comp-icon{width:40px;height:40px;border-radius:11px;background:var(--gl);border:1px solid rgba(14,207,176,0.2);display:flex;align-items:center;justify-content:center;margin-bottom:12px;}
-.comp-icon svg{width:20px;height:20px;stroke:var(--gdk);stroke-width:1.8;fill:none;}
-.comp-card h4{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px;}
-.comp-card p{font-size:12px;color:var(--muted);line-height:1.55;}
-.comp-card.big h4{color:var(--g);}
-.comp-card.big p{color:rgba(255,255,255,0.55);font-size:13px;}
-.comp-points{display:flex;flex-direction:column;gap:16px;margin-top:32px;}
-.cp{display:flex;align-items:flex-start;gap:12px;}
-.cp-bullet{width:22px;height:22px;border-radius:50%;background:var(--gl);border:1px solid rgba(14,207,176,0.3);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
-.cp-bullet svg{width:11px;height:11px;stroke:var(--gdk);stroke-width:2.5;fill:none;}
-.cp h5{font-size:14px;font-weight:600;color:var(--ink);margin-bottom:3px;}
-.cp p{font-size:13px;color:var(--muted);line-height:1.55;}
-.testi-intro{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;}
-.testi-rating{background:var(--gl);border:1px solid rgba(14,207,176,0.2);border-radius:12px;padding:16px 22px;text-align:center;}
-.rating-n{font-family:var(--fd);font-size:40px;font-weight:700;color:var(--g);}
-.rating-stars{color:var(--g);font-size:16px;margin:3px 0;}
-.rating-sub{font-size:11px;color:var(--muted);}
-.testi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-.tcard{background:var(--white);border:1px solid rgba(0,0,0,0.06);border-radius:18px;padding:28px;transition:transform .3s ease,box-shadow .3s ease;}
-.tcard:hover{transform:translateY(-3px);box-shadow:0 12px 36px rgba(14,207,176,0.08);}
-.tcard.featured{background:var(--gll);border-color:rgba(14,207,176,0.25);}
-.tquote{font-family:var(--fd);font-size:15px;font-style:italic;color:var(--ink2);line-height:1.65;margin-bottom:22px;}
-.tcard .tquote::before{content:'\\201C';font-size:36px;color:var(--g);line-height:0;vertical-align:-14px;margin-right:2px;}
-.t-auth{display:flex;align-items:center;gap:10px;border-top:1px solid rgba(14,207,176,0.12);padding-top:16px;}
-.t-av{width:38px;height:38px;border-radius:50%;background:var(--gm);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--gdk);}
-.t-name{font-size:13px;font-weight:600;color:var(--ink);}
-.t-role{font-size:11px;color:var(--muted);}
-.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:52px;}
-.pcard{background:var(--white);border:1px solid rgba(0,0,0,0.07);border-radius:20px;padding:32px;position:relative;transition:transform .3s ease,box-shadow .3s ease;}
-.pcard:hover{transform:translateY(-4px);box-shadow:0 16px 48px rgba(0,0,0,0.08);}
-.pcard.feat{background:var(--ink);border-color:var(--ink);}
-.p-pop{position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--g);color:var(--gdk);font-size:11px;font-weight:700;padding:4px 16px;border-radius:20px;white-space:nowrap;}
-.p-plan{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;}
-.pcard.feat .p-plan{color:rgba(255,255,255,0.4);}
-.p-price{font-family:var(--fd);font-size:44px;font-weight:700;color:var(--ink);margin-bottom:6px;line-height:1;}
-.pcard.feat .p-price{color:var(--white);}
-.p-unit{font-family:var(--f);font-size:14px;font-weight:400;color:var(--muted);}
-.pcard.feat .p-unit{color:rgba(255,255,255,0.4);}
-.p-desc{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:22px;min-height:40px;}
-.pcard.feat .p-desc{color:rgba(255,255,255,0.5);}
-.p-divider{height:1px;background:rgba(0,0,0,0.07);margin-bottom:20px;}
-.pcard.feat .p-divider{background:rgba(255,255,255,0.1);}
-.p-feats{list-style:none;margin-bottom:28px;}
-.p-feats li{display:flex;align-items:flex-start;gap:9px;font-size:13px;padding:6px 0;color:var(--ink2);border-bottom:1px solid rgba(0,0,0,0.05);}
-.p-feats li:last-child{border-bottom:none;}
-.pcard.feat .p-feats li{color:rgba(255,255,255,0.7);border-color:rgba(255,255,255,0.07);}
-.p-feats li svg{width:14px;height:14px;stroke:var(--g);stroke-width:2.5;fill:none;flex-shrink:0;margin-top:2px;}
-.pbtn{width:100%;padding:13px;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--f);border:none;}
-.pbtn-outline{background:transparent;border:1.5px solid rgba(0,0,0,0.15)!important;color:var(--ink);}
-.pbtn-solid{background:var(--g);color:var(--gdk);}
-.pbtn-white{background:var(--white);color:var(--ink);}
-.cta-banner{
-  background:linear-gradient(135deg,var(--g) 0%,var(--gd) 100%);padding:88px 56px;display:grid;grid-template-columns:1fr auto;gap:48px;align-items:center;
-}
-.cta-left h2{font-family:var(--fd);font-size:48px;line-height:1.08;color:var(--ink);letter-spacing:-1px;margin-bottom:12px;}
-.cta-left p{font-size:16px;color:var(--gdk);font-weight:400;max-width:480px;}
-.cta-right{display:flex;flex-direction:column;gap:12px;align-items:flex-end;}
-.btn-cta-dark{background:var(--ink);color:var(--white);padding:15px 36px;border-radius:12px;font-size:15px;font-weight:700;border:none;font-family:var(--f);cursor:pointer;white-space:nowrap;transition:transform .2s ease,box-shadow .2s ease;}
-.btn-cta-dark:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(11,31,24,0.3);}
-.btn-cta-out{background:transparent;border:2px solid var(--gdk);color:var(--gdk);padding:14px 32px;border-radius:12px;font-size:15px;font-weight:600;font-family:var(--f);cursor:pointer;white-space:nowrap;transition:background .25s ease;}
-.btn-cta-out:hover{background:rgba(8,80,65,0.06);}
-.cta-meta{font-size:12px;color:var(--gdk);text-align:right;}
-footer{background:var(--ink);padding:60px 56px 36px;}
-.foot-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px;max-width:1200px;margin:0 auto 40px;}
-.foot-brand-desc{font-size:13px;color:rgba(255,255,255,0.4);line-height:1.7;margin-top:12px;max-width:240px;}
-.foot-col h4{font-size:12px;font-weight:700;color:rgba(255,255,255,0.85);margin-bottom:16px;letter-spacing:.3px;}
-.foot-col a{display:block;font-size:13px;color:rgba(255,255,255,0.4);text-decoration:none;margin-bottom:10px;transition:color .2s;}
-.foot-col a:hover{color:var(--g);text-decoration:underline;text-underline-offset:3px;}
-.foot-bottom{max-width:1200px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;padding-top:24px;border-top:1px solid rgba(255,255,255,0.07);}
-.foot-bottom p{font-size:11.5px;color:rgba(255,255,255,0.25);}
-.foot-live{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:500;color:var(--g);}
-.foot-live::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--g);}
-svg.icon-check{display:block;}
-
-@media (max-width: 1024px){.hero{grid-template-columns:1fr;padding:60px 32px 0;text-align:center;}.hero-sub{margin:0 auto 36px;}.hero-actions{justify-content:center;}.trust-badges{justify-content:center;}.hero-right{margin-top:40px;}.feat-layout{grid-template-columns:1fr;gap:32px;}.how-wrap{grid-template-columns:1fr;gap:40px;}.comp-layout{grid-template-columns:1fr;gap:40px;}.testi-intro{flex-direction:column;align-items:flex-start;gap:24px;}}
-@media (max-width: 900px){nav{padding:0 24px;}.nav-links{display:none;}.nav-cta .btn-ghost{display:none;}h1{font-size:42px;}.sec-h{font-size:32px;}.sec-wide{padding:56px 0;}.sec-wide .sec-inner{padding-left:20px;padding-right:20px;}.feat-grid{grid-template-columns:1fr;}.personas-grid{grid-template-columns:1fr;}.testi-grid{grid-template-columns:1fr;}.pricing-grid{grid-template-columns:1fr;max-width:480px;margin:52px auto 0;}.graphic-band{grid-template-columns:1fr 1fr;gap:24px;padding:40px 24px;}.gb-item+.gb-item{border-left:none;}.gb-item:nth-child(odd){border-right:1px solid rgba(8,80,65,0.2);}.cta-banner{grid-template-columns:1fr;padding:56px 24px;text-align:center;}.cta-right{align-items:center;}.foot-grid{grid-template-columns:1fr 1fr;}.foot-bottom{flex-direction:column;gap:12px;}}
-@media (max-width: 640px){h1{font-size:36px;}.sec-h{font-size:28px;}.hero-actions{flex-direction:column;width:100%;}.hero-actions button{width:100%;}.foot-grid{grid-template-columns:1fr;}.graphic-band{grid-template-columns:1fr;}.gb-item+.gb-item{border-left:none;border-top:1px solid rgba(8,80,65,0.2);}.gb-item:nth-child(odd){border-right:none;}}
+.hero{position:relative;min-height:840px;padding:132px 0 86px;display:flex;align-items:center;background:radial-gradient(circle at 78% 16%,rgba(24,208,174,.16),transparent 23%),radial-gradient(circle at 10% 30%,rgba(113,239,216,.13),transparent 24%),linear-gradient(180deg,#fafffd 0%,#fff 78%);overflow:hidden}.hero:before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(11,31,24,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(11,31,24,.035) 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,black,transparent 84%)}.hero-grid{position:relative;display:grid;grid-template-columns:.88fr 1.12fr;gap:58px;align-items:center}.hero-copy{position:relative;z-index:3}.hero-badge{display:inline-flex;align-items:center;gap:9px;background:#fff;border:1px solid #d7efe9;border-radius:999px;padding:8px 13px;font-size:12px;font-weight:800;color:var(--deep);box-shadow:0 8px 26px rgba(8,52,43,.06)}.pulse{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 0 6px rgba(24,208,174,.12)}.hero h1{font-family:var(--fd);font-size:clamp(54px,6.2vw,86px);line-height:.96;letter-spacing:-.058em;margin:24px 0 24px;max-width:700px}.hero h1 span{color:var(--deep);position:relative}.hero h1 span:after{content:'';position:absolute;left:2px;right:0;height:12px;bottom:4px;background:rgba(24,208,174,.3);z-index:-1;border-radius:50%}.hero-copy p{font-size:18px;line-height:1.75;color:var(--muted);max-width:600px}.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin:32px 0 26px}.btn-hero{padding:16px 23px;border-radius:15px;font-size:15px}.btn-green{background:var(--green);color:var(--ink);box-shadow:0 14px 35px rgba(24,208,174,.28)}.hero-micro{display:flex;flex-wrap:wrap;gap:10px 18px;color:#547068;font-size:12.5px}.hero-micro span{display:flex;align-items:center;gap:7px}.hero-micro i{width:18px;height:18px;border-radius:50%;background:var(--mint);display:grid;place-items:center;font-style:normal;color:var(--deep);font-weight:800}
+/* Hero product stage */
+.product-stage{position:relative;min-height:610px}.stage-glow{position:absolute;width:560px;height:560px;border-radius:50%;background:radial-gradient(circle,rgba(24,208,174,.2),transparent 68%);right:-90px;top:-20px;filter:blur(6px)}.desktop{position:absolute;right:0;top:20px;width:92%;background:#fff;border:1px solid rgba(8,52,43,.12);border-radius:26px;box-shadow:0 35px 90px rgba(8,52,43,.18);overflow:hidden;transform:perspective(1200px) rotateY(-2deg) rotateX(1deg)}.desktop-top{height:50px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:7px;padding:0 18px;background:#fbfefd}.dot{width:9px;height:9px;border-radius:50%;background:#d8e6e1}.desktop-body{display:grid;grid-template-columns:150px 1fr;min-height:420px}.side{background:#0c241c;color:#fff;padding:18px 13px}.side-brand{display:flex;align-items:center;gap:8px;font-family:var(--fd);font-weight:800;font-size:13px;margin-bottom:20px}.mini-logo{width:28px;height:28px;border-radius:9px;background:var(--green);display:grid;place-items:center;color:var(--ink)}.side-item{padding:9px 10px;border-radius:10px;color:rgba(255,255,255,.55);font-size:10px;margin-bottom:4px}.side-item.active{background:rgba(24,208,174,.14);color:#fff}.dash{padding:22px;background:#f7fbfa}.dash-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.dash-head h3{font-family:var(--fd);font-size:21px;margin:0}.status{font-size:10px;font-weight:800;color:var(--deep);background:var(--mint);padding:7px 10px;border-radius:999px}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.metric{background:#fff;border:1px solid var(--line);border-radius:15px;padding:13px}.metric small{color:var(--muted);font-size:9px}.metric b{display:block;font-family:var(--fd);font-size:23px;margin-top:5px}.dash-grid{display:grid;grid-template-columns:1.25fr .75fr;gap:10px;margin-top:10px}.panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px}.panel-title{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}.visit{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:12px;background:var(--mint2);margin-bottom:8px}.person{display:flex;gap:9px;align-items:center}.avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(145deg,#c9f6ec,#e7fbf7);display:grid;place-items:center;font-size:10px;font-weight:800}.person b{display:block;font-size:11px}.person span{font-size:9px;color:var(--muted)}.tag{font-size:8px;font-weight:800;padding:5px 7px;border-radius:999px;background:var(--mint);color:var(--deep)}.ai-card{background:linear-gradient(145deg,#0c241c,#103c31);color:#fff;border-radius:16px;padding:14px;min-height:132px}.ai-card strong{font-size:11px}.ai-card p{font-size:9.5px;line-height:1.55;color:rgba(255,255,255,.7);margin:9px 0}.ai-chip{display:inline-flex;font-size:8px;padding:5px 7px;border-radius:999px;background:rgba(24,208,174,.14);color:#a8f7e7}.floating{position:absolute;background:#fff;border:1px solid rgba(8,52,43,.1);box-shadow:var(--shadow2);border-radius:18px;z-index:4}.voice-card{left:0;bottom:80px;width:215px;padding:16px;animation:float 5s ease-in-out infinite}.voice-top{display:flex;justify-content:space-between;align-items:center}.voice-top b{font-size:11px}.voice-wave{height:44px;display:flex;align-items:center;gap:4px;margin:8px 0}.voice-wave i{width:4px;border-radius:8px;background:var(--green);animation:wave 1.1s ease-in-out infinite}.voice-wave i:nth-child(2){animation-delay:.1s}.voice-wave i:nth-child(3){animation-delay:.2s}.voice-wave i:nth-child(4){animation-delay:.3s}.voice-wave i:nth-child(5){animation-delay:.4s}.voice-wave i:nth-child(6){animation-delay:.5s}.voice-card p{font-size:9px;line-height:1.5;color:var(--muted)}.safety-card{right:-12px;bottom:20px;width:210px;padding:15px;animation:float 5.5s ease-in-out infinite reverse}.safety-row{display:flex;gap:10px;align-items:center}.shield{width:38px;height:38px;border-radius:12px;background:var(--mint);display:grid;place-items:center;font-size:18px}.safety-card b{font-size:11px}.safety-card p{font-size:9px;color:var(--muted);margin:2px 0 0}.phone{position:absolute;right:40px;top:305px;width:142px;background:#0b1f18;border-radius:27px;padding:7px;box-shadow:0 28px 55px rgba(11,31,24,.26);z-index:5;transform:rotate(4deg)}.phone-in{background:#fff;border-radius:21px;overflow:hidden}.phone-head{background:var(--green);padding:12px 9px 9px;font-size:8px;font-weight:800}.phone-body{padding:9px}.phone-card{background:var(--mint2);border:1px solid var(--line);padding:8px;border-radius:10px;margin-bottom:7px}.phone-card b{font-size:8px;display:block}.phone-card span{font-size:7px;color:var(--muted)}
+@keyframes float{50%{transform:translateY(-9px)}}@keyframes wave{0%,100%{height:10px}50%{height:34px}}
+/* VALUE STRIP */
+.value-strip{position:relative;z-index:10;margin-top:-30px}.value-shell{background:var(--ink);border-radius:26px;padding:18px;display:grid;grid-template-columns:repeat(4,1fr);box-shadow:0 25px 60px rgba(11,31,24,.15)}.value{padding:20px 22px;color:#fff}.value+.value{border-left:1px solid rgba(255,255,255,.1)}.value-icon{width:38px;height:38px;border-radius:12px;background:rgba(24,208,174,.13);display:grid;place-items:center;margin-bottom:12px}.value h3{font-size:14px;margin:0 0 6px}.value p{font-size:11.5px;line-height:1.55;color:rgba(255,255,255,.55);margin:0}
+/* PROBLEM */
+.problem{background:var(--off)}.problem-grid{display:grid;grid-template-columns:.8fr 1.2fr;gap:70px;align-items:start}.problem-copy{position:sticky;top:120px}.pain-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.pain{background:#fff;border:1px solid var(--line);border-radius:20px;padding:24px;min-height:190px;transition:.25s}.pain:hover{transform:translateY(-5px);box-shadow:var(--shadow2)}.pain-num{font-family:var(--fd);font-size:13px;color:var(--green2);font-weight:800}.pain h3{font-family:var(--fd);font-size:21px;margin:28px 0 9px;letter-spacing:-.02em}.pain p{font-size:13px;line-height:1.7;color:var(--muted)}
+/* SHOWCASE */
+.showcase-head{display:flex;justify-content:space-between;gap:40px;align-items:end}.tabs{display:flex;gap:7px;flex-wrap:wrap}.tab-btn{border:1px solid var(--line);background:#fff;color:#526960;padding:10px 13px;border-radius:999px;font-weight:700;font-size:12px;cursor:pointer}.tab-btn.active{background:var(--ink);color:#fff;border-color:var(--ink)}.showcase-card{margin-top:42px;background:linear-gradient(145deg,#0a251d,#0b3c31);border-radius:32px;padding:30px;display:grid;grid-template-columns:.78fr 1.22fr;gap:30px;min-height:550px;overflow:hidden;position:relative}.showcase-copy{color:#fff;padding:20px 8px 20px 12px;align-self:center}.showcase-copy .mini{color:var(--green);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em}.showcase-copy h3{font-family:var(--fd);font-size:42px;line-height:1.05;letter-spacing:-.04em;margin:14px 0}.showcase-copy p{font-size:15px;line-height:1.75;color:rgba(255,255,255,.62)}.bullet-list{display:grid;gap:10px;margin-top:22px}.bullet{display:flex;gap:10px;align-items:flex-start;color:rgba(255,255,255,.78);font-size:13px}.bullet i{width:20px;height:20px;border-radius:50%;background:rgba(24,208,174,.16);display:grid;place-items:center;color:var(--green);font-style:normal;flex:0 0 auto}.showcase-ui{position:relative;background:#f7fbfa;border-radius:24px;padding:18px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}.feature-screen{height:100%;display:none}.feature-screen.active{display:block}.screen-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}.screen-top h4{font-family:var(--fd);font-size:19px;margin:0}.screen-chip{font-size:9px;font-weight:800;padding:6px 8px;border-radius:999px;background:var(--mint);color:var(--deep)}.screen-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:12px}.screen-panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px}.med-row{display:grid;grid-template-columns:1fr auto;align-items:center;padding:10px 0;border-bottom:1px solid #edf3f1}.med-row:last-child{border-bottom:0}.med-row b{font-size:11px}.med-row span{font-size:9px;color:var(--muted)}.med-state{font-size:8px!important;font-weight:800;padding:5px 7px;border-radius:999px;background:var(--mint);color:var(--deep)!important}.note-box{background:var(--mint2);border:1px dashed #b9e8dd;border-radius:14px;padding:12px;font-size:10px;line-height:1.6;color:#45655a}.activity{display:flex;gap:9px;margin-bottom:12px}.activity i{width:8px;height:8px;background:var(--green);border-radius:50%;margin-top:4px}.activity b{display:block;font-size:10px}.activity span{font-size:9px;color:var(--muted)}
+/* JOURNEY */
+.journey{background:linear-gradient(180deg,#fff,#f8fcfb)}.journey-line{margin-top:46px;display:grid;grid-template-columns:repeat(4,1fr);position:relative}.journey-line:before{content:'';position:absolute;top:24px;left:10%;right:10%;height:2px;background:linear-gradient(90deg,var(--green),#b7e8de)}.jstep{position:relative;padding-right:22px}.jnum{width:48px;height:48px;border-radius:16px;background:#fff;border:1px solid #cfe9e3;display:grid;place-items:center;font-family:var(--fd);font-weight:800;position:relative;z-index:2;box-shadow:0 8px 24px rgba(8,52,43,.07)}.jstep h3{font-family:var(--fd);font-size:19px;margin:20px 0 8px}.jstep p{font-size:13px;line-height:1.7;color:var(--muted)}
+/* ROLES */
+.roles{background:var(--ink);color:#fff}.roles .h2{max-width:780px}.roles .lead{color:rgba(255,255,255,.55)}.roles-grid{display:grid;grid-template-columns:1.1fr .9fr .9fr;gap:14px;margin-top:44px}.role-card{border-radius:24px;padding:28px;min-height:360px;position:relative;overflow:hidden}.role-card.carer{background:linear-gradient(145deg,var(--green),#67ead4);color:var(--ink)}.role-card.supervisor,.role-card.manager{background:#102d24;border:1px solid rgba(255,255,255,.08)}.role-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;opacity:.7}.role-card h3{font-family:var(--fd);font-size:30px;line-height:1.08;letter-spacing:-.035em;margin:18px 0 12px}.role-card p{font-size:13px;line-height:1.7;opacity:.7}.role-list{margin-top:22px;display:grid;gap:9px}.role-list div{font-size:12px;display:flex;gap:9px}.role-list i{font-style:normal;font-weight:800}.role-orb{position:absolute;width:180px;height:180px;border-radius:50%;right:-60px;bottom:-60px;background:rgba(255,255,255,.13)}
+/* AI SECTION */
+.ai-section{background:#fff}.ai-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:65px;align-items:center}.ai-demo{background:linear-gradient(145deg,#0b2019,#0e382d);border-radius:30px;padding:24px;box-shadow:var(--shadow);min-height:480px;position:relative;overflow:hidden}.ai-demo:before{content:'';position:absolute;width:260px;height:260px;border-radius:50%;background:rgba(24,208,174,.12);right:-60px;top:-70px;filter:blur(6px)}.copilot-head{display:flex;justify-content:space-between;align-items:center;color:#fff}.copilot-head b{font-family:var(--fd);font-size:18px}.live-pill{font-size:9px;padding:6px 8px;border-radius:999px;background:rgba(24,208,174,.15);color:#8ff2dd}.prompt{margin-top:22px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.08);padding:13px;border-radius:14px;color:#fff;font-size:11px}.answer{margin-top:12px;background:#fff;border-radius:16px;padding:16px}.answer small{font-size:9px;color:var(--green2);font-weight:800;text-transform:uppercase}.answer h4{font-size:13px;margin:8px 0}.answer p{font-size:10px;line-height:1.65;color:var(--muted)}.alert-box{margin-top:12px;background:#fff7ea;border:1px solid #f4ddb5;border-radius:14px;padding:13px;font-size:10px;line-height:1.55;color:#765b26}.ai-points{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:28px}.ai-point{border:1px solid var(--line);border-radius:17px;padding:17px}.ai-point b{font-size:13px}.ai-point p{font-size:11px;line-height:1.6;color:var(--muted);margin:7px 0 0}
+/* COMPLIANCE */
+.compliance{background:var(--off)}.compliance-grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:60px;align-items:center}.security-board{display:grid;grid-template-columns:1fr 1fr;gap:12px}.security-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px}.security-card.wide{grid-column:1/-1;background:var(--ink);color:#fff}.security-icon{width:42px;height:42px;border-radius:13px;background:var(--mint);display:grid;place-items:center;margin-bottom:18px}.security-card h3{font-family:var(--fd);font-size:18px;margin:0 0 7px}.security-card p{font-size:12px;line-height:1.65;color:var(--muted);margin:0}.security-card.wide p{color:rgba(255,255,255,.58)}
+/* PRICING */
+.pricing-head{display:flex;justify-content:space-between;align-items:end;gap:40px}.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:44px}.price-card{border:1px solid var(--line);border-radius:24px;padding:28px;background:#fff;position:relative}.price-card.featured{background:var(--ink);color:#fff;transform:translateY(-8px);box-shadow:var(--shadow)}.popular{position:absolute;top:-13px;left:24px;background:var(--green);color:var(--ink);font-size:10px;font-weight:800;padding:6px 10px;border-radius:999px}.plan{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}.price-card.featured .plan{color:rgba(255,255,255,.45)}.price{font-family:var(--fd);font-size:44px;font-weight:800;letter-spacing:-.04em;margin:16px 0 8px}.price span{font-family:var(--f);font-size:13px;font-weight:500;color:var(--muted)}.price-card.featured .price span{color:rgba(255,255,255,.45)}.price-desc{font-size:12px;line-height:1.65;color:var(--muted);min-height:42px}.price-card.featured .price-desc{color:rgba(255,255,255,.55)}.price-feats{display:grid;gap:10px;margin:24px 0}.price-feats div{font-size:12px;display:flex;gap:8px}.tick{color:var(--green);font-weight:900}.price-btn{width:100%;padding:13px 16px;border-radius:13px;border:1px solid var(--line);background:#fff;font-weight:800;cursor:pointer;font-family:var(--f)}.price-card.featured .price-btn{background:var(--green);border-color:var(--green);color:var(--ink)}
+/* CTA */
+.final-cta{padding:40px 0 80px}.cta-shell{background:linear-gradient(135deg,#0b1f18,#0b493b);border-radius:34px;padding:64px;display:grid;grid-template-columns:1fr auto;gap:35px;align-items:center;position:relative;overflow:hidden}.cta-shell:after{content:'';position:absolute;width:360px;height:360px;border-radius:50%;background:rgba(24,208,174,.12);right:-120px;top:-150px}.cta-shell h2{font-family:var(--fd);font-size:48px;line-height:1.04;letter-spacing:-.045em;color:#fff;margin:0 0 12px;max-width:680px}.cta-shell p{color:rgba(255,255,255,.58);font-size:14px;line-height:1.7}.cta-actions{display:flex;flex-direction:column;gap:10px;position:relative;z-index:2}.cta-actions .btn{min-width:190px}.cta-actions .btn-ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.2)}
+/* FOOTER */
+footer{background:#071a14;color:#fff;padding:58px 0 28px}.footer-grid{display:grid;grid-template-columns:1.6fr repeat(3,1fr);gap:40px}.footer-desc{font-size:12px;line-height:1.7;color:rgba(255,255,255,.42);max-width:300px;margin-top:14px}.footer-col h4{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.74);margin:0 0 15px}.footer-col a{display:block;color:rgba(255,255,255,.42);font-size:12px;margin-bottom:10px}.footer-bottom{border-top:1px solid rgba(255,255,255,.08);margin-top:34px;padding-top:22px;display:flex;justify-content:space-between;gap:20px;color:rgba(255,255,255,.28);font-size:11px}
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes popIn{from{opacity:0;transform:scale(.9) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes slideInScreen{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+@keyframes ringPulse{0%{box-shadow:0 0 0 0 rgba(24,208,174,.4)}70%{box-shadow:0 0 0 12px rgba(24,208,174,0)}100%{box-shadow:0 0 0 0 rgba(24,208,174,0)}}
+@keyframes glowPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.14);opacity:1}}
+@keyframes drawLine{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes shine{from{transform:translateX(0) skewX(-18deg)}to{transform:translateX(420%) skewX(-18deg)}}
+@keyframes gridPan{from{background-position:0 0}to{background-position:44px 44px}}
+@keyframes orbDrift{0%,100%{transform:translate(0,0)}50%{transform:translate(-16px,-20px)}}
+@keyframes phoneBob{0%,100%{transform:rotate(4deg)}50%{transform:rotate(4deg) translateY(-9px)}}
+@keyframes caretBlink{0%,100%{opacity:1}50%{opacity:0}}
+/* Hero entrance — staggered */
+.hero-copy>*{animation:fadeUp .9s cubic-bezier(.22,.8,.3,1) both}
+.hero-copy>*:nth-child(2){animation-delay:.1s}
+.hero-copy>*:nth-child(3){animation-delay:.2s}
+.hero-copy>*:nth-child(4){animation-delay:.3s}
+.hero-copy>*:nth-child(5){animation-delay:.4s}
+.hero h1 span:after{transform:scaleX(0);transform-origin:left;animation:drawLine .8s .8s cubic-bezier(.22,.8,.3,1) forwards}
+/* Hero ambient */
+.hero:before{animation:gridPan 16s linear infinite}
+.stage-glow{animation:glowPulse 6s ease-in-out infinite}
+.pulse{animation:ringPulse 2.2s infinite}
+.status{animation:ringPulse 2.6s infinite}
+.live-pill{animation:ringPulse 2.4s infinite}
+/* Cursor parallax on product stage (vars set from JS) */
+.product-stage{--rx:0deg;--ry:0deg;--tx:0px;--ty:0px}
+.desktop{transform:perspective(1200px) rotateY(calc(-2deg + var(--ry))) rotateX(calc(1deg + var(--rx))) translate(var(--tx),var(--ty));transition:transform .25s ease-out}
+.phone{animation:phoneBob 6s ease-in-out infinite}
+/* Button shine sweep */
+.btn{position:relative;overflow:hidden}
+.btn-green:after,.btn-primary:after{content:'';position:absolute;top:-10%;bottom:-10%;width:34%;left:-50%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);transform:skewX(-18deg);pointer-events:none}
+.btn-green:hover:after,.btn-primary:hover:after{animation:shine .7s ease}
+/* Showcase tab transitions */
+.tab-btn{transition:color .2s,background .2s,border-color .2s,transform .2s}
+.tab-btn:hover{transform:translateY(-2px)}
+.showcase-copy{animation:fadeUp .5s cubic-bezier(.22,.8,.3,1) both}
+.feature-screen.active{animation:slideInScreen .45s cubic-bezier(.22,.8,.3,1) both}
+/* Journey line draws across on scroll */
+.journey-line:before{transform:scaleX(0);transform-origin:left;transition:transform 1.2s cubic-bezier(.22,.8,.3,1) .4s}
+.journey-line.show:before{transform:scaleX(1)}
+.jstep:nth-child(2){transition-delay:.1s}
+.jstep:nth-child(3){transition-delay:.2s}
+.jstep:nth-child(4){transition-delay:.3s}
+/* Staggered card reveals */
+.pain:nth-child(2){transition-delay:.07s}
+.pain:nth-child(3){transition-delay:.14s}
+.pain:nth-child(4){transition-delay:.21s}
+.roles-grid .role-card:nth-child(2){transition-delay:.1s}
+.roles-grid .role-card:nth-child(3){transition-delay:.2s}
+.security-board .security-card:nth-child(2){transition-delay:.07s}
+.security-board .security-card:nth-child(3){transition-delay:.14s}
+.security-board .security-card:nth-child(4){transition-delay:.21s}
+.security-board .security-card:nth-child(5){transition-delay:.28s}
+.pricing-grid .price-card:nth-child(2){transition-delay:.1s}
+.pricing-grid .price-card:nth-child(3){transition-delay:.2s}
+/* Hover lifts */
+.security-card,.ai-point,.role-card,.price-card{transition:transform .35s ease,box-shadow .35s ease,border-color .35s ease,opacity .7s ease}
+.security-card:hover,.ai-point:hover{transform:translateY(-5px);box-shadow:var(--shadow2);border-color:#b9e8dd}
+.role-card:hover{transform:translateY(-6px)}
+.price-card:hover{transform:translateY(-6px);box-shadow:var(--shadow2)}
+.price-card.featured:hover{transform:translateY(-12px)}
+.role-orb{animation:orbDrift 7s ease-in-out infinite}
+.value{transition:background .3s ease}
+.value:hover{background:rgba(255,255,255,.04)}
+.value-icon{transition:transform .3s ease}
+.value:hover .value-icon{transform:scale(1.12) rotate(-6deg)}
+.metric{transition:transform .25s ease,border-color .25s ease}
+.metric:hover{transform:translateY(-3px);border-color:#b9e8dd}
+/* Copilot demo typing */
+.prompt .caret{display:inline-block;width:2px;height:1em;background:var(--green);vertical-align:-2px;margin-left:2px;animation:caretBlink .8s infinite}
+.answer{animation:popIn .45s cubic-bezier(.22,.8,.3,1) both}
+.alert-box{animation:fadeUp .5s .15s cubic-bezier(.22,.8,.3,1) both}
+@media(max-width:1050px){.nav-links{display:none}.mobile-toggle{display:block}.hero-grid,.problem-grid,.ai-grid,.compliance-grid{grid-template-columns:1fr}.hero{padding-top:120px}.product-stage{min-height:620px}.problem-copy{position:static}.roles-grid{grid-template-columns:1fr 1fr}.role-card.carer{grid-column:1/-1}.showcase-card{grid-template-columns:1fr}.pricing-grid{grid-template-columns:1fr}.price-card.featured{transform:none}.cta-shell{grid-template-columns:1fr}.cta-actions{flex-direction:row}.footer-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.container{width:min(100% - 24px,1200px)}.section{padding:78px 0}.site-nav{padding:10px 0}.nav-actions .btn-ghost,.nav-actions .btn-primary{display:none}.hero{min-height:auto;padding:104px 0 55px}.hero-grid{gap:34px}.hero h1{font-size:52px}.product-stage{min-height:510px}.desktop{position:relative;width:100%;top:auto}.desktop-body{grid-template-columns:1fr}.side{display:none}.dash-grid,.screen-grid{grid-template-columns:1fr}.phone{right:10px;top:300px;width:120px}.voice-card{left:4px;bottom:10px;width:185px}.safety-card{display:none}.value-strip{margin-top:0}.value-shell{grid-template-columns:1fr 1fr}.value:nth-child(3){border-left:0}.value:nth-child(n+3){border-top:1px solid rgba(255,255,255,.1)}.problem-grid{gap:36px}.pain-grid{grid-template-columns:1fr}.showcase-head,.pricing-head{align-items:flex-start;flex-direction:column}.showcase-card{padding:18px}.showcase-copy h3{font-size:34px}.journey-line{grid-template-columns:1fr;gap:22px}.journey-line:before{display:none}.jstep{display:grid;grid-template-columns:48px 1fr;column-gap:16px}.jstep h3{margin:4px 0 6px}.jstep p{grid-column:2}.roles-grid,.ai-points,.security-board{grid-template-columns:1fr}.role-card.carer{grid-column:auto}.security-card.wide{grid-column:auto}.cta-shell{padding:38px 24px}.cta-shell h2{font-size:38px}.cta-actions{flex-direction:column}.footer-grid{grid-template-columns:1fr}.footer-bottom{flex-direction:column}.metrics{grid-template-columns:1fr 1fr}.metric:nth-child(3){grid-column:1/-1}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}.reveal{opacity:1;transform:none}}
 `}</style>
 
-      {/* NAV */}
-      <nav>
-        <a className="logo" href="/">
-          <div className="logo-mark"><img src="/logo.jpg" alt="CAREi" /></div>
-          <span className="logo-name">CAREi<sup>&trade;</sup></span>
-        </a>
-        <ul className="nav-links">
-          <li><a href="#features">Features</a></li>
-          <li><a href="#how">How it works</a></li>
-          <li><a href="#compliance">Compliance</a></li>
-          <li><a href="#pricing">Pricing</a></li>
-          <li><a href={`${APP_URL}/manager/login`}>For managers</a></li>
-        </ul>
-        <div className="nav-cta">
-          <a href={`${APP_URL}/login`}><button className="btn-ghost">Sign in</button></a>
-          <a href={`${APP_URL}/login`}><button className="btn-primary">Start free trial</button></a>
-        </div>
-      </nav>
-
-      {/* HERO */}
-      <section className="hero">
-        <div className="hero-left">
-          <div className="hero-eyebrow"><span></span>Now with AI Copilot and voice documentation</div>
-          <h1>Care that<br /><em>documents</em><br />itself</h1>
-          <p className="hero-sub">AI-powered care management for frontline UK carers. Voice notes, digital MAR, instant handovers — CQC-ready from day one.</p>
-          <div className="hero-actions">
-            <a href={`${APP_URL}/login`}><button className="btn-hero">Start free trial</button></a>
-            <a href="#demo"><button className="btn-hero-out">Watch a demo</button></a>
-          </div>
-          <div className="trust-badges">
-            <div className="tbadge"><svg viewBox="0 0 24 24" fill="none" stroke="#085041" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>GDPR ready</div>
-            <div className="tbadge"><svg viewBox="0 0 24 24" fill="none" stroke="#085041" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>End-to-end encrypted</div>
-            <div className="tbadge"><svg viewBox="0 0 24 24" fill="none" stroke="#085041" strokeWidth="2"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>CQC audit-ready</div>
-            <div className="tbadge"><svg viewBox="0 0 24 24" fill="none" stroke="#085041" strokeWidth="2"><path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0H5m14 0a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2m14 0V9a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v12"/></svg>NHS-aligned</div>
+      <header className={`site-nav${scrolled ? ' scrolled' : ''}`}>
+        <div className="container nav">
+          <a href="/" className="brand">
+            <span className="brand-mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#0b1f18" strokeWidth="2"><path d="M12 3v18M3 12h18" /></svg>
+            </span>
+            CAREi
+          </a>
+          <nav className="nav-links">
+            <a href="#platform">Platform</a>
+            <a href="#workflow">How it works</a>
+            <a href="#roles">For teams</a>
+            <a href="#security">Security</a>
+            <a href="#pricing">Pricing</a>
+          </nav>
+          <div className="nav-actions">
+            <a href={`${APP_URL}/login`}><button className="btn btn-ghost">Sign in</button></a>
+            <a href="mailto:sales@careiapp.com"><button className="btn btn-primary">Book a demo</button></a>
+            <button className="mobile-toggle">☰</button>
           </div>
         </div>
-        <div className="hero-right">
-          <div className="hg-bg-shape"></div>
-          <div className="hg-circle-ring"></div>
-          <div className="hg-circle-ring2"></div>
-          <div className="float-card fc-sos">
-            <div className="sos-btn"><svg viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M12 2l10 17H2L12 2z" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
-            <div className="fc-sos-text"><p>SOS activated</p><span>Supervisor notified — 28 sec</span></div>
-          </div>
-          <div className="float-card fc-stat">
-            <div className="fc-stat-n">–70%</div>
-            <div className="fc-stat-l">less documentation time</div>
-          </div>
-          <div className="app-card">
-            <div className="app-header">
-              <div className="app-header-left">
-                <div className="app-av">ME</div>
-                <div><div className="app-title">Active visit</div><div className="app-sub">Margaret Ellis · Bristol BS3</div></div>
-              </div>
-              <div className="live-dot">Live</div>
-            </div>
-            <div className="app-body">
-              <div className="client-row">
-                <div><div className="cr-name">Margaret Ellis, 84</div><div className="cr-addr">12 Elmwood Close · 09:15 AM · 45 min</div></div>
-                <div className="cr-time">In progress</div>
-              </div>
-              <div className="meds-label">Medications — 2 of 3 confirmed</div>
-              <div className="meds-row">
-                <div className="med done"><div className="med-tick"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#085041" strokeWidth="1.8" strokeLinecap="round"/></svg></div><div className="med-name">Amlodipine</div><div className="med-dose">5mg</div></div>
-                <div className="med done"><div className="med-tick"><svg viewBox="0 0 10 10" fill="none"><path d="M2 5l2 2 4-4" stroke="#085041" strokeWidth="1.8" strokeLinecap="round"/></svg></div><div className="med-name">Lisinopril</div><div className="med-dose">10mg</div></div>
-                <div className="med pend"><div className="med-wait"></div><div className="med-name">Simvastatin</div><div className="med-dose">Pending</div></div>
-              </div>
-              <div className="ai-banner">
-                <div className="ai-label"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#085041" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>AI Copilot</div>
-                <div className="ai-text">Fluid target 1.5L today — 750ml logged. Penicillin allergy on file. Ankle swelling flagged last visit.</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      </header>
 
-      {/* STATS BAND — temporarily disabled
-      <div className="graphic-band">
-        <div className="gb-item"><div className="gb-num">200+</div><div className="gb-label">Care homes</div><div className="gb-sub">Live across the UK</div></div>
-        <div className="gb-item"><div className="gb-num">15K+</div><div className="gb-label">Shifts logged</div><div className="gb-sub">Every month</div></div>
-        <div className="gb-item"><div className="gb-num">99.9%</div><div className="gb-label">Uptime</div><div className="gb-sub">SLA-backed</div></div>
-        <div className="gb-item"><div className="gb-num">4.9★</div><div className="gb-label">App Store</div><div className="gb-sub">From 1,200 carers</div></div>
-      </div>
-      */}
-
-      {/* FEATURES */}
-      <section id="features" className="sec-wide sec-bg">
-        <div className="sec-inner">
-          <div className="feat-layout">
-            <div>
-              <div className="sec-tag">Platform features</div>
-              <h2 className="sec-h">Everything a carer needs. Nothing they don't.</h2>
-              <p className="sec-sub" style={{ marginBottom: '28px' }}>CAREi v5.0 ships 14 features across 24 screens — designed with frontline carers, built for CQC, and proven to cut documentation time by over 70%.</p>
-              <div className="feat-card" style={{ marginTop: '8px' }}>
-                <div className="feat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
-                <div className="new-badge">New in v5.0</div>
-                <h3>AI Copilot — ask anything, mid-visit</h3>
-                <p>Voice or text. Answers grounded in the client's care record. Proactive allergy and contraindication alerts. Responds in under 3 seconds.</p>
+      <main>
+        {/* HERO */}
+        <section className="hero">
+          <div className="container hero-grid">
+            <div className="hero-copy reveal">
+              <div className="hero-badge"><span className="pulse"></span>AI-powered care management, built around the visit</div>
+              <h1>Run safer, smarter care from <span>one connected platform.</span></h1>
+              <p>CAREi helps carers document faster, supervisors respond sooner, and managers keep every visit, medication, handover and audit trail connected from one place.</p>
+              <div className="hero-actions">
+                <a href={`${APP_URL}/login`}><button className="btn btn-hero btn-green">Start free trial →</button></a>
+                <a href="#platform"><button className="btn btn-hero btn-ghost">Watch product tour</button></a>
+              </div>
+              <div className="hero-micro">
+                <span><i>✓</i>Voice-first documentation</span>
+                <span><i>✓</i>Digital MAR</span>
+                <span><i>✓</i>Lone-worker safety</span>
+                <span><i>✓</i>Role-based oversight</span>
               </div>
             </div>
-            <div className="feat-grid">
-              <div className="feat-card"><div className="feat-icon"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg></div><div className="new-badge">New</div><h3>Voice documentation</h3><p>Narrate observations. AI transcribes and structures data for review. Original audio stored for audit.</p></div>
-              <div className="feat-card"><div className="feat-icon"><svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6"/><path d="M9 12l2 2 4-4"/></svg></div><h3>Digital MAR</h3><p>Per-medication confirmation. Mandatory skip reasons. CQC-auditable records with GPS and timestamp.</p></div>
-              <div className="feat-card"><div className="feat-icon"><svg viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg></div><h3>ContinuCare+ handover</h3><p>3-point briefing auto-generated at clock-out in under 10 seconds. Visible to the next carer immediately.</p></div>
-              <div className="feat-card"><div className="feat-icon"><svg viewBox="0 0 24 24"><path d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0zm-5 0a4 4 0 1 1-8 0 4 4 0 0 1 8 0z"/></svg></div><h3>Lone worker SOS</h3><p>One-tap emergency button on every screen. Supervisor receives GPS location in under 30 seconds.</p></div>
-              <div className="feat-card"><div className="feat-icon"><svg viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"/></svg></div><div className="new-badge">New</div><h3>Passive safety monitoring</h3><p>Always-on GPS heartbeat. Screen inactivity triggers check-in. Auto-escalation to supervisor.</p></div>
-              <div className="feat-card"><div className="feat-icon"><svg viewBox="0 0 24 24"><path d="M11 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5m-1.414-9.414a2 2 0 1 1 2.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></div><div className="new-badge">New</div><h3>AI care plan creator</h3><p>Generates CQC-aligned care plans from assessment input. Human-reviewed. Never auto-saves.</p></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* HOW IT WORKS */}
-      <section id="how" className="sec-wide">
-        <div className="sec-inner">
-          <div className="how-wrap">
-            <div>
-              <div className="sec-tag">How it works</div>
-              <h2 className="sec-h">From clock-in to handover in one flow</h2>
-              <p className="sec-sub" style={{ marginBottom: '36px' }}>No forms at end of shift. No chasing carers by phone. No paperwork before the next visit starts.</p>
-              <div className="steps-list">
-                <div className="step-item"><div className="step-num">1</div><div className="step-content"><h3>Clock in — GPS-verified</h3><p>Activates the visit. Audio briefing plays automatically while the carer travels. Briefing covers observations, open tasks, and flags from the last visit.</p></div></div>
-                <div className="step-item"><div className="step-num">2</div><div className="step-content"><h3>Deliver care — document by voice</h3><p>Confirm medications in 2 taps. Log vitals contextually. Track fluids with a counter. Narrate observations — AI structures them in the background.</p></div></div>
-                <div className="step-item"><div className="step-num">3</div><div className="step-content"><h3>AI reviews and flags</h3><p>Copilot surfaces alerts, flags anomalies, and monitors lone worker safety throughout the visit — passively, with no extra steps from the carer.</p></div></div>
-                <div className="step-item"><div className="step-num">4</div><div className="step-content"><h3>Clock out — handover generated</h3><p>3-point briefing auto-generated in under 10 seconds. Supervisor notified. Audit trail sealed. No forms, no summary, no typing.</p></div></div>
-              </div>
-            </div>
-            <div className="how-visual">
-              <div className="flow-row active"><div className="flow-icon g"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z" stroke="#0b1f18"/><circle cx="12" cy="11" r="3" stroke="#0b1f18"/></svg></div><div className="flow-text"><p>Clock-in verified</p><span>09:12 AM · Bristol BS3 4NR</span></div></div>
-              <div className="flow-arrow"></div>
-              <div className="flow-row"><div className="flow-icon gl"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="#085041"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="#085041"/></svg></div><div className="flow-text"><p>Audio briefing played</p><span>3 flags · 4 tasks · 2 medications</span></div></div>
-              <div className="flow-arrow"></div>
-              <div className="flow-row"><div className="flow-icon gl"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M9 5h6" stroke="#085041"/><path d="M9 12l2 2 4-4" stroke="#085041"/></svg></div><div className="flow-text"><p>3 medications confirmed</p><span>MAR record sealed · GPS logged</span></div></div>
-              <div className="flow-arrow"></div>
-              <div className="flow-row"><div className="flow-icon gl"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><circle cx="12" cy="12" r="10" stroke="#085041"/><path d="M12 8v4l3 3" stroke="#085041"/></svg></div><div className="flow-text"><p>AI Copilot alert</p><span>Fluid target 750ml short — flagged</span></div></div>
-              <div className="flow-arrow"></div>
-              <div className="flow-row active"><div className="flow-icon g"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M5 13l4 4L19 7" stroke="#0b1f18"/></svg></div><div className="flow-text"><p>Handover generated</p><span>Supervisor notified · Audit complete</span></div></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FOR WHOM */}
-      <section className="sec-wide sec-bg">
-        <div className="sec-inner">
-          <div className="sec-tag">Built for every role</div>
-          <h2 className="sec-h">One platform, every perspective</h2>
-          <div className="personas-grid">
-            <div className="persona p-carer">
-              <div className="p-role-tag">Frontline carers</div>
-              <h3>Less admin,<br />more care</h3>
-              <p className="persona-desc">Everything you need is on one screen, exactly when you need it. No paper, no chasing, no forms at end of shift.</p>
-              <ul className="p-list">
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Voice notes — no typing mid-visit</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Medication confirmation in 2 taps</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>SOS button always within reach</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Briefing plays on the way to each visit</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Progressive capture — no end-of-shift forms</li>
-              </ul>
-            </div>
-            <div className="persona p-sup">
-              <div className="p-role-tag">Supervisors</div>
-              <h3>Real-time<br />oversight</h3>
-              <p className="persona-desc">Push alerts the moment something needs attention. Acknowledge from the notification tray without opening the app.</p>
-              <ul className="p-list">
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Push alerts for every flagged visit</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Out-of-range vitals escalated instantly</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>SOS location visible within 30 seconds</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Auto-escalation if unacknowledged at 15 min</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Lone worker monitoring across every shift</li>
-              </ul>
-            </div>
-            <div className="persona p-mgr">
-              <div className="p-role-tag">Care managers</div>
-              <h3>CQC-ready,<br />always</h3>
-              <p className="persona-desc">Every visit generates a complete timestamped audit trail — exportable, searchable, and built for inspection day.</p>
-              <ul className="p-list">
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Full MAR history with PDF export</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Immutable incident records</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>AI care plan and report generation</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Live compliance dashboard</li>
-                <li><span className="p-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></span>Manager portal — full team overview</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* COMPLIANCE */}
-      <section id="compliance" className="sec-wide">
-        <div className="sec-inner">
-          <div className="comp-layout">
-            <div>
-              <div className="sec-tag">Compliance and security</div>
-              <h2 className="sec-h">Built for the NHS.<br />Trusted by CQC.</h2>
-              <p className="sec-sub" style={{ marginBottom: '0' }}>Designed alongside UK care providers and legal advisors from day one — not retrofitted after the fact.</p>
-              <div className="comp-points">
-                <div className="cp"><div className="cp-bullet"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></div><div><h5>Immutable audit trails</h5><p>Every action timestamped, GPS-tagged, and carer-attributed. Cannot be edited or deleted after submission.</p></div></div>
-                <div className="cp"><div className="cp-bullet"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></div><div><h5>End-to-end encryption</h5><p>All client data encrypted in transit and at rest. UK data residency guaranteed on every plan.</p></div></div>
-                <div className="cp"><div className="cp-bullet"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></div><div><h5>AI with human oversight</h5><p>Every AI suggestion is human-reviewed before saving. No auto-decisions. Explainable outputs aligned to CQC AI guidance (May 2026).</p></div></div>
-                <div className="cp"><div className="cp-bullet"><svg viewBox="0 0 24 24" fill="none" strokeWidth="2.5"><path d="M5 13l4 4L19 7" strokeLinecap="round"/></svg></div><div><h5>Role-based access control</h5><p>Carers see only their clients. Supervisors see their team. Managers see everything.</p></div></div>
-              </div>
-            </div>
-            <div className="comp-visual">
-              <div className="comp-card big">
-                <div className="comp-icon" style={{ background: 'rgba(14,207,176,0.15)', borderColor: 'rgba(14,207,176,0.3)' }}><svg viewBox="0 0 24 24" fill="none" stroke="#0ecfb0" strokeWidth="1.8"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0 1 12 2.944a11.955 11.955 0 0 1-8.618 3.04A12.02 12.02 0 0 0 3 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg></div>
-                <h4>DSPT aligned</h4>
-                <p>NHS Data Security and Protection Toolkit standards met across every feature — data handling, access control, audit, and breach response.</p>
-              </div>
-              <div className="comp-card"><div className="comp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#085041" strokeWidth="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h4>GDPR ready</h4><p>UK GDPR compliant. Data never leaves UK servers. Consent-logged family updates.</p></div>
-              <div className="comp-card"><div className="comp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#085041" strokeWidth="1.8"><path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 0 0 1.946-.806 3.42 3.42 0 0 1 4.438 0 3.42 3.42 0 0 0 1.946.806 3.42 3.42 0 0 1 3.138 3.138 3.42 3.42 0 0 0 .806 1.946 3.42 3.42 0 0 1 0 4.438 3.42 3.42 0 0 0-.806 1.946 3.42 3.42 0 0 1-3.138 3.138 3.42 3.42 0 0 0-1.946.806 3.42 3.42 0 0 1-4.438 0 3.42 3.42 0 0 0-1.946-.806 3.42 3.42 0 0 1-3.138-3.138 3.42 3.42 0 0 0-.806-1.946 3.42 3.42 0 0 1 0-4.438 3.42 3.42 0 0 0 .806-1.946 3.42 3.42 0 0 1 3.138-3.138z"/></svg></div><h4>CQC audit-ready</h4><p>Every record built to withstand inspection. MAR, handover, and incident records all included.</p></div>
-              <div className="comp-card"><div className="comp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#085041" strokeWidth="1.8"><path d="M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2zm10-10V7a4 4 0 0 0-8 0v4h8z"/></svg></div><h4>ISO 27001</h4><p>Information security management certified. Full penetration testing cycle.</p></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* TESTIMONIALS — temporarily disabled
-      <section className="sec-wide sec-bg2">
-        <div className="sec-inner">
-          <div className="testi-intro">
-            <div><div className="sec-tag">What care homes say</div><h2 className="sec-h" style={{ marginBottom: '0' }}>Trusted across 200+ care homes</h2></div>
-            <div className="testi-rating"><div className="rating-n">4.9</div><div className="rating-stars">★★★★★</div><div className="rating-sub">From 1,200+ carer reviews</div></div>
-          </div>
-          <div className="testi-grid">
-            <div className="tcard featured"><p className="tquote">Since deploying CAREi, our carers spend 40% less time on documentation. They actually talk to residents now instead of filling forms at the end of every visit.</p><div className="t-auth"><div className="t-av">SR</div><div><div className="t-name">Sarah Redmond</div><div className="t-role">Care Home Manager · Bristol</div></div></div></div>
-            <div className="tcard"><p className="tquote">The SOS feature was worth it alone. A lone worker activated it during a home visit — supervisor had location and was en route in under two minutes.</p><div className="t-auth"><div className="t-av">DT</div><div><div className="t-name">David Thornton</div><div className="t-role">Operations Director · Midlands</div></div></div></div>
-            <div className="tcard"><p className="tquote">Our last CQC inspection went without a single documentation query. The auditor said our MAR records were the most complete they'd seen from a provider our size.</p><div className="t-auth"><div className="t-av">AM</div><div><div className="t-name">Amara Mensah</div><div className="t-role">Registered Manager · London</div></div></div></div>
-          </div>
-        </div>
-      </section>
-      */}
-
-      {/* PRICING — temporarily disabled
-      <section id="pricing" className="sec-wide">
-        <div className="sec-inner">
-          <div style={{ maxWidth: '520px' }}>
-            <div className="sec-tag">Pricing</div>
-            <h2 className="sec-h">Simple, per-carer pricing</h2>
-            <p className="sec-sub">No setup fees. No long contracts. Cancel anytime. Every plan includes GDPR-compliant UK hosting.</p>
-          </div>
-          <div className="pricing-grid">
-            {plans.map((plan, idx) => {
-              const isFeatured = idx === 1 || (plans.length === 2 && idx === 1)
-              const isCustom = plan.billing_model === 'custom' || plan.price_per_carer === 0
-              const { price, unit } = getPricingDisplay(plan)
-              const features = PLAN_FEATURES[plan.slug] || PLAN_FEATURES[plan.name.toLowerCase()] || []
-              const description = PLAN_DESCRIPTIONS[plan.slug] || PLAN_DESCRIPTIONS[plan.name.toLowerCase()] || ''
-              const isTrial = plan.slug === 'trial' || plan.name.toLowerCase() === 'starter'
-              const btnClass = isFeatured ? 'pbtn pbtn-white' : isCustom ? 'pbtn pbtn-outline' : 'pbtn pbtn-outline'
-              const btnText = isCustom ? 'Talk to sales' : 'Start free trial'
-              const btnHref = isCustom ? 'mailto:sales@careiapp.com' : `${APP_URL}/login`
-              return (
-                <div key={plan.slug} className={`pcard${isFeatured ? ' feat' : ''}`}>
-                  {isFeatured && <div className="p-pop">Most popular</div>}
-                  <div className="p-plan">{plan.name}</div>
-                  <div className="p-price" style={isCustom ? { fontSize: '32px', paddingTop: '6px' } : undefined}>
-                    {price}{!isCustom && unit && <span className="p-unit"> {unit}</span>}
+            <div className="product-stage reveal" ref={stageRef} onMouseMove={handleStageMove} onMouseLeave={resetStageTilt}>
+              <div className="stage-glow"></div>
+              <div className="desktop">
+                <div className="desktop-top"><span className="dot"></span><span className="dot"></span><span className="dot"></span></div>
+                <div className="desktop-body">
+                  <aside className="side">
+                    <div className="side-brand"><span className="mini-logo">C</span>CAREi</div>
+                    <div className="side-item active">Overview</div>
+                    <div className="side-item">Clients</div>
+                    <div className="side-item">Visits</div>
+                    <div className="side-item">Medication</div>
+                    <div className="side-item">Care plans</div>
+                    <div className="side-item">Alerts</div>
+                    <div className="side-item">Reports</div>
+                  </aside>
+                  <div className="dash">
+                    <div className="dash-head">
+                      <div><small style={{ color: 'var(--muted)', fontSize: '9px' }}>Good morning, Sarah</small><h3>Care operations</h3></div>
+                      <span className="status">● All systems normal</span>
+                    </div>
+                    <div className="metrics">
+                      <div className="metric"><small>Visits today</small><b data-count="28">0</b></div>
+                      <div className="metric"><small>Active now</small><b data-count="7">0</b></div>
+                      <div className="metric"><small>Needs attention</small><b data-count="3">0</b></div>
+                    </div>
+                    <div className="dash-grid">
+                      <div className="panel">
+                        <div className="panel-title">Live visits</div>
+                        <div className="visit"><div className="person"><div className="avatar">ME</div><div><b>Margaret Ellis</b><span>Bristol · 09:15</span></div></div><span className="tag">In progress</span></div>
+                        <div className="visit"><div className="person"><div className="avatar">JB</div><div><b>John Baker</b><span>Bath · 09:30</span></div></div><span className="tag">Medication due</span></div>
+                        <div className="visit"><div className="person"><div className="avatar">AM</div><div><b>Ada Mensah</b><span>Bristol · 10:00</span></div></div><span className="tag">Scheduled</span></div>
+                      </div>
+                      <div className="ai-card">
+                        <strong>CAREi Copilot</strong>
+                        <p>Margaret is 750ml below today’s fluid target. Penicillin allergy is on file. Ankle swelling was noted on the previous visit.</p>
+                        <span className="ai-chip">Review insight →</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-desc">{description}</div>
-                  <div className="p-divider"></div>
-                  <ul className="p-feats">
-                    {features.map((feat, i) => (
-                      <li key={i}>
-                        <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke={isFeatured ? '#0ecfb0' : 'currentColor'}/></svg>
-                        {feat}
-                      </li>
-                    ))}
-                    {!isCustom && (
-                      <>
-                        <li>
-                          <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke={isFeatured ? '#0ecfb0' : 'currentColor'}/></svg>
-                          Up to {plan.max_users} carers
-                        </li>
-                        <li>
-                          <svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" stroke={isFeatured ? '#0ecfb0' : 'currentColor'}/></svg>
-                          Up to {plan.max_clients} clients
-                        </li>
-                      </>
-                    )}
-                  </ul>
-                  <a href={btnHref}><button className={btnClass}>{btnText}</button></a>
                 </div>
-              )
-            })}
+              </div>
+              <div className="floating voice-card">
+                <div className="voice-top"><b>Voice documentation</b><span style={{ fontSize: '9px', color: 'var(--green2)' }}>Recording</span></div>
+                <div className="voice-wave"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                <p>“Client ate most of breakfast, medication taken, mild swelling still present...”</p>
+              </div>
+              <div className="floating safety-card">
+                <div className="safety-row"><div className="shield">🛡</div><div><b>Lone-worker safety</b><p>Heartbeat received · 18 sec ago</p></div></div>
+              </div>
+              <div className="phone">
+                <div className="phone-in">
+                  <div className="phone-head">Active visit · Margaret</div>
+                  <div className="phone-body">
+                    <div className="phone-card"><b>Medication</b><span>2 of 3 confirmed</span></div>
+                    <div className="phone-card"><b>Vitals</b><span>BP 128/76 · Pulse 71</span></div>
+                    <div className="phone-card"><b>Handover</b><span>Generated at clock-out</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* VALUE STRIP */}
+        <div className="value-strip">
+          <div className="container">
+            <div className="value-shell reveal">
+              <div className="value"><div className="value-icon">◌</div><h3>One connected record</h3><p>Visits, notes, medication, care plans and alerts stay together around the client.</p></div>
+              <div className="value"><div className="value-icon">⌁</div><h3>Less typing, more care</h3><p>Voice capture and progressive documentation reduce the burden of end-of-shift admin.</p></div>
+              <div className="value"><div className="value-icon">⌖</div><h3>Safer lone working</h3><p>Built-in check-ins, GPS-aware alerts and supervisor escalation support carers in the field.</p></div>
+              <div className="value"><div className="value-icon">✓</div><h3>Audit-ready by design</h3><p>Timestamped, role-based records make review, reporting and inspection preparation simpler.</p></div>
+            </div>
           </div>
         </div>
-      </section>
-      */}
 
-      {/* CTA BAND */}
-      <div id="demo" className="cta-banner">
-        <div className="cta-left">
-          <h2>Ready to free your carers<br />from paperwork?</h2>
-          <p>Join 200+ care homes already running CAREi. Set up in under a day, trained in under an hour.</p>
-        </div>
-        <div className="cta-right">
-          <a href={`${APP_URL}/login`}><button className="btn-cta-dark">Start 30-day free trial</button></a>
-          <a href="mailto:sales@careiapp.com"><button className="btn-cta-out">Book a live demo</button></a>
-          <div className="cta-meta">No credit card required · UK data hosting · Cancel anytime</div>
-        </div>
-      </div>
+        {/* PROBLEM */}
+        <section className="section problem">
+          <div className="container problem-grid">
+            <div className="problem-copy reveal">
+              <div className="eyebrow">Why CAREi</div>
+              <h2 className="h2">Care teams do not need more software. They need less friction.</h2>
+              <p className="lead">CAREi is designed around what actually happens before, during and after a care visit — so carers can focus on people while managers keep visibility without chasing paperwork.</p>
+            </div>
+            <div className="pain-grid">
+              <article className="pain reveal"><div className="pain-num">01</div><h3>Documentation that happens during care</h3><p>Capture notes by voice, confirm medication in a few taps and progressively build the visit record instead of completing a long form afterwards.</p></article>
+              <article className="pain reveal"><div className="pain-num">02</div><h3>Handovers that do not depend on memory</h3><p>Important observations and outstanding actions can flow directly into the next carer’s briefing.</p></article>
+              <article className="pain reveal"><div className="pain-num">03</div><h3>Alerts that reach the right person</h3><p>Supervisors can see exceptions, safety concerns and visit issues as they happen instead of discovering them at the end of the day.</p></article>
+              <article className="pain reveal"><div className="pain-num">04</div><h3>Records managers can actually use</h3><p>Searchable, structured information turns everyday care activity into operational visibility and audit evidence.</p></article>
+            </div>
+          </div>
+        </section>
+
+        {/* PLATFORM SHOWCASE */}
+        <section id="platform" className="section">
+          <div className="container">
+            <div className="showcase-head">
+              <div className="reveal">
+                <div className="eyebrow">See the platform</div>
+                <h2 className="h2">One system. Different jobs. One shared picture of care.</h2>
+              </div>
+              <div className="tabs reveal">
+                {TABS.map((t) => (
+                  <button key={t.key} className={`tab-btn${tab === t.key ? ' active' : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
+                ))}
+              </div>
+            </div>
+            <div className="showcase-card reveal">
+              <div className="showcase-copy" key={tab}>
+                <div className="mini">{feature.k}</div>
+                <h3>{feature.t}</h3>
+                <p>{feature.x}</p>
+                <div className="bullet-list">
+                  {feature.b.map((item) => (
+                    <div className="bullet" key={item}><i>✓</i>{item}</div>
+                  ))}
+                </div>
+              </div>
+              <div className="showcase-ui">
+                <div className={`feature-screen${tab === 'visit' ? ' active' : ''}`}>
+                  <div className="screen-top"><h4>Active visit · Margaret Ellis</h4><span className="screen-chip">Live</span></div>
+                  <div className="screen-grid">
+                    <div className="screen-panel">
+                      <div className="panel-title">Today’s care</div>
+                      <div className="med-row"><div><b>Morning medication</b><span>Complete before 10:00</span></div><span className="med-state">2 of 3</span></div>
+                      <div className="med-row"><div><b>Breakfast &amp; fluids</b><span>Track intake</span></div><span className="med-state">In progress</span></div>
+                      <div className="med-row"><div><b>Mobility support</b><span>Use walking frame</span></div><span className="med-state">Due</span></div>
+                    </div>
+                    <div className="screen-panel">
+                      <div className="panel-title">Care context</div>
+                      <div className="note-box">Penicillin allergy on file. Previous visit noted mild ankle swelling. Fluid target today: 1.5L.</div>
+                    </div>
+                  </div>
+                </div>
+                <div className={`feature-screen${tab === 'meds' ? ' active' : ''}`}>
+                  <div className="screen-top"><h4>Digital MAR</h4><span className="screen-chip">Audit trail active</span></div>
+                  <div className="screen-panel">
+                    <div className="med-row"><div><b>Amlodipine · 5mg</b><span>09:21 · Confirmed by M. Evans</span></div><span className="med-state">Given</span></div>
+                    <div className="med-row"><div><b>Lisinopril · 10mg</b><span>09:22 · Confirmed by M. Evans</span></div><span className="med-state">Given</span></div>
+                    <div className="med-row"><div><b>Simvastatin · 20mg</b><span>Scheduled for evening round</span></div><span className="med-state">Pending</span></div>
+                  </div>
+                </div>
+                <div className={`feature-screen${tab === 'handover' ? ' active' : ''}`}>
+                  <div className="screen-top"><h4>ContinuCare+ handover</h4><span className="screen-chip">Generated</span></div>
+                  <div className="screen-panel">
+                    <div className="activity"><i></i><div><b>Observation</b><span>Mild ankle swelling remains present; no pain reported.</span></div></div>
+                    <div className="activity"><i></i><div><b>Medication</b><span>Morning medication completed as scheduled.</span></div></div>
+                    <div className="activity"><i></i><div><b>Next action</b><span>Continue fluid encouragement; review intake at next visit.</span></div></div>
+                  </div>
+                </div>
+                <div className={`feature-screen${tab === 'oversight' ? ' active' : ''}`}>
+                  <div className="screen-top"><h4>Supervisor overview</h4><span className="screen-chip">Live operations</span></div>
+                  <div className="screen-grid">
+                    <div className="screen-panel">
+                      <div className="panel-title">Needs attention</div>
+                      <div className="visit"><div className="person"><div className="avatar">ME</div><div><b>Margaret Ellis</b><span>Fluid target below plan</span></div></div><span className="tag">Review</span></div>
+                      <div className="visit"><div className="person"><div className="avatar">JB</div><div><b>John Baker</b><span>Medication not yet confirmed</span></div></div><span className="tag">Due</span></div>
+                    </div>
+                    <div className="screen-panel">
+                      <div className="panel-title">Safety</div>
+                      <div className="note-box">All active lone-worker heartbeats received. No open SOS incidents.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* JOURNEY */}
+        <section id="workflow" className="section journey">
+          <div className="container">
+            <div className="eyebrow reveal">The visit journey</div>
+            <h2 className="h2 reveal">From clock-in to handover, CAREi follows the work instead of interrupting it.</h2>
+            <p className="lead reveal">A single flow connects location, client context, care delivery, documentation, AI support and the final record.</p>
+            <div className="journey-line reveal">
+              <div className="jstep reveal"><div className="jnum">1</div><div><h3>Arrive informed</h3><p>Clock in, verify the visit and see the latest care plan, tasks, risks and handover information.</p></div></div>
+              <div className="jstep reveal"><div className="jnum">2</div><div><h3>Deliver and capture</h3><p>Complete care, confirm medication, record observations and dictate notes while the visit is still happening.</p></div></div>
+              <div className="jstep reveal"><div className="jnum">3</div><div><h3>Catch what matters</h3><p>CAREi Copilot can surface relevant context and exceptions so carers and supervisors know what deserves attention.</p></div></div>
+              <div className="jstep reveal"><div className="jnum">4</div><div><h3>Leave a clear record</h3><p>Clock out with a structured visit record and a concise handover ready for the next person in the care journey.</p></div></div>
+            </div>
+          </div>
+        </section>
+
+        {/* ROLES */}
+        <section id="roles" className="section roles">
+          <div className="container">
+            <div className="eyebrow" style={{ color: 'var(--green)' }}>Built for the whole team</div>
+            <h2 className="h2 reveal">Different roles see what they need. Everyone works from the same care record.</h2>
+            <p className="lead reveal">CAREi connects frontline work to supervision and management without turning every user into an administrator.</p>
+            <div className="roles-grid">
+              <article className="role-card carer reveal">
+                <div className="role-label">Frontline carers</div>
+                <h3>Spend less of the shift documenting the shift.</h3>
+                <p>Fast access to client context, voice notes, medication, vitals, tasks and safety controls in one visit workflow.</p>
+                <div className="role-list">
+                  <div><i>✓</i>Voice-first notes</div>
+                  <div><i>✓</i>Medication in a few taps</div>
+                  <div><i>✓</i>Briefings before each visit</div>
+                  <div><i>✓</i>SOS and passive safety support</div>
+                </div>
+                <div className="role-orb"></div>
+              </article>
+              <article className="role-card supervisor reveal">
+                <div className="role-label">Supervisors</div>
+                <h3>See exceptions before they become end-of-day surprises.</h3>
+                <p>Stay close to active visits, alerts, medication issues and lone-worker safety without calling every carer for updates.</p>
+                <div className="role-list">
+                  <div><i>✓</i>Live visit visibility</div>
+                  <div><i>✓</i>Priority alerts</div>
+                  <div><i>✓</i>Acknowledge and escalate</div>
+                </div>
+              </article>
+              <article className="role-card manager reveal">
+                <div className="role-label">Care managers</div>
+                <h3>Turn everyday care activity into operational control.</h3>
+                <p>Review records, care plans, compliance evidence and team activity from one management view.</p>
+                <div className="role-list">
+                  <div><i>✓</i>Structured audit trails</div>
+                  <div><i>✓</i>Reports and exports</div>
+                  <div><i>✓</i>Role-based permissions</div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        {/* AI */}
+        <section className="section ai-section">
+          <div className="container ai-grid">
+            <div className="ai-demo reveal" ref={demoRef}>
+              <div className="copilot-head"><b>CAREi Copilot</b><span className="live-pill">Grounded in client context</span></div>
+              <div className="prompt">{typed || '\u00A0'}{!showAnswer && <span className="caret" />}</div>
+              {showAnswer && (
+                <>
+                  <div className="answer">
+                    <small>CAREi response</small>
+                    <h4>Three things need your attention</h4>
+                    <p>1. Fluid intake is below today’s target.<br />2. Penicillin allergy remains active on the record.<br />3. Mild ankle swelling was documented on the previous visit.</p>
+                  </div>
+                  <div className="alert-box"><b>Safety note:</b> AI suggestions are presented for human review. The carer remains responsible for the care decision and saved record.</div>
+                </>
+              )}
+            </div>
+            <div className="reveal">
+              <div className="eyebrow">AI that supports care</div>
+              <h2 className="h2">Useful context, without turning care into a chatbot.</h2>
+              <p className="lead">CAREi Copilot is designed to help people notice, retrieve and structure information already connected to the client and visit. It supports the workflow; it does not replace professional judgement.</p>
+              <div className="ai-points">
+                <div className="ai-point"><b>Ask in plain language</b><p>Use voice or text to retrieve relevant client context while working.</p></div>
+                <div className="ai-point"><b>Structure voice notes</b><p>Turn spoken observations into organised documentation for review.</p></div>
+                <div className="ai-point"><b>Surface relevant flags</b><p>Bring allergies, previous observations and care-plan context closer to the moment of care.</p></div>
+                <div className="ai-point"><b>Keep humans in control</b><p>AI-generated content is reviewed before it becomes part of the official record.</p></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* COMPLIANCE */}
+        <section id="security" className="section compliance">
+          <div className="container compliance-grid">
+            <div className="reveal">
+              <div className="eyebrow">Security &amp; compliance</div>
+              <h2 className="h2">The care record should be easy to use — and difficult to compromise.</h2>
+              <p className="lead">CAREi is designed with multi-tenant isolation, role-based permissions, secure authentication, audit logging and protected client data as core platform principles.</p>
+            </div>
+            <div className="security-board">
+              <div className="security-card wide reveal"><div className="security-icon">🔒</div><h3>One accountable trail from action to record</h3><p>Important activity can be timestamped, attributed to a user and retained as part of the visit history, supporting internal review and inspection preparation.</p></div>
+              <div className="security-card reveal"><div className="security-icon">👤</div><h3>Role-based access</h3><p>Users see the information and tools appropriate to their responsibility.</p></div>
+              <div className="security-card reveal"><div className="security-icon">🛡</div><h3>Tenant isolation</h3><p>Provider data remains scoped to its own organisation environment.</p></div>
+              <div className="security-card reveal"><div className="security-icon">🔑</div><h3>Secure sign-in</h3><p>Support for modern authentication and protected token handling.</p></div>
+              <div className="security-card reveal"><div className="security-icon">🧾</div><h3>Audit logging</h3><p>Key system events can be recorded for accountability and review.</p></div>
+            </div>
+          </div>
+        </section>
+
+        {/* PRICING */}
+        <section id="pricing" className="section">
+          <div className="container">
+            <div className="pricing-head">
+              <div className="reveal">
+                <div className="eyebrow">Pricing</div>
+                <h2 className="h2">Start with what your team needs now. Expand when you are ready.</h2>
+              </div>
+              <p className="lead reveal" style={{ maxWidth: '420px' }}>Simple per-carer plans for smaller providers, with a custom option for larger and multi-site organisations.</p>
+            </div>
+            <div className="pricing-grid">
+              {plans.map((plan) => {
+                const { price, unit } = getPricingDisplay(plan)
+                const featured = plan.slug === 'professional'
+                const features = PLAN_FEATURES[plan.slug] || []
+                const desc = PLAN_DESCRIPTIONS[plan.slug] || ''
+                const cta = PLAN_CTA[plan.slug] || 'Start free trial'
+                const ctaHref = plan.billing_model === 'custom' ? 'mailto:sales@careiapp.com' : `${APP_URL}/login`
+                return (
+                  <div className={`price-card reveal${featured ? ' featured' : ''}`} key={plan.slug}>
+                    {featured && <div className="popular">Most popular</div>}
+                    <div className="plan">{plan.name}</div>
+                    <div className="price">{price} {unit && <span>{unit}</span>}</div>
+                    <p className="price-desc">{desc}</p>
+                    <div className="price-feats">
+                      {features.map((f) => (
+                        <div key={f}><span className="tick">✓</span>{f}</div>
+                      ))}
+                    </div>
+                    <a href={ctaHref}><button className="price-btn">{cta}</button></a>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* FINAL CTA */}
+        <section className="final-cta">
+          <div className="container">
+            <div className="cta-shell reveal">
+              <div>
+                <h2>Make every visit easier to deliver, easier to oversee and easier to prove.</h2>
+                <p>See how CAREi can bring documentation, medication, handovers, safety and management visibility into one connected care workflow.</p>
+              </div>
+              <div className="cta-actions">
+                <a href="mailto:sales@careiapp.com"><button className="btn btn-green">Book a live demo</button></a>
+                <a href={`${APP_URL}/login`}><button className="btn btn-ghost">Start free trial</button></a>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
 
       {/* FOOTER */}
       <footer>
-        <div className="foot-grid">
-          <div>
-            <div className="logo">
-              <div className="logo-mark" style={{ background: 'var(--g)' }}><img src="/logo.jpg" alt="CAREi" /></div>
-              <span className="logo-name" style={{ color: '#fff' }}>CAREi<sup style={{ color: 'rgba(255,255,255,.3)' }}>&trade;</sup></span>
+        <div className="container">
+          <div className="footer-grid">
+            <div>
+              <a href="/" className="brand">
+                <span className="brand-mark">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#0b1f18" strokeWidth="2"><path d="M12 3v18M3 12h18" /></svg>
+                </span>
+                CAREi
+              </a>
+              <p className="footer-desc">A connected care-management platform for carers, supervisors and managers — from the first clock-in to the final audit trail.</p>
             </div>
-            <p className="foot-brand-desc">AI-powered care management for frontline carers. Built in the UK, trusted across 200+ care homes.</p>
+            <div className="footer-col">
+              <h4>Product</h4>
+              <a href="#platform">Platform</a>
+              <a href="#workflow">Workflow</a>
+              <a href="#roles">For teams</a>
+              <a href="#pricing">Pricing</a>
+            </div>
+            <div className="footer-col">
+              <h4>Company</h4>
+              <a href="mailto:sales@careiapp.com">Contact</a>
+            </div>
+            <div className="footer-col">
+              <h4>Trust</h4>
+              <a href="#security">Security</a>
+              <a href="/privacy-policy.html">Privacy</a>
+              <a href="/terms-of-service.html">Terms</a>
+            </div>
           </div>
-          <div className="foot-col">
-            <h4>Product</h4>
-            <a href="#features">Features</a>
-            <a href="#how">How it works</a>
-            <a href="#pricing">Pricing</a>
-            <a href={`${APP_URL}/manager/login`}>Manager portal</a>
-            <a href="#">Changelog</a>
+          <div className="footer-bottom">
+            <span>© 2026 CAREi. All rights reserved.</span>
+            <span>Care technology designed around the people delivering care.</span>
           </div>
-          <div className="foot-col">
-            <h4>Compliance</h4>
-            <a href="#compliance">GDPR and data</a>
-            <a href="#compliance">DSPT alignment</a>
-            <a href="#compliance">CQC readiness</a>
-            <a href="#compliance">Security</a>
-          </div>
-          <div className="foot-col">
-            <h4>Company</h4>
-            <a href="#">About</a>
-            <a href="#">Blog</a>
-            <a href="#">Careers</a>
-            <a href="#">Contact</a>
-            <a href="#">Privacy policy</a>
-          </div>
-        </div>
-        <div className="foot-bottom">
-          <p>&copy; 2026 CAREi Technologies Limited (SC893547). Registered in England and Wales. light@careiapp.com</p>
-          <div className="foot-live">Live across 200+ care homes</div>
         </div>
       </footer>
     </div>
