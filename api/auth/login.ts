@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug, checkRateLimit } from '../db.js'
 import { verifyCredential, generateSecureToken, hashToken } from '../hash.js'
+import { logSecurityEvent } from '../db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -28,13 +29,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureTables()
     const sql = getSql()
     const rows = await sql`
-      SELECT id, name, email, phone, region, pin, pin_hash, role
+      SELECT id, name, email, phone, region, pin, pin_hash, role, status
       FROM users
       WHERE LOWER(email) = ${email.toLowerCase()}
       LIMIT 1
     ` as any[]
 
     const user = rows[0]
+    if (user && user.status === 'deactivated') {
+      await logSecurityEvent({
+        eventType: 'login_blocked_deactivated',
+        actorEmail: email,
+        metadata: { reason: 'account deactivated' },
+      })
+      res.status(403).json({ error: 'This account has been deactivated' })
+      return
+    }
     let pinValid = false
     if (user?.pin_hash) {
       pinValid = await verifyCredential(pin, user.pin_hash)
@@ -43,6 +53,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       pinValid = user.pin === pin
     }
     if (!user || !pinValid) {
+      await logSecurityEvent({
+        eventType: user ? 'login_failed_bad_pin' : 'login_failed_unknown_email',
+        actorEmail: email,
+        subjectEmail: user ? email : null,
+      })
       res.status(401).json({ error: 'Invalid email or PIN' })
       return
     }

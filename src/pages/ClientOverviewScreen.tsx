@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useLocation, useParams } from 'wouter'
-import { getClient, startVisit } from '../api/client'
+import { getClient, startVisit, getFamilyConsent, setFamilyConsent } from '../api/client'
 import FamilyMemberInvitation from '../components/FamilyMemberInvitation'
 
 const COLORS = {
@@ -57,6 +57,9 @@ export default function ClientOverviewScreen() {
   const [dismissedAllergy, setDismissedAllergy] = useState(false)
   const [showFamilyInvite, setShowFamilyInvite] = useState(false)
   const [dismissedChoking, setDismissedChoking] = useState(false)
+  const [familyConsent, setFamilyConsentState] = useState<boolean | null>(null)
+  const [consentBusy, setConsentBusy] = useState(false)
+  const [consentError, setConsentError] = useState('')
 
   useEffect(() => {
     if (!clientId) return
@@ -66,7 +69,24 @@ export default function ClientOverviewScreen() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
+    getFamilyConsent(clientId)
+      .then((res: any) => setFamilyConsentState(!!res?.consent))
+      .catch(() => setFamilyConsentState(null))
   }, [clientId])
+
+  const toggleFamilyConsent = async () => {
+    if (familyConsent === null || consentBusy) return
+    setConsentBusy(true)
+    setConsentError('')
+    try {
+      const res: any = await setFamilyConsent(clientId, !familyConsent)
+      setFamilyConsentState(!!res?.consent)
+    } catch (err: any) {
+      setConsentError(err?.message || 'Could not update consent')
+    } finally {
+      setConsentBusy(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -376,12 +396,37 @@ export default function ClientOverviewScreen() {
             <p className="text-xs text-slate-500 mb-2">
               Give family members secure access to {client.name}'s care updates, visit summaries, and messaging.
             </p>
-            <div className="flex items-center gap-2 text-xs text-teal">
+            <div className="flex items-center gap-2 text-xs text-teal mb-3">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
               </svg>
               Secure, role-based access with audit logging
             </div>
+            {familyConsent !== null && (
+              <div className="flex items-center justify-between rounded-xl bg-white border border-slate-100 px-3 py-2.5">
+                <div>
+                  <div className="text-xs font-medium text-slate-800">Share care updates with family</div>
+                  <div className="text-[10px] text-slate-500">
+                    {familyConsent
+                      ? 'Consent recorded — family updates enabled'
+                      : 'No consent on file — family updates are blocked'}
+                  </div>
+                  {consentError && <div className="text-[10px] text-red-500 mt-0.5">{consentError}</div>}
+                </div>
+                <button
+                  onClick={toggleFamilyConsent}
+                  disabled={consentBusy}
+                  aria-label="Toggle family update consent"
+                  className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${consentBusy ? 'opacity-50' : ''}`}
+                  style={{ background: familyConsent ? COLORS.teal : '#CBD5E1' }}
+                >
+                  <span
+                    className="absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all"
+                    style={{ left: familyConsent ? 22 : 2 }}
+                  />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Last Handover */}
@@ -433,7 +478,14 @@ export default function ClientOverviewScreen() {
               if (!client?.id) return
               setStartingVisit(true)
               try {
-                const res = await startVisit(client.id)
+                // Capture GPS evidence for EVV before starting the visit
+              let evv: { lat: number; lng: number; accuracy: number } | undefined
+              try {
+                const { getCurrentPosition } = await import('../utils/geoVerify')
+                const pos = await getCurrentPosition()
+                if (pos) evv = { lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy }
+              } catch { /* GPS unavailable — visit starts without geo evidence */ }
+              const res = await startVisit(client.id, evv)
                 setLocation(`/visit/${res.visitId}`)
               } catch (err: any) {
                 alert(err.message || 'Failed to start visit')

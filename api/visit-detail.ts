@@ -69,6 +69,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             tagScanId, tagScanMethod, tagScannedAt, tagVerified,
           } = body
 
+          let verifiedTag = !!tagVerified
+          if (tagScanId) {
+            const resolvedClientId = clientId
+              || (await tenantSql`SELECT client_id FROM visits WHERE id = ${visitId}` as any[])[0]?.client_id
+            if (resolvedClientId) {
+              const tagRows = await tenantSql`SELECT tag_id FROM clients WHERE id = ${resolvedClientId}` as any[]
+              const expected = tagRows[0]?.tag_id
+              if (expected) {
+                const normalized = String(tagScanId).replace(/^CAREi:client:/, '')
+                verifiedTag = expected === tagScanId || expected === normalized
+              }
+            }
+          }
+
           await tenantSql`
             INSERT INTO visits (
               id, tenant_id, client_name, client_age, client_address, client_id, visit_time, visit_duration,
@@ -81,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               ${elapsed}, ${JSON.stringify(tasks || [])}, ${fluid}, ${notes}, ${JSON.stringify(medications || [])}, ${handoverNote}, ${clockOutAt}, ${clockInAt}, ${status || 'pending'},
               ${bpSystolic}, ${bpDiastolic}, ${pulse}, ${o2Sat}, ${fluidGlasses}, ${mealStatus}, ${mood}, ${wellbeingNote},
               ${clockInLat ?? null}, ${clockInLng ?? null}, ${clockInAccuracy ?? null}, ${geoVerified ?? false}, ${geoDistanceM ?? null}, ${geoOverrideReason ?? null},
-              ${tagScanId ?? null}, ${tagScanMethod ?? null}, ${tagScannedAt ?? null}, ${tagVerified ?? false}
+              ${tagScanId ?? null}, ${tagScanMethod ?? null}, ${tagScannedAt ?? null}, ${verifiedTag}
             )
             ON CONFLICT (id) DO UPDATE SET
               client_name = EXCLUDED.client_name,
@@ -176,6 +190,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         tagScanId, tagScanMethod, tagScannedAt, tagVerified,
       } = body
 
+      let verifiedTag = !!tagVerified
+      if (tagScanId) {
+        const resolvedClientId = clientId
+          || (await sql`SELECT client_id FROM visits WHERE id = ${visitId}` as any[])[0]?.client_id
+        if (resolvedClientId) {
+          const tagRows = await sql`SELECT tag_id FROM clients WHERE id = ${resolvedClientId}` as any[]
+          const expected = tagRows[0]?.tag_id
+          if (expected) {
+            const normalized = String(tagScanId).replace(/^CAREi:client:/, '')
+            verifiedTag = expected === tagScanId || expected === normalized
+          }
+        }
+      }
+
       await sql`
         INSERT INTO visits (
           id, client_name, client_age, client_address, client_id, visit_time, visit_duration,
@@ -188,7 +216,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ${elapsed}, ${JSON.stringify(tasks || [])}, ${fluid}, ${notes}, ${JSON.stringify(medications || [])}, ${handoverNote}, ${clockOutAt}, ${clockInAt}, ${status || 'pending'},
           ${bpSystolic}, ${bpDiastolic}, ${pulse}, ${o2Sat}, ${fluidGlasses}, ${mealStatus}, ${mood}, ${wellbeingNote},
           ${clockInLat ?? null}, ${clockInLng ?? null}, ${clockInAccuracy ?? null}, ${geoVerified ?? false}, ${geoDistanceM ?? null}, ${geoOverrideReason ?? null},
-          ${tagScanId ?? null}, ${tagScanMethod ?? null}, ${tagScannedAt ?? null}, ${tagVerified ?? false}
+          ${tagScanId ?? null}, ${tagScanMethod ?? null}, ${tagScannedAt ?? null}, ${verifiedTag}
         )
         ON CONFLICT (id) DO UPDATE SET
           client_name = EXCLUDED.client_name,

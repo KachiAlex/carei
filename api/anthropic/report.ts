@@ -228,7 +228,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
+    // Persist the generated report so managers can retrieve it later
+    let reportId: string | null = null
+    try {
+      reportId = 'rep-' + Math.random().toString(36).slice(2) + Date.now().toString(36).slice(0, 4)
+      const slug = getTenantSlug(req)
+      let tenantId: string | null = null
+      if (slug) {
+        const t = await sql`SELECT id FROM tenants WHERE slug = ${slug} LIMIT 1` as any[]
+        tenantId = t[0]?.id || null
+      }
+      await sql`
+        INSERT INTO reports (id, tenant_id, client_id, report_type, title, content, generated_by)
+        VALUES (${reportId}, ${tenantId}, ${clientId || null}, ${template},
+          ${report.title || tpl.name}, ${JSON.stringify(report)}, ${user.id})
+      `
+    } catch (e: any) {
+      console.error('[anthropic/report] persist failed:', e.message)
+      reportId = null
+    }
+
     res.status(200).json({
+      id: reportId,
       template,
       templateName: tpl.name,
       report,

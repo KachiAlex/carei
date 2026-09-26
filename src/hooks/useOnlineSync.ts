@@ -16,7 +16,8 @@ import {
   updateClient,
   createClient,
   updateProfile,
-  createCaregiver
+  createCaregiver,
+  replayApiRequest
 } from '../api/client'
 
 // Track sync status globally
@@ -113,6 +114,12 @@ export function useOnlineSync() {
             case 'client-create':
               await createClient(item.payload as any)
               break
+
+            case 'api-request': {
+              const { path, method, body } = item.payload as { path: string; method: string; body?: unknown }
+              await replayApiRequest(path, method, body)
+              break
+            }
               
             case 'caregiver-update':
               await updateProfile(item.payload as { name?: string; phone?: string; region?: string })

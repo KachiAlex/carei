@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken, withTenant, getTenantSlug } from '../db.js'
+import { extractFamilySafeFacts, renderFamilySummary, sanitizeFamilyText } from '../family-safe.js'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const MODEL = 'claude-sonnet-4-6'
@@ -91,23 +92,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    if (!ANTHROPIC_API_KEY) {
-      res.status(503).json({ error: 'AI service not configured' })
-      return
-    }
+    // Deterministic extraction — only whitelisted safe facts can reach family.
+    // The AI only ever sees this fact set; raw visit fields (meds, notes,
+    // incidents, carer details) never enter the prompt.
+    const safeFacts = extractFamilySafeFacts({
+      client_name: visit.client_name,
+      clock_in_at: visit.clock_in_at,
+      clock_out_at: visit.clock_out_at,
+      mood: visit.mood,
+      meal_status: visit.meal_status,
+      fluid_glasses: visit.fluid_glasses,
+      tasks: safeJson<string[]>(visit.tasks) || [],
+    })
 
-    // Build visit context for LLM (strip carer-private details)
-    const visitContext = {
-      clientName: visit.client_name || 'the service user',
-      date: visit.clock_in_at,
-      duration: visit.clock_out_at ? `${Math.round((new Date(visit.clock_out_at).getTime() - new Date(visit.clock_in_at).getTime()) / 60000)} minutes` : 'unknown',
-      mood: visit.mood || 'not recorded',
-      mealStatus: visit.meal_status || 'not recorded',
-      fluid: visit.fluid || 'not recorded',
-      tasksCompleted: safeJson<string[]>(visit.tasks) || [],
-      medications: safeJson<any[]>(visit.medications) || [],
-      wellbeingNote: visit.wellbeing_note || '',
-      // Explicitly exclude: carer name, carer personal notes, handover_note (internal), incident details
+    // Deterministic fallback when the AI service is unavailable
+    if (!ANTHROPIC_API_KEY) {
+      res.status(200).json({
+        generated: true,
+        summary: renderFamilySummary(safeFacts),
+        clientName: visit.client_name,
+        visitDate: visit.clock_in_at,
+        fallback: true,
+      })
+      return
     }
 
     const systemPrompt = `You are CAREi Family Update, a feature that generates brief, family-friendly updates after care visits for a UK care service.
@@ -142,7 +149,7 @@ Do NOT include:
         system: systemPrompt,
         messages: [{
           role: 'user',
-          content: `Generate a family update from this visit data:\n\n${JSON.stringify(visitContext, null, 2)}`,
+          content: `Generate a family update from these approved facts only — do not infer or add anything beyond them:\n\n${JSON.stringify(safeFacts, null, 2)}`,
         }],
       }),
     })
@@ -154,7 +161,13 @@ Do NOT include:
     }
 
     const data = await response.json()
-    const summary = data.content?.[0]?.text || 'No summary generated.'
+    const rawSummary = data.content?.[0]?.text || 'No summary generated.'
+
+    // Post-generation safety net — redact anything that slipped through
+    const { text: summary, removed } = sanitizeFamilyText(rawSummary)
+    if (removed.length) {
+      console.warn('[family-update] sanitized output removed:', removed.join(', '))
+    }
 
     // Log that a family update was generated (audit trail)
     try {
@@ -166,18 +179,14 @@ Do NOT include:
       `
     } catch {}
 
-    // Check for family members to notify
+    // Check for family members to notify (family_members table)
     let familyMembers: any[] = []
     try {
       familyMembers = await sql`
-        SELECT id, name, email, phone FROM users
-        WHERE role = 'family'
-          AND id IN (
-            SELECT user_id FROM family_access
-            WHERE client_id = ${visit.client_id}
-              AND access_level IN ('primary', 'secondary')
-              AND notification_consent = true
-          )
+        SELECT id, name, email, phone FROM family_members
+        WHERE client_id = ${visit.client_id}
+          AND is_active = TRUE
+          AND role IN ('primary', 'secondary')
       ` as any[]
     } catch {}
 

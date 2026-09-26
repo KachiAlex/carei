@@ -1153,6 +1153,99 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_msg_tenant ON messages(tenant_id)`
     await sql`CREATE INDEX IF NOT EXISTS idx_msg_created ON messages(created_at)`
   })
+
+  await run(42, 'vision_parity_tables', async () => {
+    // Persisted AI-generated documents (incident reports, assessment summaries, letters)
+    await sql`
+      CREATE TABLE IF NOT EXISTS documents (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        client_id TEXT,
+        visit_id TEXT,
+        template_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        content JSONB NOT NULL,
+        status TEXT DEFAULT 'draft',
+        generated_by TEXT,
+        confirmed_by TEXT,
+        confirmed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_documents_tenant ON documents(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_documents_client ON documents(client_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status)`
+
+    // Persisted AI reports for managers
+    await sql`
+      CREATE TABLE IF NOT EXISTS reports (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        client_id TEXT,
+        visit_id TEXT,
+        report_type TEXT NOT NULL,
+        title TEXT,
+        content JSONB NOT NULL,
+        generated_by TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_reports_tenant ON reports(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_reports_client ON reports(client_id)`
+
+    // Per-client key/value settings (family update consent lives here as
+    // key 'family_update_consent' — referenced by anthropic/family-update.ts)
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_settings (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        client_id TEXT NOT NULL,
+        key TEXT NOT NULL,
+        value TEXT,
+        updated_by TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(client_id, key)
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_client_settings_client ON client_settings(client_id)`
+
+    // Append-only security event log (no PINs/tokens/care content in metadata)
+    await sql`
+      CREATE TABLE IF NOT EXISTS security_events (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        event_type TEXT NOT NULL,
+        actor_id TEXT,
+        actor_email TEXT,
+        subject_email TEXT,
+        device_id TEXT,
+        metadata JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_security_events_tenant ON security_events(tenant_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_security_events_type ON security_events(event_type)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)`
+
+    // Copilot conversation sessions
+    await sql`
+      CREATE TABLE IF NOT EXISTS assistant_sessions (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        user_id TEXT NOT NULL,
+        title TEXT,
+        messages JSONB NOT NULL DEFAULT '[]',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_assistant_sessions_user ON assistant_sessions(user_id)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_assistant_sessions_tenant ON assistant_sessions(tenant_id)`
+
+    // Account deactivation marker
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ`
+  })
 }
 
 const ALLOWED_ORIGINS = [
@@ -1267,6 +1360,36 @@ export async function logAuditEvent(data: {
     `
   } catch (err: any) {
     console.error('Audit log error:', err.message)
+  }
+}
+
+export async function logSecurityEvent(data: {
+  tenantId?: string | null
+  eventType: string
+  actorId?: string | null
+  actorEmail?: string | null
+  subjectEmail?: string | null
+  deviceId?: string | null
+  metadata?: Record<string, unknown>
+}): Promise<void> {
+  try {
+    const sql = getSql()
+    const id = `sec-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    await sql`
+      INSERT INTO security_events (id, tenant_id, event_type, actor_id, actor_email, subject_email, device_id, metadata)
+      VALUES (
+        ${id},
+        ${data.tenantId || null},
+        ${data.eventType},
+        ${data.actorId || null},
+        ${data.actorEmail?.toLowerCase().trim() || null},
+        ${data.subjectEmail?.toLowerCase().trim() || null},
+        ${data.deviceId || null},
+        ${data.metadata ? JSON.stringify(data.metadata) : null}
+      )
+    `
+  } catch (err: any) {
+    console.error('Security event log error:', err.message)
   }
 }
 
