@@ -171,6 +171,13 @@ async function runMigrations() {
 
     await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ`
   })
+
+  await run(43, 'client_geocode_columns', async () => {
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS formatted_address TEXT`
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS geocoded_at TIMESTAMPTZ`
+  })
 }
 
 // ─── Helper functions ───

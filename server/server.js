@@ -71,7 +71,7 @@ async function setupRoutes() {
     'data-delete', 'data-export', 'data-retention', 'dbs-checks',
     'device-wipe', 'drug-interactions', 'email', 'events',
     'family-messages', 'family-visits', 'family', 'fix-tenant-id',
-    'handover-briefing', 'incidents', 'init-db', 'invites',
+    'geocode', 'handover-briefing', 'incidents', 'init-db', 'invites',
     'medication-log', 'messages', 'otp', 'plans', 'public-plans',
     'right-to-work', 'schedule', 'seed-superadmin', 'sos',
     'supervisions', 'tenants', 'training', 'travel', 'upload',
