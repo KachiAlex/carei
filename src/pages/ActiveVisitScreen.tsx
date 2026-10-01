@@ -1369,7 +1369,12 @@ export default function ActiveVisitScreen() {
               setShowGeoOverride(false)
 
               const address = client?.address || visit?.clientAddress || ''
-              const result = await verifyLocation(address)
+              const clientCoords = (client?.lat != null && client?.lng != null)
+                ? { lat: client.lat, lng: client.lng }
+                : (visit?.clientLat != null && visit?.clientLng != null)
+                  ? { lat: visit.clientLat, lng: visit.clientLng }
+                  : null
+              const result = await verifyLocation(address, undefined, clientCoords)
               setGeoResult(result)
               setGeoChecking(false)
               triggerHaptic(HAPTIC_PATTERNS.tap)

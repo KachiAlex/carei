@@ -1,5 +1,21 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, withTenant, getTenantSlug } from './db.js'
+import { geocodeAddress } from './geocode.js'
+
+// Geocode and persist a client's address coordinates (fire-and-forget safe).
+async function geocodeClient(sql: any, clientId: string, address: string, tenantId?: string | null) {
+  try {
+    const geo = await geocodeAddress(address)
+    if (!geo) return
+    if (tenantId) {
+      await sql`UPDATE clients SET lat = ${geo.lat}, lng = ${geo.lng}, formatted_address = ${geo.formattedAddress}, geocoded_at = NOW() WHERE id = ${clientId} AND tenant_id = ${tenantId}`
+    } else {
+      await sql`UPDATE clients SET lat = ${geo.lat}, lng = ${geo.lng}, formatted_address = ${geo.formattedAddress}, geocoded_at = NOW() WHERE id = ${clientId}`
+    }
+  } catch (err: any) {
+    console.error('[clients] geocode failed:', err.message)
+  }
+}
 
 async function carerCanAccessClient(sql: any, tenantId: string, carerId: string, clientId: string): Promise<boolean> {
   // Check scheduled visits (today or future)
@@ -103,6 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           INSERT INTO clients (id, tenant_id, name, age, address, conditions, medications, preferences, emergency_contact, allergies, dysphagia_protocol, support_framework, communication_guidance, mobility, care_cues)
           VALUES (${bodyId}, ${tenantId}, ${name}, ${age || null}, ${address || null}, ${JSON.stringify(conditions || [])}, ${JSON.stringify(medications || [])}, ${preferences || null}, ${emergencyContact || null}, ${allergies || null}, ${dysphagiaProtocol || null}, ${supportFramework || null}, ${communicationGuidance || null}, ${mobility || null}, ${JSON.stringify(careCues || null)})
         `
+        if (address) await geocodeClient(sql, bodyId, address, tenantId)
         res.status(201).json({ status: 'created', id: bodyId })
       }
 
@@ -130,6 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             care_cues = COALESCE(${JSON.stringify(careCues || null)}, care_cues)
           WHERE id = ${id} AND tenant_id = ${tenantId}
         `
+        if (address) await geocodeClient(sql, id, address, tenantId)
         res.status(200).json({ status: 'updated', id })
       }
 
@@ -186,6 +204,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         INSERT INTO clients (id, name, age, address, conditions, medications, preferences, emergency_contact, allergies, dysphagia_protocol, support_framework, communication_guidance, mobility, care_cues)
         VALUES (${bodyId}, ${name}, ${age || null}, ${address || null}, ${JSON.stringify(conditions || [])}, ${JSON.stringify(medications || [])}, ${preferences || null}, ${emergencyContact || null}, ${allergies || null}, ${dysphagiaProtocol || null}, ${supportFramework || null}, ${communicationGuidance || null}, ${mobility || null}, ${JSON.stringify(careCues || null)})
       `
+      if (address) await geocodeClient(sql, bodyId, address)
       res.status(201).json({ status: 'created', id: bodyId })
       return
     }
@@ -214,6 +233,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           care_cues = COALESCE(${JSON.stringify(careCues || null)}, care_cues)
         WHERE id = ${id}
       `
+      if (address) await geocodeClient(sql, id, address)
       res.status(200).json({ status: 'updated', id })
       return
     }

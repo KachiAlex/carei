@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, withTenant, getTenantSlug } from './db.js'
+import { geocodeAddress } from './geocode.js'
 
 // Haversine distance in meters
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -16,24 +17,6 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
 function estimateTravelTimeSeconds(distanceMeters: number): number {
   const avgSpeedMs = 35 * 1000 / 3600 // 35 km/h in m/s
   return Math.round(distanceMeters / avgSpeedMs)
-}
-
-// Try to geocode an address using Nominatim (OpenStreetMap)
-async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
-  if (!address || address.trim().length < 3) return null
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=gb`
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'carei-app/1.0' },
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    if (data && data[0]) {
-      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
-    }
-  } catch {}
-  return null
 }
 
 // Try OSRM for road distance/time, fallback to haversine
@@ -243,9 +226,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const to = visits[i + 1]
           if (!from.address || !to.address) continue
 
+          // Prefer stored client coordinates (from geocode-on-save) before hitting Google.
           const [fromGeo, toGeo] = await Promise.all([
-            geocodeAddress(from.address),
-            geocodeAddress(to.address),
+            from.lat && from.lng ? { lat: Number(from.lat), lng: Number(from.lng) } : geocodeAddress(from.address),
+            to.lat && to.lng ? { lat: Number(to.lat), lng: Number(to.lng) } : geocodeAddress(to.address),
           ])
 
           if (!fromGeo || !toGeo) {

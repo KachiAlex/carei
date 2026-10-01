@@ -53,17 +53,27 @@ export function getCurrentPosition(): Promise<GeoPosition | null> {
 }
 
 /**
- * Geocode a street address to lat/lng using the free Nominatim (OpenStreetMap) API.
+ * Geocode a street address via our backend (/api/geocode → Google Geocoding API).
+ * The Google key stays server-side; Nominatim is kept only as a last-resort
+ * fallback so EVV still works if our API or Google is unreachable.
  * Returns null if geocoding fails.
  */
 export async function geocodeAddress(address: string): Promise<GeoPosition | null> {
   if (!address || address.trim().length < 5) return null
 
   try {
+    const { get } = await import('../api/client')
+    const data = await get(`/api/geocode?address=${encodeURIComponent(address)}`)
+    if (data?.lat != null && data?.lng != null) {
+      return { lat: Number(data.lat), lng: Number(data.lng), accuracy: 0, timestamp: Date.now() }
+    }
+  } catch {
+    // fall through to last-resort fallback
+  }
+
+  try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1`
-    const res = await fetch(url, {
-      headers: { 'Accept': 'application/json' },
-    })
+    const res = await fetch(url, { headers: { 'Accept': 'application/json' } })
     if (!res.ok) return null
     const data = await res.json()
     if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) {
@@ -108,7 +118,8 @@ export function haversineDistance(lat1: number, lng1: number, lat2: number, lng2
  */
 export async function verifyLocation(
   clientAddress: string,
-  radiusM: number = GEOFENCE_RADIUS_M
+  radiusM: number = GEOFENCE_RADIUS_M,
+  clientCoords?: { lat?: number | string | null; lng?: number | string | null } | null
 ): Promise<GeoVerifyResult> {
   const position = await getCurrentPosition()
 
@@ -124,7 +135,13 @@ export async function verifyLocation(
     }
   }
 
-  const clientPosition = await geocodeAddress(clientAddress)
+  // Prefer coordinates stored on the client record (geocoded on save via Google);
+  // only geocode the raw address when they're missing.
+  const storedLat = clientCoords?.lat != null ? Number(clientCoords.lat) : NaN
+  const storedLng = clientCoords?.lng != null ? Number(clientCoords.lng) : NaN
+  const clientPosition = Number.isFinite(storedLat) && Number.isFinite(storedLng)
+    ? { lat: storedLat, lng: storedLng, accuracy: 0, timestamp: Date.now() }
+    : await geocodeAddress(clientAddress)
 
   if (!clientPosition) {
     return {

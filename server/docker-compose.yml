@@ -34,6 +34,7 @@ services:
       NODE_ENV: production
       PORT: 3001
       DATABASE_URL: postgresql://carei:CareiDB2026!Secure@db:5432/carei
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
     ports:
       - "127.0.0.1:3012:3001"
     volumes:
