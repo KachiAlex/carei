@@ -21,6 +21,9 @@ import {
   getClientLogs,
   updateCaregiverStatus,
   deleteCaregiver,
+  getInviteLinks,
+  createInviteLink,
+  revokeInviteLink,
   logoutUser,
   exportAgencyDataUrl,
   deleteAgencyData,
@@ -71,6 +74,16 @@ export default function ManagerDashboard() {
   const [teamPin, setTeamPin] = useState('')
   const [teamRole, setTeamRole] = useState('carer')
   const [teamMsg, setTeamMsg] = useState('')
+
+  // Invite links state
+  const [inviteLinks, setInviteLinks] = useState<any[]>([])
+  const [showLinkForm, setShowLinkForm] = useState(false)
+  const [linkRole, setLinkRole] = useState('carer')
+  const [linkLabel, setLinkLabel] = useState('')
+  const [linkMaxUses, setLinkMaxUses] = useState('')
+  const [linkExpiry, setLinkExpiry] = useState('')
+  const [linkMsg, setLinkMsg] = useState('')
+  const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null)
 
   // Clients tab state
   const [clientShowAdd, setClientShowAdd] = useState(false)
@@ -129,6 +142,9 @@ export default function ManagerDashboard() {
   useEffect(() => {
     if (!tenantSlug) return
     refreshManagerData()
+    getInviteLinks(tenantSlug)
+      .then((data) => setInviteLinks(data.links || []))
+      .catch(() => setInviteLinks([]))
   }, [tenantSlug])
 
   useEffect(() => {
@@ -665,6 +681,45 @@ export default function ManagerDashboard() {
       } catch (err: any) { setTeamMsg(err.message || 'Failed') }
     }
 
+    const handleCreateLink = async (e: React.FormEvent) => {
+      e.preventDefault()
+      if (!currentTenant?.id) return
+      setLinkMsg('')
+      try {
+        const data = await createInviteLink({
+          tenantId: currentTenant.id,
+          role: linkRole,
+          label: linkLabel || undefined,
+          maxUses: linkMaxUses ? parseInt(linkMaxUses, 10) : undefined,
+          expiresInHours: linkExpiry ? parseInt(linkExpiry, 10) : undefined,
+        })
+        try { await navigator.clipboard.writeText(data.url) } catch { /* clipboard unavailable */ }
+        setCopiedLinkId(data.id)
+        setTimeout(() => setCopiedLinkId(null), 3000)
+        setLinkMsg('Link created and copied to clipboard')
+        setLinkLabel(''); setLinkMaxUses(''); setLinkExpiry(''); setLinkRole('carer')
+        setShowLinkForm(false)
+        const refreshed = await getInviteLinks(tenantSlug)
+        setInviteLinks(refreshed.links || [])
+      } catch (err: any) { setLinkMsg(err.message || 'Failed to create link') }
+    }
+
+    const handleCopyLink = (link: any) => {
+      const url = `${window.location.origin}/join?link=${link.token}`
+      navigator.clipboard.writeText(url).then(() => {
+        setCopiedLinkId(link.id)
+        setTimeout(() => setCopiedLinkId(null), 3000)
+      }).catch(() => window.prompt('Copy invite link:', url))
+    }
+
+    const handleRevokeLink = async (id: string) => {
+      try {
+        await revokeInviteLink(id)
+        const refreshed = await getInviteLinks(tenantSlug)
+        setInviteLinks(refreshed.links || [])
+      } catch (err: any) { setLinkMsg(err.message || 'Failed to revoke link') }
+    }
+
     return (
       <motion.div className="flex flex-col gap-3" initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}>
         <div className="flex items-center justify-between">
@@ -690,6 +745,75 @@ export default function ManagerDashboard() {
             {teamMsg && <div className="text-xs text-slate-500">{teamMsg}</div>}
           </motion.form>
         )}
+
+        {/* Invite Links */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-bold text-sm text-slate-800">Invite Links</h3>
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowLinkForm(!showLinkForm)} className="px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer flex items-center gap-1" style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              {showLinkForm ? 'Close' : 'New Link'}
+            </motion.button>
+          </div>
+          <p className="text-xs text-slate-400 mb-2">Share a link — anyone with it can join your organisation in the chosen role.</p>
+
+          {showLinkForm && (
+            <motion.form onSubmit={handleCreateLink} initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="flex flex-col gap-2 mb-3">
+              <select value={linkRole} onChange={(e) => setLinkRole(e.target.value)} className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal bg-white">
+                <option value="carer">Carer</option>
+                <option value="manager">Manager</option>
+                <option value="viewer">Viewer (Family)</option>
+                {currentTenant?.role === 'admin' && <option value="admin">Admin</option>}
+              </select>
+              <input value={linkLabel} onChange={(e) => setLinkLabel(e.target.value)} placeholder="Label (optional, e.g. Night shift)" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+              <div className="grid grid-cols-2 gap-2">
+                <input value={linkMaxUses} onChange={(e) => setLinkMaxUses(e.target.value)} placeholder="Max uses" type="number" min="1" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+                <input value={linkExpiry} onChange={(e) => setLinkExpiry(e.target.value)} placeholder="Expires (hrs)" type="number" min="1" className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm outline-none focus:border-teal" />
+              </div>
+              <motion.button whileTap={{ scale: 0.97 }} type="submit" className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer" style={{ background: `linear-gradient(135deg, ${COLORS.teal}, ${COLORS.teal2})` }}>Create & Copy Link</motion.button>
+            </motion.form>
+          )}
+
+          {linkMsg && <div className="text-xs text-slate-500 mb-2">{linkMsg}</div>}
+
+          {inviteLinks.length === 0 ? (
+            <div className="text-xs text-slate-400">No invite links yet.</div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {inviteLinks.map((link: any) => {
+                const exhausted = link.max_uses !== null && link.uses >= link.max_uses
+                const expired = link.expires_at && new Date(link.expires_at) < new Date()
+                const usable = link.active && !exhausted && !expired
+                return (
+                  <div key={link.id} className={`flex items-center gap-2 p-2.5 rounded-xl border ${usable ? 'border-slate-100' : 'border-slate-100 opacity-50'}`} style={{ background: 'rgba(0,0,0,0.02)' }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-700 truncate">{link.label || 'Invite link'}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(79,209,197,0.1)', color: COLORS.teal }}>{link.role}</span>
+                        {!link.active && <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(255,90,95,0.1)', color: COLORS.red }}>revoked</span>}
+                        {link.active && (expired || exhausted) && <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(246,183,60,0.1)', color: COLORS.amber }}>{expired ? 'expired' : 'used up'}</span>}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">
+                        {link.uses}{link.max_uses !== null ? ` / ${link.max_uses}` : ''} joined
+                        {link.expires_at && ` · expires ${new Date(link.expires_at).toLocaleDateString()}`}
+                      </div>
+                    </div>
+                    {usable && (
+                      <button onClick={() => handleCopyLink(link)} className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border-none cursor-pointer shrink-0" style={{ background: copiedLinkId === link.id ? 'rgba(79,209,197,0.2)' : 'rgba(79,209,197,0.1)', color: COLORS.teal }}>
+                        {copiedLinkId === link.id ? 'Copied' : 'Copy'}
+                      </button>
+                    )}
+                    {link.active && (
+                      <button onClick={() => handleRevokeLink(link.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 bg-transparent border-none cursor-pointer shrink-0" title="Revoke link">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </motion.div>
 
         {dbCarers.length === 0 && (
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-12">

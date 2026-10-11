@@ -10,28 +10,57 @@ interface InviteDetails {
   tenantSlug: string
   tenantName: string
   role: string
-  email: string
+  email?: string
+  label?: string
+  maxUses?: number | null
+  uses?: number
 }
 
 export default function AcceptInviteScreen() {
   const [, setLocation] = useLocation()
   const search = useSearch()
   const [inviteCode, setInviteCode] = useState('')
+  const [linkToken, setLinkToken] = useState<string | null>(null)
   const [inviteDetails, setInviteDetails] = useState<InviteDetails | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [alreadyMember, setAlreadyMember] = useState(false)
 
-  // Extract code from URL on mount
+  // Extract code or link token from URL on mount
   useEffect(() => {
     const params = new URLSearchParams(search)
+    const link = params.get('link')
     const code = params.get('code')
-    if (code) {
+    if (link) {
+      setLinkToken(link)
+      verifyLink(link)
+    } else if (code) {
       setInviteCode(code)
       verifyInvite(code)
     }
   }, [search])
+
+  const verifyLink = async (token: string) => {
+    try {
+      setIsVerifying(true)
+      setError(null)
+
+      const res = await fetch(`${API_BASE}/invite-links?token=${token}`)
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Invalid invite link')
+      }
+
+      setInviteDetails(data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsVerifying(false)
+    }
+  }
 
   const verifyInvite = async (code: string) => {
     if (!code.trim()) return
@@ -63,8 +92,13 @@ export default function AcceptInviteScreen() {
     }
     if (!token) {
       // Redirect to login with return URL
-      localStorage.setItem('carei_pending_invite', inviteCode)
-      setLocation(`/login?redirect=/join?code=${inviteCode}`)
+      const returnUrl = linkToken ? `/join?link=${linkToken}` : `/join?code=${inviteCode}`
+      if (linkToken) {
+        localStorage.setItem('carei_pending_invite_link', linkToken)
+      } else {
+        localStorage.setItem('carei_pending_invite', inviteCode)
+      }
+      setLocation(`/login?redirect=${encodeURIComponent(returnUrl)}`)
       return
     }
 
@@ -72,14 +106,23 @@ export default function AcceptInviteScreen() {
       setIsLoading(true)
       setError(null)
 
-      const res = await fetch(`${API_BASE}/invites`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ code: inviteCode })
-      })
+      const res = linkToken
+        ? await fetch(`${API_BASE}/invite-links`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ token: linkToken })
+          })
+        : await fetch(`${API_BASE}/invites`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ code: inviteCode })
+          })
 
       const data = await res.json()
 
@@ -87,8 +130,13 @@ export default function AcceptInviteScreen() {
         throw new Error(data.error || 'Failed to accept invite')
       }
 
+      setAlreadyMember(!!data.alreadyMember)
       setSuccess(true)
       localStorage.removeItem('carei_pending_invite')
+      localStorage.removeItem('carei_pending_invite_link')
+      if (data.tenantSlug && !inviteDetails?.tenantSlug) {
+        setInviteDetails((d) => d ? { ...d, tenantSlug: data.tenantSlug } : d)
+      }
 
       // Redirect to the tenant dashboard after a short delay
       setTimeout(() => {
@@ -125,7 +173,11 @@ export default function AcceptInviteScreen() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Welcome to {inviteDetails?.tenantName}!</h1>
-          <p className="text-white/60">You've successfully joined the organization.</p>
+          <p className="text-white/60">
+            {alreadyMember
+              ? "You're already a member of this organization."
+              : "You've successfully joined the organization."}
+          </p>
           <p className="text-white/40 text-sm mt-4">Redirecting to dashboard...</p>
         </motion.div>
       </div>
@@ -154,7 +206,13 @@ export default function AcceptInviteScreen() {
           </div>
         )}
 
-        {!inviteDetails ? (
+        {isVerifying && linkToken ? (
+          // Verifying a shared link
+          <div className="flex flex-col items-center py-12">
+            <div className="animate-spin w-8 h-8 border-2 border-teal-400 border-t-transparent rounded-full mb-4" />
+            <p className="text-white/50 text-sm">Checking invite link...</p>
+          </div>
+        ) : !inviteDetails ? (
           // Code entry form
           <form onSubmit={handleCodeSubmit} className="space-y-4">
             <div>
@@ -207,10 +265,24 @@ export default function AcceptInviteScreen() {
                   {inviteDetails.role}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-white/60">Email</span>
-                <span className="text-white">{inviteDetails.email}</span>
-              </div>
+              {inviteDetails.email && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/60">Email</span>
+                  <span className="text-white">{inviteDetails.email}</span>
+                </div>
+              )}
+              {inviteDetails.label && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/60">Group</span>
+                  <span className="text-white">{inviteDetails.label}</span>
+                </div>
+              )}
+              {inviteDetails.maxUses != null && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/60">Spots remaining</span>
+                  <span className="text-white">{(inviteDetails.maxUses ?? 0) - (inviteDetails.uses ?? 0)}</span>
+                </div>
+              )}
             </div>
 
             <button
@@ -225,11 +297,12 @@ export default function AcceptInviteScreen() {
               onClick={() => {
                 setInviteDetails(null)
                 setInviteCode('')
+                setLinkToken(null)
                 setError(null)
               }}
               className="w-full py-3 rounded-xl text-white/40 hover:text-white/60 text-sm transition-colors mt-2"
             >
-              Use different code
+              {linkToken ? 'Cancel' : 'Use different code'}
             </button>
           </div>
         )}

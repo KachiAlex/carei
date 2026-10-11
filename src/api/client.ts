@@ -952,6 +952,24 @@ export async function deleteCaregiver(caregiverId: string) {
   return delWithRetry(`/manager/caregiver?id=${caregiverId}`)
 }
 
+export async function getInviteLinks(tenantSlug: string) {
+  return get(`/invite-links?tenantSlug=${encodeURIComponent(tenantSlug)}`)
+}
+
+export async function createInviteLink(data: {
+  tenantId: string
+  role: string
+  label?: string
+  maxUses?: number
+  expiresInHours?: number
+}) {
+  return post('/invite-links', data)
+}
+
+export async function revokeInviteLink(id: string) {
+  return del(`/invite-links?id=${id}`)
+}
+
 export async function getAssignments() {
   return get('/manager/assignments')
 }
