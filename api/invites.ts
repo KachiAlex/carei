@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, withTenant, getAuthToken, getTenantFromSlug, verifyTenantAccess, addUserToTenant, getTenantMemberCount } from './db.js'
+import { getSql, setCors, ensureTables, withTenant, getAuthToken, getUserFromToken, getTenantFromSlug, verifyTenantAccess, addUserToTenant, getTenantMemberCount } from './db.js'
 import { sendEmail } from './email.js'
 
 // Generate a secure random code
@@ -22,9 +22,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      // Decode token
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-      const userId = payload.userId
+      const sql = getSql()
+      const user = await getUserFromToken(sql, token)
+      const userId = user?.id
 
       if (!userId) {
         res.status(401).json({ error: 'Invalid token' })
@@ -44,8 +44,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(403).json({ error: 'Only admins can create invites' })
         return
       }
-
-      const sql = getSql()
 
       // Check tenant active and not expired
       const tenantInfo = await sql`SELECT name, active, expires_at, max_users, plan FROM tenants WHERE id = ${tenantId}` as any[]
@@ -147,8 +145,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return
         }
 
-        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-        const userId = payload.userId
+        const sql = getSql()
+        const user = await getUserFromToken(sql, token)
+        const userId = user?.id
 
         if (!userId) {
           res.status(401).json({ error: 'Invalid token' })
@@ -168,7 +167,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return
         }
 
-        const sql = getSql()
         const rows = await sql`
           SELECT i.*, u.name as created_by_name
           FROM invites i
@@ -201,18 +199,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
+      const sql = getSql()
+
       let userId = targetUserId
       if (token) {
-        const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-        userId = payload.userId
+        const user = await getUserFromToken(sql, token)
+        userId = user?.id
       }
 
       if (!userId) {
         res.status(401).json({ error: 'Invalid token or userId' })
         return
       }
-
-      const sql = getSql()
 
       // Get and validate invite
       const inviteRows = await sql`
@@ -265,15 +263,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-      const userId = payload.userId
+      const sql = getSql()
+      const user = await getUserFromToken(sql, token)
+      const userId = user?.id
 
       if (!userId) {
         res.status(401).json({ error: 'Invalid token' })
         return
       }
-
-      const sql = getSql()
 
       // Get invite to check permissions
       const inviteRows = await sql`SELECT * FROM invites WHERE id = ${inviteId} LIMIT 1`

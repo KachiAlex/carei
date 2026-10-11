@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, getAuthToken, verifyTenantAccess } from './db.js'
+import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken, verifyTenantAccess } from './db.js'
 import { sendEmail } from './email.js'
 
 function generateInviteCode(): string {
@@ -76,12 +76,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    let userId: string
-    try {
-      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-      userId = payload.userId
-      if (!userId) throw new Error()
-    } catch {
+    const sql = getSql()
+    const user = await getUserFromToken(sql, token)
+    const userId = user?.id
+    if (!userId) {
       res.status(401).json({ error: 'Invalid token' })
       return
     }
@@ -99,7 +97,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    const sql = getSql()
     const rows = parseCSV(csv)
     if (rows.length === 0) {
       res.status(400).json({ error: 'CSV is empty' })

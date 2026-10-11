@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { randomBytes } from 'crypto'
-import { getSql, setCors, ensureTables, getAuthToken, getTenantFromSlug, verifyTenantAccess, addUserToTenant, getTenantMemberCount } from './db.js'
+import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken, getTenantFromSlug, verifyTenantAccess, addUserToTenant, getTenantMemberCount } from './db.js'
 
 const VALID_ROLES = ['carer', 'manager', 'admin', 'viewer']
 
@@ -8,15 +8,11 @@ function generateLinkToken(): string {
   return randomBytes(24).toString('base64url')
 }
 
-function getUserIdFromRequest(req: VercelRequest): string | null {
+async function getUserIdFromRequest(req: VercelRequest, sql: any): Promise<string | null> {
   const token = getAuthToken(req)
   if (!token) return null
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    return payload.userId || null
-  } catch {
-    return null
-  }
+  const user = await getUserFromToken(sql, token)
+  return user?.id || null
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -29,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // POST /api/invite-links - Create a reusable invite link (admin only)
     if (req.method === 'POST') {
-      const userId = getUserIdFromRequest(req)
+      const userId = await getUserIdFromRequest(req, sql)
       if (!userId) {
         res.status(401).json({ error: 'Authentication required' })
         return
@@ -140,7 +136,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (tenantSlug) {
-        const userId = getUserIdFromRequest(req)
+        const userId = await getUserIdFromRequest(req, sql)
         if (!userId) {
           res.status(401).json({ error: 'Authentication required' })
           return
@@ -183,7 +179,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      const userId = getUserIdFromRequest(req)
+      const userId = await getUserIdFromRequest(req, sql)
       if (!userId) {
         res.status(401).json({ error: 'Authentication required' })
         return
@@ -264,7 +260,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      const userId = getUserIdFromRequest(req)
+      const userId = await getUserIdFromRequest(req, sql)
       if (!userId) {
         res.status(401).json({ error: 'Authentication required' })
         return
