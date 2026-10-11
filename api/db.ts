@@ -1253,6 +1253,26 @@ async function runMigrations() {
     await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS formatted_address TEXT`
     await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS geocoded_at TIMESTAMPTZ`
   })
+
+  await run(44, 'create_invite_links', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS invite_links (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        token TEXT NOT NULL UNIQUE,
+        role TEXT NOT NULL DEFAULT 'carer',
+        label TEXT,
+        created_by TEXT REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        expires_at TIMESTAMPTZ,
+        max_uses INTEGER,
+        uses INTEGER DEFAULT 0,
+        active BOOLEAN DEFAULT TRUE
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_invite_links_token ON invite_links(token)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_invite_links_tenant ON invite_links(tenant_id)`
+  })
 }
 
 const ALLOWED_ORIGINS = [
