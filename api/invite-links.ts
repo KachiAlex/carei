@@ -173,7 +173,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // PATCH /api/invite-links - Join a tenant via invite link
     // Authenticated: { token } joins the logged-in user.
-    // Unauthenticated: { token, user: { name, email, phone?, password } } creates
+    // Unauthenticated: { token, user: { name, email, phone?, pin } } creates
     // the account, joins, and returns session tokens for auto-login.
     if (req.method === 'PATCH') {
       const { token: linkToken, user: newUser } = req.body || {}
@@ -210,18 +210,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const name = (newUser.name || '').trim()
         const email = (newUser.email || '').trim().toLowerCase()
         const phone = (newUser.phone || '').trim()
-        const password = newUser.password || ''
+        const pin = newUser.pin || ''
 
-        if (!name || !email || !password) {
-          res.status(400).json({ error: 'name, email, and password are required' })
+        if (!name || !email || !pin) {
+          res.status(400).json({ error: 'name, email, and pin are required' })
           return
         }
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
           res.status(400).json({ error: 'Invalid email address' })
           return
         }
-        if (password.length < 8) {
-          res.status(400).json({ error: 'Password must be at least 8 characters' })
+        if (!/^\d{4,6}$/.test(pin)) {
+          res.status(400).json({ error: 'PIN must be 4-6 digits' })
           return
         }
 
@@ -257,7 +257,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const newUserId = `user-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-        const passwordHash = await hashCredential(password)
+        const pinHash = await hashCredential(pin)
 
         const accessToken = generateSecureToken()
         const accessTokenHash = await hashToken(accessToken)
@@ -267,8 +267,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
         await sql`
-          INSERT INTO users (id, name, email, phone, region, password_hash_scrypt, role, token_hash, token_expires_at, refresh_token_hash, refresh_token_expires_at, email_verified)
-          VALUES (${newUserId}, ${name}, ${email}, ${phone}, ${newUser.region || ''}, ${passwordHash}, ${link.role}, ${accessTokenHash}, ${accessTokenExpiresAt}, ${refreshTokenHash}, ${refreshTokenExpiresAt}, TRUE)
+          INSERT INTO users (id, name, email, phone, region, pin_hash, role, token_hash, token_expires_at, refresh_token_hash, refresh_token_expires_at, email_verified)
+          VALUES (${newUserId}, ${name}, ${email}, ${phone}, ${newUser.region || ''}, ${pinHash}, ${link.role}, ${accessTokenHash}, ${accessTokenExpiresAt}, ${refreshTokenHash}, ${refreshTokenExpiresAt}, TRUE)
         `
 
         await addUserToTenant(newUserId, link.tenant_id, link.role)
