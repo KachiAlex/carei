@@ -33,8 +33,8 @@ export default function AcceptInviteScreen() {
   const [suName, setSuName] = useState('')
   const [suEmail, setSuEmail] = useState('')
   const [suPhone, setSuPhone] = useState('')
-  const [suPassword, setSuPassword] = useState('')
-  const [suConfirm, setSuConfirm] = useState('')
+  const [suPin, setSuPin] = useState('')
+  const [suPinConfirm, setSuPinConfirm] = useState('')
 
   // Check auth state once on mount
   useEffect(() => {
@@ -176,12 +176,12 @@ export default function AcceptInviteScreen() {
   const signupAndJoin = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!linkToken) return
-    if (suPassword !== suConfirm) {
-      setError('Passwords do not match')
+    if (!/^\d{4,6}$/.test(suPin)) {
+      setError('PIN must be 4-6 digits')
       return
     }
-    if (suPassword.length < 8) {
-      setError('Password must be at least 8 characters')
+    if (suPin !== suPinConfirm) {
+      setError('PINs do not match')
       return
     }
 
@@ -194,7 +194,7 @@ export default function AcceptInviteScreen() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: linkToken,
-          user: { name: suName, email: suEmail, phone: suPhone, password: suPassword },
+          user: { name: suName, email: suEmail, phone: suPhone, pin: suPin },
         }),
       })
 
@@ -389,22 +389,27 @@ export default function AcceptInviteScreen() {
                 />
                 <input
                   type="password"
-                  value={suPassword}
-                  onChange={(e) => setSuPassword(e.target.value)}
-                  placeholder="Password (min 8 characters)"
+                  inputMode="numeric"
+                  pattern="\d*"
+                  maxLength={6}
+                  value={suPin}
+                  onChange={(e) => setSuPin(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Choose a PIN (4-6 digits)"
                   required
-                  minLength={8}
                   className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 focus:border-teal-400 focus:outline-none"
                 />
                 <input
                   type="password"
-                  value={suConfirm}
-                  onChange={(e) => setSuConfirm(e.target.value)}
-                  placeholder="Confirm password"
+                  inputMode="numeric"
+                  pattern="\d*"
+                  maxLength={6}
+                  value={suPinConfirm}
+                  onChange={(e) => setSuPinConfirm(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Confirm PIN"
                   required
-                  minLength={8}
                   className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 focus:border-teal-400 focus:outline-none"
                 />
+                <p className="text-white/40 text-xs px-1">This PIN is how you'll log in to the app.</p>
 
                 <button
                   type="submit"
