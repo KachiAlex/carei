@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { randomBytes } from 'crypto'
 import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken, getTenantFromSlug, verifyTenantAccess, addUserToTenant, getTenantMemberCount } from './db.js'
+import { hashCredential, generateSecureToken, hashToken } from './hash.js'
 
 const VALID_ROLES = ['carer', 'manager', 'admin', 'viewer']
 
@@ -170,18 +171,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    // PATCH /api/invite-links - Join a tenant via invite link (authenticated)
+    // PATCH /api/invite-links - Join a tenant via invite link
+    // Authenticated: { token } joins the logged-in user.
+    // Unauthenticated: { token, user: { name, email, phone?, password } } creates
+    // the account, joins, and returns session tokens for auto-login.
     if (req.method === 'PATCH') {
-      const { token: linkToken } = req.body || {}
+      const { token: linkToken, user: newUser } = req.body || {}
 
       if (!linkToken) {
         res.status(400).json({ error: 'token is required' })
-        return
-      }
-
-      const userId = await getUserIdFromRequest(req, sql)
-      if (!userId) {
-        res.status(401).json({ error: 'Authentication required' })
         return
       }
 
@@ -200,6 +198,96 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const link = linkRows[0] as any
 
+      const userId = await getUserIdFromRequest(req, sql)
+
+      // ── Signup path: create account + join via the link ──
+      if (!userId) {
+        if (!newUser || typeof newUser !== 'object') {
+          res.status(401).json({ error: 'Authentication required' })
+          return
+        }
+
+        const name = (newUser.name || '').trim()
+        const email = (newUser.email || '').trim().toLowerCase()
+        const phone = (newUser.phone || '').trim()
+        const password = newUser.password || ''
+
+        if (!name || !email || !password) {
+          res.status(400).json({ error: 'name, email, and password are required' })
+          return
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          res.status(400).json({ error: 'Invalid email address' })
+          return
+        }
+        if (password.length < 8) {
+          res.status(400).json({ error: 'Password must be at least 8 characters' })
+          return
+        }
+
+        // Email must not already be registered
+        const existingUser = await sql`SELECT id FROM users WHERE LOWER(email) = ${email} LIMIT 1` as any[]
+        if (existingUser.length > 0) {
+          res.status(409).json({ error: 'An account with this email already exists. Sign in instead.' })
+          return
+        }
+
+        // Plan limit check before consuming a use
+        if (link.max_users) {
+          const memberCount = await getTenantMemberCount(link.tenant_id)
+          if (memberCount >= link.max_users) {
+            res.status(403).json({ error: 'Organization has reached its member limit' })
+            return
+          }
+        }
+
+        // Atomically consume a use — fails if link is revoked, expired, or exhausted
+        const consumed = await sql`
+          UPDATE invite_links
+          SET uses = uses + 1
+          WHERE id = ${link.id}
+            AND active = TRUE
+            AND (expires_at IS NULL OR expires_at > NOW())
+            AND (max_uses IS NULL OR uses < max_uses)
+          RETURNING uses
+        `
+        if (consumed.length === 0) {
+          res.status(410).json({ error: 'This invite link is no longer valid' })
+          return
+        }
+
+        const newUserId = `user-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+        const passwordHash = await hashCredential(password)
+
+        const accessToken = generateSecureToken()
+        const accessTokenHash = await hashToken(accessToken)
+        const accessTokenExpiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
+        const refreshToken = generateSecureToken()
+        const refreshTokenHash = await hashToken(refreshToken)
+        const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
+        await sql`
+          INSERT INTO users (id, name, email, phone, region, password_hash_scrypt, role, token_hash, token_expires_at, refresh_token_hash, refresh_token_expires_at, email_verified)
+          VALUES (${newUserId}, ${name}, ${email}, ${phone}, ${newUser.region || ''}, ${passwordHash}, ${link.role}, ${accessTokenHash}, ${accessTokenExpiresAt}, ${refreshTokenHash}, ${refreshTokenExpiresAt}, TRUE)
+        `
+
+        await addUserToTenant(newUserId, link.tenant_id, link.role)
+
+        res.setHeader('Set-Cookie', `carei_token=${accessToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${60 * 60 * 24 * 30}`)
+        res.status(201).json({
+          message: 'Account created and joined organization',
+          token: accessToken,
+          refreshToken,
+          user: { id: newUserId, name, email, phone, role: link.role },
+          tenantId: link.tenant_id,
+          tenantSlug: link.tenant_slug,
+          tenantName: link.tenant_name,
+          role: link.role,
+        })
+        return
+      }
+
+      // ── Authenticated path: join the logged-in user ──
       // Already a member — treat as success without consuming a use
       const existing = await verifyTenantAccess(userId, link.tenant_id)
       if (existing.hasAccess) {
