@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useLocation, useSearch } from 'wouter'
 import { motion } from 'framer-motion'
 import { API_BASE } from '../api/client'
-import { getToken, setToken } from '../utils/tokenCache'
-import { secureGet } from '../utils/secureStorage'
+import { getToken, setToken, setRefreshToken, setUser } from '../utils/tokenCache'
+import { secureGet, secureSet } from '../utils/secureStorage'
 
 interface InviteDetails {
   valid: boolean
@@ -27,6 +27,26 @@ export default function AcceptInviteScreen() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [alreadyMember, setAlreadyMember] = useState(false)
+
+  // Signup-on-join state (link invites, unauthenticated)
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null)
+  const [suName, setSuName] = useState('')
+  const [suEmail, setSuEmail] = useState('')
+  const [suPhone, setSuPhone] = useState('')
+  const [suPassword, setSuPassword] = useState('')
+  const [suConfirm, setSuConfirm] = useState('')
+
+  // Check auth state once on mount
+  useEffect(() => {
+    (async () => {
+      let t = getToken()
+      if (!t) {
+        t = await secureGet('token')
+        if (t) setToken(t)
+      }
+      setIsAuthed(!!t)
+    })()
+  }, [])
 
   // Extract code or link token from URL on mount
   useEffect(() => {
@@ -145,6 +165,62 @@ export default function AcceptInviteScreen() {
         } else {
           setLocation('/select-tenant')
         }
+      }, 2000)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const signupAndJoin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!linkToken) return
+    if (suPassword !== suConfirm) {
+      setError('Passwords do not match')
+      return
+    }
+    if (suPassword.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      setError(null)
+
+      const res = await fetch(`${API_BASE}/invite-links`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: linkToken,
+          user: { name: suName, email: suEmail, phone: suPhone, password: suPassword },
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create account')
+      }
+
+      // Auto-login: store the issued session tokens
+      if (data.token) {
+        setToken(data.token)
+        await secureSet('token', data.token)
+      }
+      if (data.refreshToken) {
+        setRefreshToken(data.refreshToken)
+        await secureSet('refreshToken', data.refreshToken)
+      }
+      if (data.user) {
+        setUser(data.user)
+        await secureSet('user', JSON.stringify(data.user))
+      }
+
+      setSuccess(true)
+      setTimeout(() => {
+        setLocation(data.tenantSlug ? `/tenant/${data.tenantSlug}/dashboard` : '/select-tenant')
       }, 2000)
     } catch (err: any) {
       setError(err.message)
@@ -285,25 +361,93 @@ export default function AcceptInviteScreen() {
               )}
             </div>
 
-            <button
-              onClick={acceptInvite}
-              disabled={isLoading}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-400 to-teal-500 text-slate-900 font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Joining...' : 'Join Organization'}
-            </button>
+            {linkToken && isAuthed === false ? (
+              // New invitee: create account + join
+              <form onSubmit={signupAndJoin} className="space-y-3 text-left">
+                <input
+                  type="text"
+                  value={suName}
+                  onChange={(e) => setSuName(e.target.value)}
+                  placeholder="Full name"
+                  required
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 focus:border-teal-400 focus:outline-none"
+                />
+                <input
+                  type="email"
+                  value={suEmail}
+                  onChange={(e) => setSuEmail(e.target.value)}
+                  placeholder="Email address"
+                  required
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 focus:border-teal-400 focus:outline-none"
+                />
+                <input
+                  type="tel"
+                  value={suPhone}
+                  onChange={(e) => setSuPhone(e.target.value)}
+                  placeholder="Phone (optional)"
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 focus:border-teal-400 focus:outline-none"
+                />
+                <input
+                  type="password"
+                  value={suPassword}
+                  onChange={(e) => setSuPassword(e.target.value)}
+                  placeholder="Password (min 8 characters)"
+                  required
+                  minLength={8}
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 focus:border-teal-400 focus:outline-none"
+                />
+                <input
+                  type="password"
+                  value={suConfirm}
+                  onChange={(e) => setSuConfirm(e.target.value)}
+                  placeholder="Confirm password"
+                  required
+                  minLength={8}
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/30 focus:border-teal-400 focus:outline-none"
+                />
 
-            <button
-              onClick={() => {
-                setInviteDetails(null)
-                setInviteCode('')
-                setLinkToken(null)
-                setError(null)
-              }}
-              className="w-full py-3 rounded-xl text-white/40 hover:text-white/60 text-sm transition-colors mt-2"
-            >
-              {linkToken ? 'Cancel' : 'Use different code'}
-            </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-400 to-teal-500 text-slate-900 font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Creating account...' : 'Create Account & Join'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('carei_pending_invite_link', linkToken)
+                    setLocation(`/login?redirect=${encodeURIComponent(`/join?link=${linkToken}`)}`)
+                  }}
+                  className="w-full py-2 rounded-xl text-white/50 hover:text-white/70 text-sm transition-colors"
+                >
+                  Already have an account? Sign in
+                </button>
+              </form>
+            ) : (
+              <>
+                <button
+                  onClick={acceptInvite}
+                  disabled={isLoading}
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-teal-400 to-teal-500 text-slate-900 font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Joining...' : 'Join Organization'}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setInviteDetails(null)
+                    setInviteCode('')
+                    setLinkToken(null)
+                    setError(null)
+                  }}
+                  className="w-full py-3 rounded-xl text-white/40 hover:text-white/60 text-sm transition-colors mt-2"
+                >
+                  {linkToken ? 'Cancel' : 'Use different code'}
+                </button>
+              </>
+            )}
           </div>
         )}
       </motion.div>
