@@ -13,6 +13,8 @@ import {
   completeTask,
   addTaskLog,
   getClientLogs,
+  getClientRequests,
+  requestClientAssignment,
 } from '../api/client'
 import { enqueue } from '../utils/offlineQueue'
 import BiometricsPrompt from '../components/BiometricsPrompt'
@@ -124,6 +126,8 @@ export default function CarerDashboard() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [visits, setVisits] = useState<Visit[]>([])
   const [assignedClients, setAssignedClients] = useState<any[]>([])
+  const [clientRequestPending, setClientRequestPending] = useState(false)
+  const [requestSending, setRequestSending] = useState(false)
   const [clientTasks, setClientTasks] = useState<Record<string, any[]>>({})
   const [activeTaskLog, setActiveTaskLog] = useState<{ logId: string; clientId: string; taskName: string; startTime: string } | null>(null)
   const [taskNotes, setTaskNotes] = useState('')
@@ -183,7 +187,24 @@ export default function CarerDashboard() {
             .catch(() => {})
         })
       }).catch(() => {}),
+      getClientRequests().then((data) => {
+        const latest = (data.requests || [])[0]
+        setClientRequestPending(latest?.status === 'pending')
+      }).catch(() => {}),
     ]).finally(() => setLoading(false))
+  }
+
+  const handleRequestClient = async () => {
+    setRequestSending(true)
+    triggerHaptic(HAPTIC_PATTERNS.success)
+    try {
+      await requestClientAssignment()
+      setClientRequestPending(true)
+    } catch (err: any) {
+      console.error('client request failed:', err.message)
+    } finally {
+      setRequestSending(false)
+    }
   }
 
   useEffect(() => {
@@ -640,7 +661,39 @@ export default function CarerDashboard() {
 
         {assignedClients.length === 0 && !loading && (
           <div className="text-center py-8">
-            <div className="text-slate-400 text-sm">No clients assigned yet.</div>
+            <div className="text-slate-600 text-sm font-medium mb-1">You don't have a client assigned to you yet.</div>
+            <div className="text-slate-400 text-xs mb-5">Your manager assigns clients to your schedule.</div>
+            {user?.role === 'carer' ? (
+              clientRequestPending ? (
+                <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold" style={{ background: 'rgba(79,209,197,0.12)', color: COLORS.teal }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Request sent — your manager will be notified
+                </div>
+              ) : (
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={handleRequestClient}
+                  disabled={requestSending}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white border-none cursor-pointer disabled:opacity-50"
+                  style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+                >
+                  {requestSending ? 'Sending…' : 'Request a Client'}
+                </motion.button>
+              )
+            ) : (
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => {
+                  const saved = localStorage.getItem('carei_current_tenant')
+                  const slug = saved ? JSON.parse(saved)?.slug : null
+                  if (slug) setLocation(`/tenant/${slug}/manager/clients`)
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-white border-none cursor-pointer"
+                style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})` }}
+              >
+                Add a Client
+              </motion.button>
+            )}
           </div>
         )}
 

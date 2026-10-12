@@ -109,6 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (req.method === 'POST') {
+        if (!isManager) { res.status(403).json({ error: 'Only managers can create clients' }); return }
         const body = req.body || {}
         const { id: bodyId, name, age, address, conditions, medications, preferences, emergencyContact, allergies, dysphagiaProtocol, supportFramework, communicationGuidance, mobility, careCues } = body
         if (!bodyId || !name) {
@@ -124,6 +125,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (req.method === 'PATCH' || req.method === 'PUT') {
+        if (!isManager) { res.status(403).json({ error: 'Only managers can edit clients' }); return }
         if (!id) {
           res.status(400).json({ error: 'id required' })
           return
@@ -152,6 +154,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (req.method === 'DELETE') {
+        if (!isManager) { res.status(403).json({ error: 'Only managers can delete clients' }); return }
         if (!id) {
           res.status(400).json({ error: 'id required' })
           return

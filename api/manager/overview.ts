@@ -40,6 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         upcomingSupervisions,
         unreadMessages,
         clientsCount,
+        clientRequestsPending,
       ] = await Promise.all([
         // Visit stats
         safeQuery(sql, sql`SELECT COUNT(*) as cnt FROM visits WHERE tenant_id = ${tenantId} AND DATE(submitted_at) = CURRENT_DATE`, [{ cnt: 0 }]),
@@ -89,6 +90,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Clients count
         safeQuery(sql, sql`SELECT COUNT(*) as cnt FROM clients WHERE tenant_id = ${tenantId}`, [{ cnt: 0 }]),
+
+        // Client assignment requests from carers
+        safeQuery(sql, sql`SELECT * FROM client_requests WHERE tenant_id = ${tenantId} AND status = 'pending' ORDER BY created_at ASC LIMIT 20`, []),
       ])
 
       // Compute DBS summary
@@ -119,6 +123,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (rtwPending > 0) complianceAlerts.push({ type: 'rtw_pending', severity: 'medium', message: `${rtwPending} right-to-work check(s) pending verification`, count: rtwPending })
       if (rtwRejected > 0) complianceAlerts.push({ type: 'rtw_rejected', severity: 'high', message: `${rtwRejected} right-to-work check(s) rejected`, count: rtwRejected })
       if ((leavePending as any[]).length > 0) complianceAlerts.push({ type: 'leave_pending', severity: 'medium', message: `${(leavePending as any[]).length} leave request(s) pending approval`, count: (leavePending as any[]).length })
+      if ((clientRequestsPending as any[]).length > 0) complianceAlerts.push({ type: 'client_request', severity: 'medium', message: `${(clientRequestsPending as any[]).length} carer(s) requesting a client assignment`, count: (clientRequestsPending as any[]).length })
       if ((alerts as any[]).length > 0) complianceAlerts.push({ type: 'sos', severity: 'high', message: `${(alerts as any[]).length} unresolved SOS alert(s)`, count: (alerts as any[]).length })
 
       res.status(200).json({
@@ -154,6 +159,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
         alerts: complianceAlerts,
         leaveRequests: leavePending as any[],
+        clientRequests: clientRequestsPending as any[],
         upcomingSupervisions: upcomingSupervisions as any[],
         sosAlerts: alerts as any[],
         incidents: incidents as any[],
