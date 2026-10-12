@@ -1273,6 +1273,24 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_invite_links_token ON invite_links(token)`
     await sql`CREATE INDEX IF NOT EXISTS idx_invite_links_tenant ON invite_links(tenant_id)`
   })
+
+  await run(45, 'create_client_requests', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS client_requests (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        carer_id TEXT NOT NULL REFERENCES users(id),
+        carer_name TEXT,
+        message TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        resolved_at TIMESTAMPTZ,
+        resolved_by TEXT
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_client_requests_tenant ON client_requests(tenant_id, status)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_client_requests_carer ON client_requests(carer_id)`
+  })
 }
 
 const ALLOWED_ORIGINS = [

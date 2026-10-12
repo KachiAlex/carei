@@ -24,6 +24,7 @@ import {
   getInviteLinks,
   createInviteLink,
   revokeInviteLink,
+  resolveClientRequest,
   logoutUser,
   exportAgencyDataUrl,
   deleteAgencyData,
@@ -405,6 +406,7 @@ export default function ManagerDashboard() {
                   else if (alert.type.startsWith('train')) setLocation(`/tenant/${tenantSlug}/training`)
                   else if (alert.type.startsWith('rtw')) setLocation(`/tenant/${tenantSlug}/right-to-work`)
                   else if (alert.type === 'leave_pending') setLocation(`/tenant/${tenantSlug}/availability`)
+                  else if (alert.type === 'client_request') setTab('schedule')
                 }}
                 className="flex items-center gap-3 text-left p-2.5 rounded-xl cursor-pointer border-none transition-all hover:scale-[1.01]"
                 style={{ background: alert.severity === 'high' ? 'rgba(255,90,95,0.05)' : 'rgba(246,183,60,0.05)' }}
@@ -464,6 +466,47 @@ export default function ManagerDashboard() {
                   <div className="text-[10px] text-slate-400">{lr.type || 'Leave'} · {lr.startDate} to {lr.endDate}</div>
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(246,183,60,0.1)', color: COLORS.amber }}>Pending</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Client Assignment Requests */}
+      {overview?.clientRequests && overview.clientRequests.length > 0 && (
+        <motion.div custom={6} variants={cardVariants} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-sm text-slate-800">Client Requests</h3>
+            <span className="text-[10px] font-semibold text-slate-400">{overview.clientRequests.length} pending</span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {overview.clientRequests.slice(0, 5).map((cr: any, idx: number) => (
+              <div key={cr.id || idx} className="flex items-center justify-between p-2 rounded-lg" style={{ background: 'rgba(79,209,197,0.05)' }}>
+                <div>
+                  <div className="text-xs font-semibold text-slate-700">{cr.carer_name || 'A carer'}</div>
+                  <div className="text-[10px] text-slate-400">
+                    requested a client{cr.message ? ` · "${cr.message}"` : ''}
+                    {cr.created_at ? ` · ${new Date(cr.created_at).toLocaleDateString('en-GB')}` : ''}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => { setScheduleCaregiverId(cr.carer_id); setTab('schedule') }}
+                    className="px-3 py-1 rounded-lg text-xs font-semibold border cursor-pointer"
+                    style={{ borderColor: 'rgba(79,209,197,0.3)', color: COLORS.teal }}
+                  >
+                    Assign
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => resolveClientRequest(cr.id, 'dismiss').then(refreshManagerData).catch((err: any) => console.error(err.message))}
+                    className="px-3 py-1 rounded-lg text-xs font-semibold border cursor-pointer"
+                    style={{ borderColor: 'rgba(0,0,0,0.08)', color: '#64748b' }}
+                  >
+                    Dismiss
+                  </motion.button>
+                </div>
               </div>
             ))}
           </div>
@@ -1219,6 +1262,8 @@ export default function ManagerDashboard() {
           instructions: scheduleInstructions || undefined,
         })
         setScheduleMsg('Assigned successfully')
+        const pendingReq = overview?.clientRequests?.find((r: any) => r.carer_id === scheduleCaregiverId)
+        if (pendingReq) await resolveClientRequest(pendingReq.id, 'resolve').catch(() => {})
         setScheduleCaregiverId(''); setScheduleClientId(''); setScheduleDate(''); setScheduleTime(''); setScheduleInstructions('')
         const res = await getAssignments()
         setAssignmentsList(res.assignments || [])

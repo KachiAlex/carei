@@ -1562,3 +1562,15 @@ export async function saveOutcomeIndicators(data: {
 }) {
   return post('/outcome-indicators', data)
 }
+
+export async function requestClientAssignment(message?: string) {
+  return post('/client-requests', { message })
+}
+
+export async function getClientRequests() {
+  return get('/client-requests')
+}
+
+export async function resolveClientRequest(id: string, action: 'resolve' | 'dismiss') {
+  return patchWithRetry('/client-requests', { id, action })
+}
