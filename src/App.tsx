@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react'
-import { Route, Router, Switch, useLocation } from 'wouter'
+import { Route, Router, Switch, useLocation, Redirect } from 'wouter'
 import SplashScreen from './pages/SplashScreen'
 import { useOnlineSync } from './hooks/useOnlineSync'
 import { useRemoteWipe } from './hooks/useRemoteWipe'
@@ -160,6 +160,8 @@ function HomeOrSplash() {
 
 // Routes that are NOT wrapped in TenantProvider
 function PublicRoutes() {
+  const [location] = useLocation()
+  if (location.startsWith('/tenant/')) return null
   return (
     <Switch>
       <Route path="/" component={HomeOrSplash} />
@@ -186,7 +188,7 @@ function PublicRoutes() {
       <Route path="/settings" component={SettingsScreen} />
       <Route path="/availability" component={AvailabilityScreen} />
       <Route path="/messages" component={MessagesScreen} />
-      <Route path="/:rest*" component={NotFoundPage} />
+      <Route path="/*" component={NotFoundPage} />
     </Switch>
   )
 }
@@ -210,6 +212,7 @@ function TenantRoutes() {
       <Switch>
         {/* Tenant-prefixed routes */}
         <Route path="/tenant/:slug/dashboard" component={CarerDashboard} />
+        <Route path="/tenant/:slug/history" component={VisitHistoryScreen} />
         <Route path="/tenant/:slug/visit/:id" component={ActiveVisitScreen} />
         <Route path="/tenant/:slug/summary/:id" component={VisitSummaryScreen} />
         <Route path="/tenant/:slug/copilot" component={AICopilotScreen} />
@@ -246,6 +249,10 @@ function TenantRoutes() {
         <Route path="/tenant/:slug/right-to-work" component={RightToWorkScreen} />
         <Route path="/tenant/:slug/supervisions" component={SupervisionScreen} />
         <Route path="/tenant/:slug/messages" component={MessagesScreen} />
+        <Route path="/tenant/:slug">
+          {(params) => <Redirect to={`/tenant/${params.slug}/dashboard`} />}
+        </Route>
+        <Route path="/tenant/:slug/*" component={NotFoundPage} />
       </Switch>
     </TenantProvider>
   )
