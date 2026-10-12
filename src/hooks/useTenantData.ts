@@ -174,23 +174,12 @@ export function useCreateInvite() {
         throw new Error('Admin access required')
       }
 
-      const res = await fetch('/api/invites', {
-        method: 'POST',
-        headers: api.authHeaders(),
-        body: JSON.stringify({
-          tenantId: currentTenant.id,
-          email,
-          role,
-          expiresInHours,
-        }),
+      return api.post('/invites', {
+        tenantId: currentTenant.id,
+        email,
+        role,
+        expiresInHours,
       })
-
-      if (!res.ok) {
-        const error = await res.json()
-        throw new Error(error.error || 'Failed to create invite')
-      }
-
-      return res.json()
     },
     [currentTenant?.id, currentUserRole]
   )
