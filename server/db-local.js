@@ -216,6 +216,16 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_client_requests_tenant ON client_requests(tenant_id, status)`
     await sql`CREATE INDEX IF NOT EXISTS idx_client_requests_carer ON client_requests(carer_id)`
   })
+
+  await run(46, 'backfill_user_tenant_ids', async () => {
+    await sql`
+      UPDATE users u SET tenant_id = (
+        SELECT tenant_id FROM tenant_users tu WHERE tu.user_id = u.id LIMIT 1
+      )
+      WHERE (u.tenant_id IS NULL OR u.tenant_id = '')
+        AND EXISTS (SELECT 1 FROM tenant_users tu WHERE tu.user_id = u.id)
+    `
+  })
 }
 
 // ─── Helper functions ───
@@ -280,6 +290,7 @@ export async function addUserToTenant(userId, tenantId, role = 'carer') {
   const sql = getSql()
   const id = `tu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   await sql`INSERT INTO tenant_users (id, tenant_id, user_id, role) VALUES (${id}, ${tenantId}, ${userId}, ${role}) ON CONFLICT (tenant_id, user_id) DO UPDATE SET role = ${role}`
+  await sql`UPDATE users SET tenant_id = ${tenantId} WHERE id = ${userId} AND (tenant_id IS NULL OR tenant_id = '')`
 }
 
 export async function verifyTenantAccess(userId, tenantId) {

@@ -267,8 +267,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
         await sql`
-          INSERT INTO users (id, name, email, phone, region, pin_hash, role, token_hash, token_expires_at, refresh_token_hash, refresh_token_expires_at, email_verified)
-          VALUES (${newUserId}, ${name}, ${email}, ${phone}, ${newUser.region || ''}, ${pinHash}, ${link.role}, ${accessTokenHash}, ${accessTokenExpiresAt}, ${refreshTokenHash}, ${refreshTokenExpiresAt}, TRUE)
+          INSERT INTO users (id, tenant_id, name, email, phone, region, pin_hash, role, token_hash, token_expires_at, refresh_token_hash, refresh_token_expires_at, email_verified)
+          VALUES (${newUserId}, ${link.tenant_id}, ${name}, ${email}, ${phone}, ${newUser.region || ''}, ${pinHash}, ${link.role}, ${accessTokenHash}, ${accessTokenExpiresAt}, ${refreshTokenHash}, ${refreshTokenExpiresAt}, TRUE)
         `
 
         await addUserToTenant(newUserId, link.tenant_id, link.role)

@@ -54,8 +54,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         safeQuery(sql, sql`SELECT COUNT(*) as cnt FROM scheduled_visits WHERE tenant_id = ${tenantId} AND visit_date = ${today} AND status = 'pending'`, [{ cnt: 0 }]),
 
         // Carer stats
-        safeQuery(sql, sql`SELECT COUNT(*) as cnt FROM users WHERE role = 'carer' AND tenant_id = ${tenantId}`, [{ cnt: 0 }]),
-        safeQuery(sql, sql`SELECT COUNT(*) as cnt FROM users WHERE role = 'carer' AND tenant_id = ${tenantId} AND status = 'active'`, [{ cnt: 0 }]),
+        safeQuery(sql, sql`SELECT COUNT(*) as cnt FROM tenant_users tu JOIN users u ON u.id = tu.user_id WHERE tu.tenant_id = ${tenantId} AND tu.role = 'carer'`, [{ cnt: 0 }]),
+        safeQuery(sql, sql`SELECT COUNT(*) as cnt FROM tenant_users tu JOIN users u ON u.id = tu.user_id WHERE tu.tenant_id = ${tenantId} AND tu.role = 'carer' AND u.status = 'active'`, [{ cnt: 0 }]),
 
         // Alerts & incidents
         safeQuery(sql, sql`SELECT * FROM sos_alerts WHERE tenant_id = ${tenantId} AND resolved = FALSE ORDER BY timestamp DESC LIMIT 10`, []),
