@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (req.method === 'GET') {
-        const rows = await sql`SELECT id, name, email, phone, region, role, status, created_at FROM users WHERE id = ${caregiverId} AND tenant_id = ${tenantId} LIMIT 1` as any[]
+        const rows = await sql`SELECT id, name, email, phone, region, role, status, created_at FROM users WHERE id = ${caregiverId} AND id IN (SELECT user_id FROM tenant_users WHERE tenant_id = ${tenantId}) LIMIT 1` as any[]
         if (!rows[0]) {
           res.status(404).json({ error: 'Caregiver not found' })
           return
@@ -45,13 +45,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           res.status(400).json({ error: 'status is required' })
           return
         }
-        await sql`UPDATE users SET status = ${status} WHERE id = ${caregiverId} AND tenant_id = ${tenantId}`
+        await sql`UPDATE users SET status = ${status} WHERE id = ${caregiverId} AND id IN (SELECT user_id FROM tenant_users WHERE tenant_id = ${tenantId})`
         res.status(200).json({ status: 'updated', id: caregiverId })
         return
       }
 
       if (req.method === 'DELETE') {
-        await sql`DELETE FROM users WHERE id = ${caregiverId} AND tenant_id = ${tenantId}`
+        await sql`DELETE FROM users WHERE id = ${caregiverId} AND id IN (SELECT user_id FROM tenant_users WHERE tenant_id = ${tenantId})`
         res.status(200).json({ status: 'deleted', id: caregiverId })
         return
       }

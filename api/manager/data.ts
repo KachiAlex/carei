@@ -29,7 +29,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureTables()
     await withTenant(req, res, async ({ tenantId, sql }) => {
-      const caregiverRows = await sql`SELECT id, name, email, phone, region, role, status, created_at FROM users WHERE role = 'carer' AND tenant_id = ${tenantId} ORDER BY name` as any[]
+      const caregiverRows = await sql`
+        SELECT u.id, u.name, u.email, u.phone, u.region, tu.role, u.status, u.created_at
+        FROM tenant_users tu
+        JOIN users u ON u.id = tu.user_id
+        WHERE tu.tenant_id = ${tenantId}
+        ORDER BY u.name
+      ` as any[]
       const carers = caregiverRows.map((u: any) => ({
         id: u.id,
         name: u.name,
