@@ -4,7 +4,7 @@ import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken, withTena
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''
 const MODEL = 'claude-sonnet-4-6'
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest'
 const MAX_TOKENS = 2048
 
 interface StructuredNote {
@@ -124,32 +124,45 @@ Return ONLY valid JSON with this structure:
     let text = ''
     let tokens: number | undefined
     if (GEMINI_API_KEY) {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: MAX_TOKENS,
-              responseMimeType: 'application/json',
-            },
-          }),
-        }
-      )
+      let lastErr = ''
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+              generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: MAX_TOKENS,
+                responseMimeType: 'application/json',
+              },
+            }),
+          }
+        )
 
-      if (!response.ok) {
-        const err = await response.text()
-        res.status(502).json({ error: 'Gemini API error', detail: err })
+        if (response.status === 503 && attempt < 2) {
+          lastErr = await response.text()
+          await new Promise(r => setTimeout(r, 1500 * (attempt + 1)))
+          continue
+        }
+        if (!response.ok) {
+          const err = await response.text()
+          res.status(502).json({ error: 'Gemini API error', detail: err })
+          return
+        }
+
+        const data = await response.json()
+        text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        tokens = data.usageMetadata?.candidatesTokenCount
+        break
+      }
+      if (!text && lastErr) {
+        res.status(502).json({ error: 'Gemini API error', detail: lastErr })
         return
       }
-
-      const data = await response.json()
-      text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
-      tokens = data.usageMetadata?.candidatesTokenCount
     } else {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
