@@ -4,7 +4,7 @@ import { useLocation, useParams } from 'wouter'
 import { useAutoSave } from '../hooks/useAutoSave'
 import { triggerHaptic, HAPTIC_PATTERNS } from '../utils/haptic'
 import { enqueue } from '../utils/offlineQueue'
-import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft, getDrugInteractions, logMedication, getMedicationLogs, reportIncident, saveVoiceMemo, uploadFile, getHandoverBriefing, structureVoiceNotes, saveOutcomeIndicators } from '../api/client'
+import { fetchVisit, fetchClient, saveVisit, sendSOS, saveVisitDraft, getVisitDraft, getDrugInteractions, logMedication, getMedicationLogs, reportIncident, getIncidents, saveVoiceMemo, uploadFile, getVoiceMemos, getHandoverBriefing, structureVoiceNotes, saveOutcomeIndicators } from '../api/client'
 import { checkAllergy, checkMedicationOnList, checkDuplicateDose, checkTimeWindow, SAFETY_RULE_VERSION } from '../utils/safetyRules'
 import { sendMedicationReminder, requestNotificationPermission } from '../utils/notifications'
 import { verifyLocation, type GeoVerifyResult } from '../utils/geoVerify'
@@ -114,6 +114,7 @@ export default function ActiveVisitScreen() {
   const [incidentType, setIncidentType] = useState('')
   const [incidentSeverity, setIncidentSeverity] = useState<'low' | 'medium' | 'high'>('medium')
   const [incidentNote, setIncidentNote] = useState('')
+  const [incidentSubmitting, setIncidentSubmitting] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordDuration, setRecordDuration] = useState(0)
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
@@ -121,6 +122,10 @@ export default function ActiveVisitScreen() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recordedChunksRef = useRef<Blob[]>([])
+
+  const [notesSaving, setNotesSaving] = useState(false)
+  const [notesSavedAt, setNotesSavedAt] = useState<number | null>(null)
+  const voiceDocActiveRef = useRef(false)
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const recognitionRef = useRef<any>(null)
@@ -155,7 +160,7 @@ export default function ActiveVisitScreen() {
   const [activePostMedMonitor, setActivePostMedMonitor] = useState<string | null>(null)
   const postMedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn, mealStatus, loneWorkerElapsed, bpSystolic, bpDiastolic, pulse, o2Sat, nutritionNote, selectedMood, wellbeingNote, geoResult, geoOverrideReason, tagScanResult }, 3000)
+  useAutoSave(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn, mealStatus, loneWorkerElapsed, loneWorkerPaused, bpSystolic, bpDiastolic, pulse, o2Sat, nutritionNote, selectedMood, wellbeingNote, geoResult, geoOverrideReason, tagScanResult }, 3000)
 
   // Load visit + client from API, then DB data + draft
   useEffect(() => {
@@ -293,7 +298,36 @@ export default function ActiveVisitScreen() {
           if (draft.geoResult) setGeoResult(draft.geoResult)
           if (draft.geoOverrideReason) setGeoOverrideReason(draft.geoOverrideReason)
           if (draft.tagScanResult) setTagScanResult(draft.tagScanResult)
+          if (draft.loneWorkerElapsed != null) setLoneWorkerElapsed(draft.loneWorkerElapsed)
+          if (draft.loneWorkerPaused != null) setLoneWorkerPaused(draft.loneWorkerPaused)
         } catch (err: any) { console.error('getVisitDraft failed', err.message) }
+
+        // Load previously saved voice memos (non-blocking)
+        try {
+          const memosRes = await getVoiceMemos(visitId)
+          if (mounted && Array.isArray(memosRes?.memos)) {
+            setVoiceMemos(memosRes.memos.map((m: any) => ({
+              id: m.id,
+              audioUrl: m.audioUrl,
+              duration: m.duration || 0,
+              createdAt: m.createdAt,
+            })))
+          }
+        } catch (err: any) { console.error('getVoiceMemos failed', err.message) }
+
+        // Load previously reported incidents for this visit (non-blocking)
+        try {
+          const incRes = await getIncidents(visitId)
+          if (mounted && Array.isArray(incRes?.incidents)) {
+            setIncidents(incRes.incidents.map((i: any) => ({
+              id: i.id,
+              type: i.type,
+              severity: i.severity,
+              description: i.description,
+              timestamp: i.timestamp,
+            })))
+          }
+        } catch (err: any) { console.error('fetchIncidents failed', err.message) }
       } catch (err: any) { 
         console.error('load visit failed', err.message)
         if (mounted) setLoading(false)
@@ -315,38 +349,41 @@ export default function ActiveVisitScreen() {
     }
   }, [client, meds])
 
+  // Shared visit payload used by the debounced sync and the manual notes save
+  const buildVisitPayload = () => ({
+    visitId,
+    clientId: client?.id,
+    clientName: client?.name,
+    clientAge: client?.age,
+    clientAddress: client?.address,
+    visitTime: visit?.time,
+    visitDuration: visit?.duration,
+    elapsed,
+    tasks,
+    fluid,
+    notes,
+    medications: meds,
+    mealStatus,
+    status: 'in-progress',
+    clockInAt: clockInAt ? new Date(clockInAt).toISOString() : null,
+    clockInLat: geoResult?.position?.lat ?? null,
+    clockInLng: geoResult?.position?.lng ?? null,
+    clockInAccuracy: geoResult?.position?.accuracy ?? null,
+    geoVerified: geoResult?.withinGeofence ?? false,
+    geoDistanceM: geoResult?.distanceMeters ?? null,
+    geoOverrideReason: geoOverrideReason || null,
+    tagScanId: tagScanResult?.tagId ?? null,
+    tagScanMethod: tagScanResult?.method ?? null,
+    tagScannedAt: tagScanResult?.scannedAt ?? null,
+    tagVerified: !!tagScanResult,
+  })
+
   // Debounced auto-save to DB
   useEffect(() => {
     if (!visitId || !clockedIn) return
     if (dbSyncRef.current) clearTimeout(dbSyncRef.current)
     dbSyncRef.current = setTimeout(() => {
-      const payload = {
-        visitId,
-        clientId: client?.id,
-        clientName: client?.name,
-        clientAge: client?.age,
-        clientAddress: client?.address,
-        visitTime: visit?.time,
-        visitDuration: visit?.duration,
-        elapsed,
-        tasks,
-        fluid,
-        notes,
-        medications: meds,
-        mealStatus,
-        clockInAt: clockInAt ? new Date(clockInAt).toISOString() : null,
-        clockInLat: geoResult?.position?.lat ?? null,
-        clockInLng: geoResult?.position?.lng ?? null,
-        clockInAccuracy: geoResult?.position?.accuracy ?? null,
-        geoVerified: geoResult?.withinGeofence ?? false,
-        geoDistanceM: geoResult?.distanceMeters ?? null,
-        geoOverrideReason: geoOverrideReason || null,
-        tagScanId: tagScanResult?.tagId ?? null,
-        tagScanMethod: tagScanResult?.method ?? null,
-        tagScannedAt: tagScanResult?.scannedAt ?? null,
-        tagVerified: !!tagScanResult,
-      }
-      saveVisit(visitId, payload).catch(() => {})
+      saveVisit(visitId, buildVisitPayload()).catch(() => {})
     }, 5000)
     return () => { if (dbSyncRef.current) clearTimeout(dbSyncRef.current) }
   }, [visitId, elapsed, tasks, fluid, notes, meds, clockedIn, client, visit, mealStatus, geoResult, tagScanResult])
@@ -668,56 +705,49 @@ export default function ActiveVisitScreen() {
       alert('Please select an incident type.')
       return
     }
-    try {
-      await reportIncident({
-        visitId,
-        clientId: client?.id,
-        clientName: client?.name,
-        type: incidentType,
-        description: incidentNote,
-        severity: incidentSeverity,
-      })
-      setIncidents((prev) => [
-        {
-          id: 'local-' + Date.now(),
-          type: incidentType,
-          severity: incidentSeverity,
-          description: incidentNote,
-          timestamp: new Date().toISOString(),
-        },
-        ...prev,
-      ])
-    } catch {
-      if (!navigator.onLine) {
-        await enqueue({
-          type: 'visit',
-          payload: {
-            type: 'incident',
-            visitId,
-            clientId: client?.id,
-            clientName: client?.name,
-            incidentType,
-            description: incidentNote,
-            severity: incidentSeverity,
-          },
-        })
-        setIncidents((prev) => [
-          {
-            id: 'local-' + Date.now(),
-            type: incidentType,
-            severity: incidentSeverity,
-            description: incidentNote,
-            timestamp: new Date().toISOString(),
-          },
-          ...prev,
-        ])
-      }
+    if (incidentSubmitting) return
+    setIncidentSubmitting(true)
+    // Client-generated id used as an idempotency key — server dedupes on conflict
+    const incidentId = 'inc-' + Math.random().toString(36).slice(2) + Date.now().toString(36)
+    const entry = {
+      id: incidentId,
+      type: incidentType,
+      severity: incidentSeverity,
+      description: incidentNote,
+      timestamp: new Date().toISOString(),
     }
-    setIncidentType('')
-    setIncidentNote('')
-    setIncidentSeverity('medium')
-    setShowIncidentForm(false)
-    triggerHaptic(HAPTIC_PATTERNS.confirm)
+    const payload = {
+      id: incidentId,
+      visitId,
+      clientId: client?.id,
+      clientName: client?.name,
+      type: incidentType,
+      description: incidentNote,
+      severity: incidentSeverity,
+    }
+    try {
+      await reportIncident(payload)
+      setIncidents((prev) => [entry, ...prev])
+      setIncidentType('')
+      setIncidentNote('')
+      setIncidentSeverity('medium')
+      setShowIncidentForm(false)
+      triggerHaptic(HAPTIC_PATTERNS.confirm)
+    } catch (err: any) {
+      if (!navigator.onLine) {
+        await enqueue({ type: 'incident', payload })
+        setIncidents((prev) => [entry, ...prev])
+        setIncidentType('')
+        setIncidentNote('')
+        setIncidentSeverity('medium')
+        setShowIncidentForm(false)
+        triggerHaptic(HAPTIC_PATTERNS.confirm)
+      } else {
+        alert(`Incident could not be saved: ${err?.message || 'unknown error'}. Please try again.`)
+      }
+    } finally {
+      setIncidentSubmitting(false)
+    }
   }
 
   // Phase 6: Voice memo recording
@@ -783,7 +813,7 @@ export default function ActiveVisitScreen() {
             audioUrl,
             duration: recordDuration,
           })
-        } catch {
+        } catch (err: any) {
           if (!navigator.onLine) {
             await enqueue({
               type: 'voice-memo',
@@ -794,6 +824,8 @@ export default function ActiveVisitScreen() {
                 duration: recordDuration,
               },
             })
+          } else {
+            alert(`Voice memo could not be saved to the server: ${err?.message || 'unknown error'}. It is kept on this device only.`)
           }
         }
       }
@@ -855,27 +887,68 @@ export default function ActiveVisitScreen() {
     rec.continuous = true
     rec.interimResults = true
     rec.onresult = (e: any) => {
-      let txt = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        txt += e.results[i][0].transcript
+      // e.results holds the full session transcript — accumulate from index 0
+      // so earlier finalized segments are never dropped
+      let final = ''
+      let interim = ''
+      for (let i = 0; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript
+        if (e.results[i].isFinal) final += t + ' '
+        else interim += t
       }
-      setTranscript(txt)
+      setTranscript((final + interim).trim())
     }
-    rec.onend = () => setIsTranscribing(false)
+    rec.onend = () => {
+      // Chrome/Android ends recognition on a silence gap even with
+      // continuous=true — restart automatically unless the user stopped it
+      if (voiceDocActiveRef.current && recognitionRef.current === rec) {
+        try { rec.start() } catch { /* already started */ }
+      } else {
+        setIsTranscribing(false)
+      }
+    }
+    rec.onerror = (e: any) => {
+      if (e?.error === 'not-allowed' || e?.error === 'audio-capture') {
+        voiceDocActiveRef.current = false
+        setIsTranscribing(false)
+      }
+    }
+    voiceDocActiveRef.current = true
     rec.start()
     recognitionRef.current = rec
     setIsTranscribing(true)
   }
 
   const stopVoiceDoc = () => {
-    recognitionRef.current?.stop()
+    voiceDocActiveRef.current = false
+    try { recognitionRef.current?.stop() } catch { /* ignore */ }
     setIsTranscribing(false)
   }
 
   const saveVoiceDoc = () => {
+    stopVoiceDoc()
     setNotes((n) => (n ? n + '\n' + transcript : transcript))
     setTranscript('')
     setShowVoiceDoc(false)
+  }
+
+  // Manual notes save — persists immediately instead of waiting for autosave
+  const saveNotesNow = async () => {
+    if (notesSaving) return
+    setNotesSaving(true)
+    try {
+      await saveVisitDraft(visitId, { visitId, elapsed, tasks, fluid, notes, meds, clockedIn, mealStatus, loneWorkerElapsed, loneWorkerPaused, bpSystolic, bpDiastolic, pulse, o2Sat, nutritionNote, selectedMood, wellbeingNote, geoResult, geoOverrideReason, tagScanResult })
+      if (clockedIn) await saveVisit(visitId, buildVisitPayload())
+      setNotesSavedAt(Date.now())
+    } catch (err: any) {
+      if (!navigator.onLine) {
+        setNotesSavedAt(Date.now())
+      } else {
+        alert('Could not save notes right now — autosave will keep trying.')
+      }
+    } finally {
+      setNotesSaving(false)
+    }
   }
 
   // AI Voice-to-Documentation structuring
@@ -1949,6 +2022,19 @@ export default function ActiveVisitScreen() {
                 className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
                 rows={3}
               />
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[10px] text-slate-400">
+                  {notesSavedAt ? `Saved ${new Date(notesSavedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Autosaves as you type'}
+                </span>
+                <button
+                  onClick={saveNotesNow}
+                  disabled={notesSaving}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border-none cursor-pointer disabled:opacity-50 transition-all"
+                  style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: 'white' }}
+                >
+                  {notesSaving ? 'Saving…' : 'Save Note'}
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -2098,6 +2184,19 @@ export default function ActiveVisitScreen() {
                 className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
                 rows={2}
               />
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[10px] text-slate-400">
+                  {notesSavedAt ? `Saved ${new Date(notesSavedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Autosaves as you type'}
+                </span>
+                <button
+                  onClick={saveNotesNow}
+                  disabled={notesSaving}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border-none cursor-pointer disabled:opacity-50 transition-all"
+                  style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: 'white' }}
+                >
+                  {notesSaving ? 'Saving…' : 'Save Note'}
+                </button>
+              </div>
             </div>
 
             {/* Mood Selector */}
@@ -2138,6 +2237,19 @@ export default function ActiveVisitScreen() {
                 className="w-full bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none resize-none border border-slate-100 focus:border-teal transition-colors"
                 rows={3}
               />
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[10px] text-slate-400">
+                  {notesSavedAt ? `Saved ${new Date(notesSavedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : 'Autosaves as you type'}
+                </span>
+                <button
+                  onClick={saveNotesNow}
+                  disabled={notesSaving}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border-none cursor-pointer disabled:opacity-50 transition-all"
+                  style={{ background: `linear-gradient(90deg, ${COLORS.teal}, ${COLORS.teal2})`, color: 'white' }}
+                >
+                  {notesSaving ? 'Saving…' : 'Save Note'}
+                </button>
+              </div>
             </div>
 
             {/* Outcome Indicators */}
@@ -2310,10 +2422,11 @@ export default function ActiveVisitScreen() {
 
               <button
                 onClick={submitIncident}
-                className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer"
+                disabled={incidentSubmitting}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold text-white border-none cursor-pointer disabled:opacity-50"
                 style={{ background: `linear-gradient(90deg, ${COLORS.red}, ${COLORS.amber})` }}
               >
-                Submit Incident
+                {incidentSubmitting ? 'Submitting…' : 'Submit Incident'}
               </button>
             </motion.div>
           )}
@@ -2416,15 +2529,18 @@ export default function ActiveVisitScreen() {
           {/* Saved memos list */}
           {voiceMemos.length > 0 && (
             <div className="px-4 pb-3 flex flex-col gap-2">
-              {voiceMemos.slice(0, 3).map((memo) => (
-                <div key={memo.id} className="flex items-center gap-2 rounded-xl p-2.5 bg-slate-50">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.lavender} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="5 3 19 12 5 21 5 3"/>
-                  </svg>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-semibold text-slate-700">Voice Memo</div>
+              {voiceMemos.slice(0, 5).map((memo) => (
+                <div key={memo.id} className="rounded-xl p-2.5 bg-slate-50">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.lavender} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="5 3 19 12 5 21 5 3"/>
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-slate-700">Voice Memo</div>
+                    </div>
+                    <span className="text-[10px] text-slate-400 shrink-0">{formatRecordTime(memo.duration)}</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 shrink-0">{formatRecordTime(memo.duration)}</span>
+                  <audio src={memo.audioUrl} controls preload="none" className="w-full h-9" />
                 </div>
               ))}
             </div>
