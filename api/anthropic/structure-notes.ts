@@ -2,7 +2,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken, withTenant, getTenantSlug } from '../db.js'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ''
 const MODEL = 'claude-sonnet-4-6'
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 const MAX_TOKENS = 2048
 
 interface StructuredNote {
@@ -48,7 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    if (!ANTHROPIC_API_KEY) {
+    if (!GEMINI_API_KEY && !ANTHROPIC_API_KEY) {
       res.status(503).json({ error: 'AI service not configured' })
       return
     }
@@ -117,33 +119,64 @@ Return ONLY valid JSON with this structure:
   "wellbeingNote": "Overall wellbeing observation"
 }`
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        temperature: 0.2,
-        system: systemPrompt,
-        messages: [{
-          role: 'user',
-          content: `Structure this voice transcript into visit notes:${visitContext}\n\nTranscript: "${transcript}"`,
-        }],
-      }),
-    })
+    const userMessage = `Structure this voice transcript into visit notes:${visitContext}\n\nTranscript: "${transcript}"`
 
-    if (!response.ok) {
-      const err = await response.text()
-      res.status(502).json({ error: 'Anthropic API error', detail: err })
-      return
+    let text = ''
+    let tokens: number | undefined
+    if (GEMINI_API_KEY) {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: MAX_TOKENS,
+              responseMimeType: 'application/json',
+            },
+          }),
+        }
+      )
+
+      if (!response.ok) {
+        const err = await response.text()
+        res.status(502).json({ error: 'Gemini API error', detail: err })
+        return
+      }
+
+      const data = await response.json()
+      text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      tokens = data.usageMetadata?.candidatesTokenCount
+    } else {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: MAX_TOKENS,
+          temperature: 0.2,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userMessage }],
+        }),
+      })
+
+      if (!response.ok) {
+        const err = await response.text()
+        res.status(502).json({ error: 'Anthropic API error', detail: err })
+        return
+      }
+
+      const data = await response.json()
+      text = data.content?.[0]?.text || ''
+      tokens = data.usage?.output_tokens
     }
-
-    const data = await response.json()
-    const text = data.content?.[0]?.text || ''
 
     let structured: StructuredNote
     try {
@@ -168,7 +201,7 @@ Return ONLY valid JSON with this structure:
 
     res.status(200).json({
       structured,
-      tokens: data.usage?.output_tokens,
+      tokens,
     })
   } catch (err: any) {
     console.error('[anthropic/structure-notes] error:', err)
