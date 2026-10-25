@@ -458,6 +458,10 @@ export async function getVisits() {
   return get('/visits')
 }
 
+export async function getClientVisitHistory(clientId: string) {
+  return get(`/visits?clientId=${encodeURIComponent(clientId)}`)
+}
+
 export async function fetchVisit(visitId: string) {
   return get(`/visit-detail?id=${encodeURIComponent(visitId)}`)
 }
@@ -1067,6 +1071,7 @@ export async function getDrugInteractions(drugs: string[]) {
 }
 
 export async function reportIncident(data: {
+  id?: string
   visitId?: string
   clientId?: string
   clientName?: string

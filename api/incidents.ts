@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             res.status(429).json({ error: 'Too many incident reports', retryAfter: limit.retryAfter })
             return
           }
-          const { visitId, clientId, clientName, type, description, severity } = req.body || {}
+          const { id: clientId_, visitId, clientId, clientName, type, description, severity } = req.body || {}
           if (!type) {
             res.status(400).json({ error: 'type required' })
             return
@@ -55,14 +55,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
           }
 
-          const id = generateId()
-          await tenantSql`
+          // Client-supplied id acts as an idempotency key — retries and
+          // offline-queue replays dedupe on conflict instead of double-inserting
+          const id = typeof clientId_ === 'string' && /^inc-[a-z0-9]{1,40}$/i.test(clientId_)
+            ? clientId_
+            : generateId()
+          const inserted = await tenantSql`
             INSERT INTO incidents (id, visit_id, carer_id, carer_name, client_id, client_name, type, description, severity, timestamp)
             VALUES (
               ${id}, ${visitId || null}, ${user.id}, ${user.name}, ${clientId || null},
               ${clientName || null}, ${type}, ${description || null}, ${severity || 'medium'}, NOW()
             )
-          `
+            ON CONFLICT (id) DO NOTHING
+            RETURNING id
+          ` as any[]
+          if (inserted.length === 0) {
+            res.status(200).json({ status: 'logged', id, deduplicated: true })
+            return
+          }
           res.status(201).json({ status: 'logged', id })
           return
         }
@@ -111,7 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(429).json({ error: 'Too many incident reports', retryAfter: limit.retryAfter })
         return
       }
-      const { visitId, clientId, clientName, type, description, severity } = req.body || {}
+      const { id: clientId_, visitId, clientId, clientName, type, description, severity } = req.body || {}
       if (!type) {
         res.status(400).json({ error: 'type required' })
         return
@@ -122,14 +132,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return
       }
 
-      const id = generateId()
-      await sql`
+      // Client-supplied id acts as an idempotency key — retries and
+      // offline-queue replays dedupe on conflict instead of double-inserting
+      const id = typeof clientId_ === 'string' && /^inc-[a-z0-9]{1,40}$/i.test(clientId_)
+        ? clientId_
+        : generateId()
+      const inserted = await sql`
         INSERT INTO incidents (id, visit_id, carer_id, carer_name, client_id, client_name, type, description, severity, timestamp)
         VALUES (
           ${id}, ${visitId || null}, ${user.id}, ${user.name}, ${clientId || null},
           ${clientName || null}, ${type}, ${description || null}, ${severity || 'medium'}, NOW()
         )
-      `
+        ON CONFLICT (id) DO NOTHING
+        RETURNING id
+      ` as any[]
+      if (inserted.length === 0) {
+        res.status(200).json({ status: 'logged', id, deduplicated: true })
+        return
+      }
       res.status(201).json({ status: 'logged', id })
       return
     }
