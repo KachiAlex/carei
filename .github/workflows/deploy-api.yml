@@ -1,0 +1,32 @@
+name: Deploy API to GCP
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'server/**'
+      - 'migrations/**'
+      - '.github/workflows/deploy-api.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GCE VM over SSH
+        env:
+          GCE_VM_HOST: ${{ secrets.GCE_VM_HOST }}
+          GCE_VM_USER: ${{ secrets.GCE_VM_USER }}
+          GCE_SSH_KEY: ${{ secrets.GCE_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$GCE_VM_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          printf '%s' "$GCE_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -i ~/.ssh/deploy_key "$GCE_VM_USER@$GCE_VM_HOST" \
+            'cd /var/www/carei && git pull --ff-only origin main && cd server && docker compose up -d --build api && sleep 8 && curl -sf http://127.0.0.1:3012/health'

@@ -22,7 +22,9 @@ services:
       - carei-net
 
   api:
-    build: .
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
     container_name: carei-api
     restart: unless-stopped
     depends_on:
