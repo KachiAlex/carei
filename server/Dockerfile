@@ -7,6 +7,7 @@ COPY server/tsconfig.json server/
 COPY api/ api/
 COPY server/server.js server/
 COPY server/db-local.js server/db-local.js
+RUN ln -s /repo/server/node_modules /repo/node_modules
 RUN cd server && npx tsc -p tsconfig.json
 
 # ─── Runtime stage ───
