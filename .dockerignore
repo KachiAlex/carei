@@ -1,0 +1,8 @@
+# Docker build context is the repo root (see server/docker-compose.yml).
+# The api image only needs api/ and server/.
+
+*
+!api
+!api/**
+!server
+!server/**

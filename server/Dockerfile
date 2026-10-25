@@ -1,16 +1,27 @@
-FROM node:22-slim
+# ─── Build stage: compile TypeScript API handlers ───
+FROM node:22-slim AS build
+WORKDIR /repo
+COPY server/package.json server/package-lock.json* server/
+RUN cd server && npm install
+COPY server/tsconfig.json server/
+COPY api/ api/
+COPY server/server.js server/
+COPY server/db-local.js server/db-local.js
+RUN cd server && npx tsc -p tsconfig.json
 
+# ─── Runtime stage ───
+FROM node:22-slim
 WORKDIR /app
 
 # Copy package files and install dependencies
-COPY package.json package-lock.json* ./
+COPY server/package.json server/package-lock.json* ./
 RUN npm install --omit=dev
 
 # Copy application files
-COPY server.js ./
-COPY dist/api/ ./dist/api/
-COPY db-local.js ./dist/api/db.js
-COPY db-local.js ./dist/db.js
+COPY server/server.js ./
+COPY --from=build /repo/server/dist/api/ ./dist/api/
+COPY server/db-local.js ./dist/api/db.js
+COPY server/db-local.js ./dist/db.js
 
 # Expose the API port
 EXPOSE 3001
