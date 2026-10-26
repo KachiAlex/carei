@@ -5,6 +5,12 @@
   "cleanUrls": true,
   "redirects": [
     {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.careiapp.com" }],
+      "destination": "https://careiapp.com/",
+      "permanent": true
+    },
+    {
       "source": "/:path*",
       "has": [{ "type": "host", "value": "www.careiapp.com" }],
       "destination": "https://careiapp.com/:path*",
