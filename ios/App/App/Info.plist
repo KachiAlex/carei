@@ -45,5 +45,15 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CAREi uses the microphone to record voice memos during visits.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>CAREi uses the camera to attach photos to care records.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>CAREi uses your location to verify visit check-ins at the client's address.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>CAREi uses Face ID to quickly and securely unlock the app.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>CAREi uses speech recognition to convert your spoken notes into visit documentation.</string>
 </dict>
 </plist>
