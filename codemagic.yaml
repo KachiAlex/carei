@@ -1,6 +1,8 @@
 workflows:
   ios-app-store:
     name: iOS App Store build
+    integrations:
+      app_store_connect: app_store_connect
     instance_type: mac_mini_m1
     max_build_duration: 90
     environment:
