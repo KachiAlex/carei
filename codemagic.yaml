@@ -1,8 +1,6 @@
 workflows:
   ios-app-store:
     name: iOS App Store build
-    integrations:
-      app_store_connect: app_store_connect
     instance_type: mac_mini_m1
     max_build_duration: 90
     environment:
@@ -33,7 +31,3 @@ workflows:
           xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
-    publishing:
-      app_store_connect:
-        auth: integration
-        submit_to_testflight: true
