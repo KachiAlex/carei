@@ -96,12 +96,16 @@ jobs:
           path: ${{ runner.temp }}/ipa/*.ipa
 
       - name: Upload to TestFlight
-        if: ${{ secrets.ASC_API_KEY_P8 != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' }}
         env:
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
+          if [ -z "$ASC_API_KEY_P8" ] || [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ]; then
+            echo "ASC API key secrets not set — skipping TestFlight upload."
+            echo "Download the IPA from the workflow artifacts instead."
+            exit 0
+          fi
           mkdir -p ~/private_keys
           echo "$ASC_API_KEY_P8" | base64 -d > ~/private_keys/AuthKey_$ASC_KEY_ID.p8 2>/dev/null \
             || echo "$ASC_API_KEY_P8" > ~/private_keys/AuthKey_$ASC_KEY_ID.p8
