@@ -26,6 +26,9 @@ workflows:
         script: npm run build
       - name: Sync Capacitor iOS (copies web assets, runs pod install)
         script: npx cap sync ios
+      - name: Set build number from Codemagic build counter
+        working_directory: ios/App
+        script: agvtool new-version -all "$BUILD_NUMBER"
       - name: Build and sign IPA
         working_directory: ios/App
         script: |
