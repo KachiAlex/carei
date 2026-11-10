@@ -11,7 +11,7 @@ workflows:
         XCODE_WORKSPACE: App.xcworkspace
         XCODE_SCHEME: App
       groups:
-        - appstore_credentials
+        - appstore credentials
       node: latest
       xcode: latest
       cocoapods: default
