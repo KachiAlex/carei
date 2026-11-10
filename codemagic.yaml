@@ -10,6 +10,8 @@ workflows:
       vars:
         XCODE_WORKSPACE: App.xcworkspace
         XCODE_SCHEME: App
+      groups:
+        - appstore_credentials
       node: latest
       xcode: latest
       cocoapods: default
@@ -31,3 +33,10 @@ workflows:
           xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+        expire_build_submitted_for_review: true
