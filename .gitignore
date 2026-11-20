@@ -46,3 +46,7 @@ playstore/
 aab_extract_temp/
 test-results/
 playwright-report/
+
+# Local/server env files with secrets
+server/.env.docker
+.env*.local
