@@ -1,7 +1,7 @@
 // CAREi db.js - Local PostgreSQL version
 // Replaces Neon serverless driver with node-postgres (pg)
 import pg from 'pg'
-import { verifyToken } from './hash.js'
+import { verifyToken, tokenLookup } from './hash.js'
 
 const { Pool } = pg
 let _pool = null
@@ -226,6 +226,28 @@ async function runMigrations() {
         AND EXISTS (SELECT 1 FROM tenant_users tu WHERE tu.user_id = u.id)
     `
   })
+
+  await run(47, 'add_token_lookup_indexes', async () => {
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS token_lookup TEXT`
+    await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS refresh_token_lookup TEXT`
+    await sql`CREATE INDEX IF NOT EXISTS idx_users_token_lookup ON users (token_lookup)`
+    await sql`CREATE INDEX IF NOT EXISTS idx_users_refresh_lookup ON users (refresh_token_lookup)`
+  })
+
+  await run(48, 'create_push_tokens', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        token TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE (user_id, token)
+      )
+    `
+    await sql`CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens (user_id)`
+  })
 }
 
 // ─── Helper functions ───
@@ -273,7 +295,17 @@ export async function getTenantFromSlug(slug) {
 }
 
 export async function getUserFromToken(sql, token) {
-  const hashedUsers = await sql`SELECT id, name, email, phone, region, role, token_hash, token_expires_at FROM users WHERE token_hash IS NOT NULL`
+  // Indexed lookup first — O(1) instead of scrypt-verifying every user
+  const lookupRows = await sql`SELECT id, name, email, phone, region, role, token_hash, token_expires_at FROM users WHERE token_lookup = ${tokenLookup(token)} LIMIT 1`
+  if (lookupRows[0]) {
+    const u = lookupRows[0]
+    const valid = await verifyToken(token, u.token_hash)
+    if (valid && (!u.token_expires_at || new Date(u.token_expires_at) >= new Date())) {
+      return { id: u.id, name: u.name, role: u.role, email: u.email }
+    }
+  }
+  // Bounded fallback for sessions issued before token_lookup existed
+  const hashedUsers = await sql`SELECT id, name, email, phone, region, role, token_hash, token_expires_at FROM users WHERE token_lookup IS NULL AND token_hash IS NOT NULL`
   for (const u of hashedUsers) {
     const valid = await verifyToken(token, u.token_hash)
     if (valid) {
