@@ -117,7 +117,7 @@ async function setupRoutes() {
   }
 
   // ─── Push routes (/api/push/*) ───
-  const pushRoutes = ['register', 'send']
+  const pushRoutes = ['register']
 
   for (const name of pushRoutes) {
     try {
