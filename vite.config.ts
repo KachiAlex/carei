@@ -36,7 +36,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://carei-app.vercel.app',
+        target: 'https://api.careiapp.com',
         changeOrigin: true,
         secure: true,
       },

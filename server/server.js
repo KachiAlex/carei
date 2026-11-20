@@ -116,6 +116,22 @@ async function setupRoutes() {
     }
   }
 
+  // ─── Push routes (/api/push/*) ───
+  const pushRoutes = ['register', 'send']
+
+  for (const name of pushRoutes) {
+    try {
+      const handler = await load(`./dist/api/push/${name}.js`)
+      if (handler) {
+        app.all(`/api/push/${name}`, route(handler))
+        loadedRoutes.push(`push/${name}`)
+      }
+    } catch (err) {
+      console.error(`Failed to load push route: ${name}`, err.message)
+      failedRoutes.push(`push/${name}`)
+    }
+  }
+
   // ─── Manager routes (/api/manager/*) ───
   const managerRoutes = ['assignments', 'caregiver', 'caregivers', 'data', 'overview', 'tasks']
 
