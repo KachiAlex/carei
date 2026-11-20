@@ -58,7 +58,7 @@ export async function verifyBiometric(reason = 'Authenticate to access CAREi'): 
       reason,
       title: 'CAREi',
       subtitle: 'Biometric Authentication',
-      description: 'Use your fingerprint, face, or device PIN to unlock',
+      description: 'Unlock with biometrics or your device passcode',
       useFallback: true,
     })
     console.log(TAG, 'verifyIdentity success')
@@ -117,7 +117,7 @@ export async function getCredentialsWithBiometric(): Promise<BiometricCredential
       reason: 'Authenticate to access CAREi',
       title: 'CAREi',
       subtitle: 'Biometric Authentication',
-      description: 'Use your fingerprint, face, or device PIN to unlock',
+      description: 'Unlock with biometrics or your device passcode',
     })
     console.log(TAG, 'getSecureCredentials result:', result ? 'has data' : 'empty')
     if (!result.username || !result.password) return null

@@ -498,7 +498,7 @@ export default function LoginScreen() {
                   <path d="M8 12a4 4 0 0 1 8 0c0 1.5-.5 3-1 4.5"/>
                   <path d="M12 12c0 2.5-.5 4.5-1 6"/>
                 </svg>
-                {loading ? 'Verifying...' : 'Unlock with Fingerprint'}
+                {loading ? 'Verifying...' : 'Unlock with Biometrics'}
               </button>
             )}
 

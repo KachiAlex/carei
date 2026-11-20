@@ -207,7 +207,7 @@ export default function SettingsScreen() {
 
         const available = await isBiometricAvailable()
         if (!available) {
-          setError('Biometric hardware not available. Make sure fingerprint is set up in Android Settings.')
+          setError('Biometric hardware not available. Make sure Face ID, Touch ID, or fingerprint is set up in your device settings.')
           setBiometricsLoading(false)
           return
         }

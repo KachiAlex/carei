@@ -23,7 +23,7 @@ const config: CapacitorConfig = {
       overlaysWebView: false,
     },
     Keyboard: {
-      resize: 'none',
+      resize: 'body',
       style: 'dark',
     },
     SplashScreen: {
