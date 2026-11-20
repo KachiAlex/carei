@@ -53,7 +53,22 @@ class FamilyNotificationManager {
   private async initNativePush(): Promise<boolean> {
     try {
       const { PushNotifications } = await import('@capacitor/push-notifications')
+      const { Capacitor } = await import('@capacitor/core')
       await PushNotifications.requestPermissions()
+
+      // Persist the device token server-side so remote pushes can target it
+      await PushNotifications.addListener('registration', async ({ value }) => {
+        try {
+          const { post } = await import('../api/client')
+          await post('/push/register', { token: value, platform: Capacitor.getPlatform() })
+        } catch (err) {
+          console.error('Failed to register push token with backend:', err)
+        }
+      })
+      await PushNotifications.addListener('registrationError', (err) => {
+        console.error('Push registration error:', err)
+      })
+
       await PushNotifications.register()
       console.log('Native push notifications initialized')
       return true

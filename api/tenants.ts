@@ -5,7 +5,7 @@ import {
   getTenantSlug, getUserFromToken, getTenantMembers, getTenantStats,
   getTenantMemberCount, getAllTenantsWithStats, getTenantClientCount,
 } from './db.js'
-import { generateSecureToken, hashToken } from './hash.js'
+import { generateSecureToken, hashToken, tokenLookup } from './hash.js'
 
 async function getPlanDefaults(plan: string): Promise<{ max_users: number; max_clients: number; price_per_carer: number; billing_model: string } | null> {
   const sql = getSql()
@@ -169,7 +169,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const tokenHash = await hashToken(managerToken)
           const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
           await sql`
-            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_expires_at, email_verified)
+            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_lookup, token_expires_at, email_verified)
             VALUES (
               ${managerId},
               ${manager.name},
@@ -179,6 +179,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               ${manager.pin || ''},
               ${manager.role || 'admin'},
               ${tokenHash},
+              ${tokenLookup(managerToken)},
               ${tokenExpiresAt},
               TRUE
             )

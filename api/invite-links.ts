@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { randomBytes } from 'crypto'
 import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken, getTenantFromSlug, verifyTenantAccess, addUserToTenant, getTenantMemberCount } from './db.js'
-import { hashCredential, generateSecureToken, hashToken } from './hash.js'
+import { hashCredential, generateSecureToken, hashToken, tokenLookup } from './hash.js'
 
 const VALID_ROLES = ['carer', 'manager', 'admin', 'viewer']
 
@@ -267,8 +267,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
         await sql`
-          INSERT INTO users (id, tenant_id, name, email, phone, region, pin_hash, role, token_hash, token_expires_at, refresh_token_hash, refresh_token_expires_at, email_verified)
-          VALUES (${newUserId}, ${link.tenant_id}, ${name}, ${email}, ${phone}, ${newUser.region || ''}, ${pinHash}, ${link.role}, ${accessTokenHash}, ${accessTokenExpiresAt}, ${refreshTokenHash}, ${refreshTokenExpiresAt}, TRUE)
+          INSERT INTO users (id, tenant_id, name, email, phone, region, pin_hash, role, token_hash, token_lookup, token_expires_at, refresh_token_hash, refresh_token_lookup, refresh_token_expires_at, email_verified)
+          VALUES (${newUserId}, ${link.tenant_id}, ${name}, ${email}, ${phone}, ${newUser.region || ''}, ${pinHash}, ${link.role}, ${accessTokenHash}, ${tokenLookup(accessToken)}, ${accessTokenExpiresAt}, ${refreshTokenHash}, ${tokenLookup(refreshToken)}, ${refreshTokenExpiresAt}, TRUE)
         `
 
         await addUserToTenant(newUserId, link.tenant_id, link.role)

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug } from '../db.js'
-import { generateSecureToken, hashToken, verifyToken } from '../hash.js'
+import { generateSecureToken, hashToken, verifyToken, tokenLookup } from '../hash.js'
 
 const ACCESS_TOKEN_TTL = 15 * 60 * 1000 // 15 minutes
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -23,11 +23,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await ensureTables()
     const sql = getSql()
 
-    // Find user by refresh token hash
+    // Find user by refresh token — indexed lookup first, then bounded
+    // scan for sessions issued before refresh_token_lookup existed
+    const lookup = tokenLookup(refreshToken)
     const users = await sql`
       SELECT id, name, email, phone, region, role, refresh_token_hash, refresh_token_expires_at
       FROM users
-      WHERE refresh_token_hash IS NOT NULL
+      WHERE refresh_token_lookup = ${lookup}
+         OR (refresh_token_lookup IS NULL AND refresh_token_hash IS NOT NULL)
     ` as any[]
 
     let matchedUser: any = null
@@ -59,8 +62,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sql`
       UPDATE users
       SET token_hash = ${accessTokenHash},
+          token_lookup = ${tokenLookup(accessToken)},
           token_expires_at = ${accessTokenExpiresAt},
           refresh_token_hash = ${newRefreshTokenHash},
+          refresh_token_lookup = ${tokenLookup(newRefreshToken)},
           refresh_token_expires_at = ${newRefreshTokenExpiresAt},
           token = NULL
       WHERE id = ${matchedUser.id}

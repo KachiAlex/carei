@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, getUserFromToken, addUserToTenant, getTenantFromSlug } from '../db.js'
-import { generateSecureToken, hashToken, verifyToken } from '../hash.js'
+import { generateSecureToken, hashToken, verifyToken, tokenLookup } from '../hash.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
@@ -28,7 +28,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const refreshUsers = await sql`
       SELECT id, name, email, phone, region, role, biometrics_enabled, refresh_token_hash, refresh_token_expires_at
       FROM users
-      WHERE refresh_token_hash IS NOT NULL
+      WHERE refresh_token_lookup = ${tokenLookup(token)}
+         OR (refresh_token_lookup IS NULL AND refresh_token_hash IS NOT NULL)
     ` as any[]
 
     for (const u of refreshUsers) {
@@ -75,7 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const newRefreshTokenHash = await hashToken(newRefreshToken)
     const newRefreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    await sql`UPDATE users SET token_hash = ${accessTokenHash}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${newRefreshTokenHash}, refresh_token_expires_at = ${newRefreshTokenExpiresAt}, token = NULL WHERE id = ${matchedUser.id}`
+    await sql`UPDATE users SET token_hash = ${accessTokenHash}, token_lookup = ${tokenLookup(accessToken)}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${newRefreshTokenHash}, refresh_token_lookup = ${tokenLookup(newRefreshToken)}, refresh_token_expires_at = ${newRefreshTokenExpiresAt}, token = NULL WHERE id = ${matchedUser.id}`
 
     // Auto-link orphaned users to carei tenant
     const tenantRows = await sql`

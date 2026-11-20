@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, checkRateLimit } from './db.js'
-import { generateSecureToken, hashToken } from './hash.js'
+import { generateSecureToken, hashToken, tokenLookup } from './hash.js'
 import crypto from 'crypto'
 
 function generateCode(): string {
@@ -92,8 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
 
           await sql`
-            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_expires_at, email_verified)
-            VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role || 'carer'}, ${tokenHash}, ${tokenExpiresAt}, TRUE)
+            INSERT INTO users (id, name, email, phone, region, pin, role, token_hash, token_lookup, token_expires_at, email_verified)
+            VALUES (${id}, ${name}, ${email.toLowerCase()}, ${phone}, ${region}, ${pin}, ${role || 'carer'}, ${tokenHash}, ${tokenLookup(token)}, ${tokenExpiresAt}, TRUE)
           `
           res.status(200).json({ status: 'verified', token, user: { id, name, email: email.toLowerCase(), role: role || 'carer' } })
           return
@@ -110,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const token = generateSecureToken()
           const tokenHash = await hashToken(token)
           const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
-          await sql`UPDATE users SET token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
+          await sql`UPDATE users SET token_hash = ${tokenHash}, token_lookup = ${tokenLookup(token)}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
           res.status(200).json({ status: 'verified', token, user: { id: user.id, name: user.name, email: user.email, role: user.role } })
           return
         }

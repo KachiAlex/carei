@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug, checkRateLimit, logSecurityEvent } from '../db.js'
 import crypto from 'crypto'
-import { verifyCredential, generateSecureToken, hashToken } from '../hash.js'
+import { verifyCredential, hashCredential, generateSecureToken, hashToken, tokenLookup } from '../hash.js'
 
 function legacyHashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex')
@@ -61,6 +61,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else if (user.password_hash) {
       // Legacy SHA-256 fallback during transition
       valid = user.password_hash === legacyHashPassword(password)
+      // Opportunistic upgrade: on a successful legacy login, rehash with
+      // scrypt and clear the unsalted hash — no separate migration needed
+      if (valid) {
+        const upgraded = await hashCredential(password)
+        await sql`UPDATE users SET password_hash_scrypt = ${upgraded}, password_hash = NULL WHERE id = ${user.id}`
+      }
     }
     if (!valid) {
       await logSecurityEvent({ eventType: 'login_failed_bad_password', actorEmail: email })
@@ -76,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const refreshTokenHash = await hashToken(refreshToken)
     const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
 
-    await sql`UPDATE users SET token_hash = ${accessTokenHash}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${refreshTokenHash}, refresh_token_expires_at = ${refreshTokenExpiresAt}, token = NULL WHERE id = ${user.id}`
+    await sql`UPDATE users SET token_hash = ${accessTokenHash}, token_lookup = ${tokenLookup(accessToken)}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${refreshTokenHash}, refresh_token_lookup = ${tokenLookup(refreshToken)}, refresh_token_expires_at = ${refreshTokenExpiresAt}, token = NULL WHERE id = ${user.id}`
 
     // Auto-link orphaned users to carei tenant so they can access tenant-scoped endpoints
     const tenantRows = await sql`

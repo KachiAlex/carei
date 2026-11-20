@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
-import { isNfcAvailable, startNfcScan, stopNfcScan, type NFCScanResult } from '../utils/nfc'
 
 const COLORS = {
   darkNavy: '#0F1D34',
@@ -16,7 +15,7 @@ export interface TagScanResult {
   tagId: string
   clientId: string
   scannedAt: string
-  method: 'qr' | 'manual' | 'nfc'
+  method: 'qr' | 'manual'
 }
 
 interface TagScanModalProps {
@@ -35,16 +34,10 @@ export default function TagScanModal({
   onClose,
 }: TagScanModalProps) {
   const [scanStatus, setScanStatus] = useState<'scanning' | 'success' | 'error' | 'unsupported'>('scanning')
-  const [activeMethod, setActiveMethod] = useState<'qr' | 'nfc'>('qr')
   const [errorMessage, setErrorMessage] = useState('')
   const [manualTagId, setManualTagId] = useState('')
-  const [nfcAvailable, setNfcAvailable] = useState(false)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const containerId = 'qr-scan-container'
-
-  useEffect(() => {
-    setNfcAvailable(isNfcAvailable())
-  }, [])
 
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
@@ -56,11 +49,10 @@ export default function TagScanModal({
       }
       scannerRef.current = null
     }
-    stopNfcScan()
   }, [])
 
   const handleScanResult = useCallback(
-    (decodedText: string, method: 'qr' | 'nfc' = 'qr') => {
+    (decodedText: string, method: 'qr' = 'qr') => {
       // Format: CAREi:client:<clientId> or just <clientId>
       let clientId = decodedText
       if (decodedText.startsWith('CAREi:client:')) {
@@ -68,9 +60,7 @@ export default function TagScanModal({
       }
 
       // QR codes we issue encode CAREi:client:<id> and can be checked locally.
-      // Raw NFC tags only expose a UID — the server verifies it against the
-      // client's registered tag_id, so accept the scan and record the evidence.
-      if (clientId === expectedClientId || method === 'nfc') {
+      if (clientId === expectedClientId) {
         setScanStatus('success')
         stopScanner()
         onScanSuccess({
@@ -89,23 +79,6 @@ export default function TagScanModal({
     [expectedClientId, expectedClientName, onScanSuccess, stopScanner]
   )
 
-  const initiateNfc = useCallback(() => {
-    setActiveMethod('nfc')
-    setScanStatus('scanning')
-    stopScanner() // Stop QR if running
-
-    startNfcScan(
-      (result: NFCScanResult) => {
-        handleScanResult(result.tagId, 'nfc')
-      },
-      (err) => {
-        setScanStatus('error')
-        setErrorMessage(err)
-        setTimeout(() => setScanStatus('scanning'), 3000)
-      }
-    )
-  }, [handleScanResult, stopScanner])
-
   useEffect(() => {
     if (!open) return
 
@@ -114,8 +87,6 @@ export default function TagScanModal({
     setErrorMessage('')
 
     const startScanner = async () => {
-      if (activeMethod !== 'qr') return
-      
       try {
         const html5Qrcode = new Html5Qrcode(containerId, { verbose: false })
         scannerRef.current = html5Qrcode
@@ -134,18 +105,12 @@ export default function TagScanModal({
         )
       } catch (err: any) {
         if (mounted) {
-          // If QR fails and NFC is available, suggest NFC
-          if (nfcAvailable) {
-            setActiveMethod('nfc')
-            initiateNfc()
-          } else {
-            setScanStatus('unsupported')
-            setErrorMessage(
-              err?.message?.includes('Permission')
-                ? 'Camera permission denied. Allow camera access to scan QR tags, or enter the tag ID manually below.'
-                : 'Camera not available. You can enter the tag ID manually below.'
-            )
-          }
+          setScanStatus('unsupported')
+          setErrorMessage(
+            err?.message?.includes('Permission')
+              ? 'Camera permission denied. Allow camera access to scan QR tags, or enter the tag ID manually below.'
+              : 'Camera not available. You can enter the tag ID manually below.'
+          )
         }
       }
     }
@@ -158,7 +123,7 @@ export default function TagScanModal({
       clearTimeout(timer)
       stopScanner()
     }
-  }, [open, handleScanResult, stopScanner, activeMethod, nfcAvailable, initiateNfc])
+  }, [open, handleScanResult, stopScanner])
 
   const handleManualSubmit = () => {
     const tagId = manualTagId.trim()
@@ -205,7 +170,7 @@ export default function TagScanModal({
 
         {/* Scanner / Status */}
         <div className="p-5">
-          {scanStatus === 'scanning' && activeMethod === 'qr' && (
+          {scanStatus === 'scanning' && (
             <>
               <div
                 id={containerId}
@@ -216,37 +181,7 @@ export default function TagScanModal({
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"/><path d="M3 8h5"/><rect width="5" height="5" x="16" y="3" rx="1"/><path d="M16 8h5"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M3 16v5"/><path d="M8 16v5"/><rect width="5" height="5" x="16" y="16" rx="1"/><path d="M16 16v5"/><path d="M21 16v5"/></svg>
                 Point camera at the QR tag in the client's home
               </div>
-              
-              {nfcAvailable && (
-                <button
-                  onClick={initiateNfc}
-                  className="w-full py-3 rounded-xl text-sm font-semibold text-slate-700 bg-slate-100 border-none cursor-pointer flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20v-8m-4 8V4m8 16V8"/></svg>
-                  Switch to NFC Tap
-                </button>
-              )}
             </>
-          )}
-
-          {scanStatus === 'scanning' && activeMethod === 'nfc' && (
-            <div className="flex flex-col items-center py-10">
-              <div className="relative mb-6">
-                <div className="w-24 h-24 rounded-full bg-teal/10 flex items-center justify-center animate-pulse">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={COLORS.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20v-8m-4 8V4m8 16V8"/></svg>
-                </div>
-                <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-teal text-white flex items-center justify-center text-[10px] font-bold">NFC</div>
-              </div>
-              <div className="text-sm font-bold text-slate-800">Ready to Scan</div>
-              <div className="text-xs text-slate-500 mt-2 text-center px-4">Tap your phone against the NFC tag</div>
-              
-              <button
-                onClick={() => { stopNfcScan(); setActiveMethod('qr'); setScanStatus('scanning'); }}
-                className="mt-6 px-4 py-2 rounded-lg text-xs font-semibold text-teal bg-teal/5 border border-teal/20 cursor-pointer"
-              >
-                Use Camera Instead
-              </button>
-            </div>
           )}
 
           {scanStatus === 'success' && (

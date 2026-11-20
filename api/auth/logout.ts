@@ -19,7 +19,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (user) {
         await sql`
           UPDATE users
-          SET token_hash = NULL, token_expires_at = NULL, token = NULL
+          SET token_hash = NULL, token_lookup = NULL, token_expires_at = NULL,
+              refresh_token_hash = NULL, refresh_token_lookup = NULL,
+              refresh_token_expires_at = NULL, token = NULL
           WHERE id = ${user.id}
         `
       }

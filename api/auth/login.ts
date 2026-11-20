@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug, checkRateLimit } from '../db.js'
-import { verifyCredential, generateSecureToken, hashToken } from '../hash.js'
+import { verifyCredential, generateSecureToken, hashToken, tokenLookup } from '../hash.js'
 import { logSecurityEvent } from '../db.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -73,9 +73,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Also clear plaintext pin if hash exists (migration cleanup)
     const shouldClearPlaintextPin = user.pin_hash ? true : false
     if (shouldClearPlaintextPin) {
-      await sql`UPDATE users SET pin = NULL, token_hash = ${accessTokenHash}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${refreshTokenHash}, refresh_token_expires_at = ${refreshTokenExpiresAt}, token = NULL WHERE id = ${user.id}`
+      await sql`UPDATE users SET pin = NULL, token_hash = ${accessTokenHash}, token_lookup = ${tokenLookup(accessToken)}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${refreshTokenHash}, refresh_token_lookup = ${tokenLookup(refreshToken)}, refresh_token_expires_at = ${refreshTokenExpiresAt}, token = NULL WHERE id = ${user.id}`
     } else {
-      await sql`UPDATE users SET token_hash = ${accessTokenHash}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${refreshTokenHash}, refresh_token_expires_at = ${refreshTokenExpiresAt}, token = NULL WHERE id = ${user.id}`
+      await sql`UPDATE users SET token_hash = ${accessTokenHash}, token_lookup = ${tokenLookup(accessToken)}, token_expires_at = ${accessTokenExpiresAt}, refresh_token_hash = ${refreshTokenHash}, refresh_token_lookup = ${tokenLookup(refreshToken)}, refresh_token_expires_at = ${refreshTokenExpiresAt}, token = NULL WHERE id = ${user.id}`
     }
 
     // Auto-link orphaned users to carei tenant so they can access tenant-scoped endpoints

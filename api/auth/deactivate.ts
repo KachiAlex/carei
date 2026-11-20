@@ -61,8 +61,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sql`
       UPDATE users
       SET status = 'deactivated', deactivated_at = NOW(),
-          token = NULL, token_hash = NULL, token_expires_at = NULL,
-          refresh_token_hash = NULL, refresh_token_expires_at = NULL
+          token = NULL, token_hash = NULL, token_lookup = NULL, token_expires_at = NULL,
+          refresh_token_hash = NULL, refresh_token_lookup = NULL, refresh_token_expires_at = NULL
       WHERE id = ${targetId}
     `
 

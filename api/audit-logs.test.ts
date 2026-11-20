@@ -40,6 +40,7 @@ describe('audit logging', () => {
     const token = 'valid-token-123'
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }]) // getTenantFromSlug
+      .mockResolvedValueOnce([]) // getUserFromToken token_lookup indexed query
       .mockResolvedValueOnce([]) // getUserFromToken hashed-token scan
       .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'carer' }]) // getUserFromToken plaintext fallback
       .mockResolvedValueOnce([]) // verifyTenantAccess
@@ -54,9 +55,9 @@ describe('audit logging', () => {
     await withTenant(req, res, handler)
 
     expect(res.status).toHaveBeenCalledWith(403)
-    expect(mockSql).toHaveBeenCalledTimes(5)
+    expect(mockSql).toHaveBeenCalledTimes(6)
     // Verify the audit log INSERT arguments include action and userId
-    const insertCall = mockSql.mock.calls[4]
+    const insertCall = mockSql.mock.calls[5]
     const args = insertCall.slice(1) // skip template strings
     expect(args).toContain('cross_tenant_access_attempt')
     expect(args).toContain('u-1')

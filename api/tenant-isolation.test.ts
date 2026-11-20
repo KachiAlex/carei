@@ -114,6 +114,7 @@ describe('withTenant middleware', () => {
   it('returns 401 when token is invalid (user not found)', async () => {
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([]) // token_lookup indexed query: miss
       .mockResolvedValueOnce([]) // hashed-token scan: no hashed users
       .mockResolvedValueOnce([]) // plaintext fallback: no match
     const req = makeReq({
@@ -135,6 +136,7 @@ describe('withTenant middleware', () => {
     const token = 'valid-token-123'
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([]) // token_lookup indexed query: miss
       .mockResolvedValueOnce([]) // hashed-token scan
       .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'carer' }])
       .mockResolvedValueOnce([])
@@ -158,6 +160,7 @@ describe('withTenant middleware', () => {
     const token = 'valid-token-123'
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([]) // token_lookup indexed query: miss
       .mockResolvedValueOnce([]) // hashed-token scan
       .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'carer' }])
       .mockResolvedValueOnce([{ role: 'admin' }])

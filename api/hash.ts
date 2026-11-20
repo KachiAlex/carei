@@ -42,6 +42,13 @@ export function generateSecureToken(): string {
   return crypto.randomBytes(32).toString('base64')
 }
 
+// Deterministic lookup key for indexed token queries. Tokens are
+// high-entropy random values, so unsalted SHA-256 is sufficient —
+// scrypt's cost only matters for low-entropy secrets like passwords.
+export function tokenLookup(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+
 export async function hashToken(token: string): Promise<string> {
   const salt = crypto.randomBytes(16).toString('hex')
   const derivedKey = await scryptAsync(token, salt)

@@ -44,6 +44,7 @@ describe('bulk invites', () => {
   it('creates invites from CSV and returns summary', async () => {
     const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
     mockSql
+      .mockResolvedValueOnce([]) // getUserFromToken token_lookup indexed query
       .mockResolvedValueOnce([]) // getUserFromToken hashed-token scan
       .mockResolvedValueOnce([{ id: 'u-1', name: 'Admin', role: 'admin' }]) // plaintext fallback
       .mockResolvedValueOnce([{ role: 'admin' }]) // verifyTenantAccess
@@ -69,12 +70,13 @@ describe('bulk invites', () => {
     expect(response.total).toBe(2)
     expect(response.created).toBe(2)
     expect(response.failed).toBe(0)
-    expect(mockSql).toHaveBeenCalledTimes(6)
+    expect(mockSql).toHaveBeenCalledTimes(7)
   })
 
   it('returns 403 for non-admin', async () => {
     const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
     mockSql
+      .mockResolvedValueOnce([]) // getUserFromToken token_lookup indexed query
       .mockResolvedValueOnce([]) // getUserFromToken hashed-token scan
       .mockResolvedValueOnce([{ id: 'u-1', name: 'Carer', role: 'carer' }]) // plaintext fallback
       .mockResolvedValueOnce([{ role: 'carer' }]) // verifyTenantAccess
@@ -93,6 +95,7 @@ describe('bulk invites', () => {
   it('reports invalid emails without failing entire batch', async () => {
     const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
     mockSql
+      .mockResolvedValueOnce([]) // getUserFromToken token_lookup indexed query
       .mockResolvedValueOnce([]) // getUserFromToken hashed-token scan
       .mockResolvedValueOnce([{ id: 'u-1', name: 'Admin', role: 'admin' }]) // plaintext fallback
       .mockResolvedValueOnce([{ role: 'admin' }])
@@ -121,6 +124,7 @@ describe('bulk invites', () => {
   it('returns 400 when CSV header is missing email column', async () => {
     const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
     mockSql
+      .mockResolvedValueOnce([]) // getUserFromToken token_lookup indexed query
       .mockResolvedValueOnce([]) // getUserFromToken hashed-token scan
       .mockResolvedValueOnce([{ id: 'u-1', name: 'Admin', role: 'admin' }]) // plaintext fallback
       .mockResolvedValueOnce([{ role: 'admin' }])
