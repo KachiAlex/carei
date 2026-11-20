@@ -36,6 +36,15 @@ function getApiBase(): string {
 export const API_BASE = getApiBase()
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
+// Genuine connectivity failures only: navigator offline, or the TypeError
+// fetch itself throws ('Failed to fetch', 'fetch failed', 'Network request
+// failed'). TypeErrors from our own parsing/handling code must NOT match —
+// otherwise real bugs get silently swallowed into the offline queue.
+function isNetworkError(err: unknown): boolean {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true
+  return err instanceof TypeError && /fetch|network/i.test(err.message)
+}
+
 async function parseJsonResponse(res: Response): Promise<any> {
   const contentType = res.headers.get('content-type') || ''
   const text = await res.text()
@@ -181,8 +190,10 @@ async function postWithRetry(path: string, body: unknown, retries = 3, extraHead
         throw err
       }
 
-      // OFFLINE HANDLING: If it's a network error and we're not online, or it's a fetch error
-      if (!navigator.onLine || err instanceof TypeError) {
+      // OFFLINE HANDLING: only genuine network failures queue the mutation.
+      // Other TypeErrors — e.g. a response-parsing bug — must surface, not
+      // be silently queued.
+      if (isNetworkError(err)) {
         return queueMutation(path, 'POST', body)
       }
 
@@ -265,7 +276,7 @@ async function getWithRetry(path: string, retries = 3, extraHeaders?: Record<str
       }
 
       // OFFLINE READ: serve the last cached response for this path
-      if (!navigator.onLine || err instanceof TypeError) {
+      if (isNetworkError(err)) {
         const cached = await getApiCache(apiCacheKey(path))
         if (cached) {
           console.log(`[Offline] Serving cached response for ${path}`)
@@ -315,7 +326,7 @@ async function putWithRetry(path: string, body: unknown, retries = 3, extraHeade
     } catch (err) {
       lastError = err as Error
       if (err instanceof Error && err.message.includes('HTTP 4')) throw err
-      if (!navigator.onLine || err instanceof TypeError) {
+      if (isNetworkError(err)) {
         return queueMutation(path, 'PUT', body)
       }
       if (attempt < retries - 1) {
@@ -353,7 +364,7 @@ async function patchWithRetry(path: string, body?: unknown, retries = 3, extraHe
     } catch (err) {
       lastError = err as Error
       if (err instanceof Error && err.message.includes('HTTP 4')) throw err
-      if (!navigator.onLine || err instanceof TypeError) {
+      if (isNetworkError(err)) {
         return queueMutation(path, 'PATCH', body)
       }
       if (attempt < retries - 1) {
@@ -385,7 +396,7 @@ async function delWithRetry(path: string, retries = 3, extraHeaders?: Record<str
     } catch (err) {
       lastError = err as Error
       if (err instanceof Error && err.message.includes('HTTP 4')) throw err
-      if (!navigator.onLine || err instanceof TypeError) {
+      if (isNetworkError(err)) {
         return queueMutation(path, 'DELETE', undefined)
       }
       if (attempt < retries - 1) {

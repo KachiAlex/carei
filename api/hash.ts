@@ -49,6 +49,7 @@ export async function hashToken(token: string): Promise<string> {
 }
 
 export async function verifyToken(token: string, storedHash: string): Promise<boolean> {
+  if (!token || !storedHash) return false
   const [salt, hash] = storedHash.split(':')
   if (!salt || !hash) return false
   const derivedKey = await scryptAsync(token, salt)

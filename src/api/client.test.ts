@@ -1,6 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createCaregiver, createClient } from './client'
 
+function jsonResponse(status: number, body: unknown) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: () => 'application/json' },
+    text: async () => JSON.stringify(body),
+    json: async () => body,
+  }
+}
+
 describe('createCaregiver', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn())
@@ -15,10 +25,7 @@ describe('createCaregiver', () => {
       status: 'created',
       caregiver: { id: 'cg-123', name: 'Jane Doe', email: 'jane@example.com', phone: '5551234', region: 'North', role: 'carer' },
     }
-    ;(globalThis.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    })
+    ;(globalThis.fetch as any).mockResolvedValue(jsonResponse(200, mockResponse))
 
     const result = await createCaregiver({
       name: 'Jane Doe',
@@ -40,11 +47,7 @@ describe('createCaregiver', () => {
   })
 
   it('throws on duplicate email (409)', async () => {
-    ;(globalThis.fetch as any).mockResolvedValue({
-      ok: false,
-      status: 409,
-      json: async () => ({ error: 'Email already registered' }),
-    })
+    ;(globalThis.fetch as any).mockResolvedValue(jsonResponse(409, { error: 'Email already registered' }))
 
     await expect(
       createCaregiver({
@@ -83,10 +86,7 @@ describe('createClient', () => {
 
   it('successfully creates a client', async () => {
     const mockResponse = { id: 'cl-123', name: 'Mary Johnson', age: 78 }
-    ;(globalThis.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    })
+    ;(globalThis.fetch as any).mockResolvedValue(jsonResponse(200, mockResponse))
 
     const result = await createClient({
       id: 'cl-123',
@@ -109,10 +109,7 @@ describe('createClient', () => {
 
   it('successfully creates a client with minimal fields', async () => {
     const mockResponse = { id: 'cl-456', name: 'Tom Adams' }
-    ;(globalThis.fetch as any).mockResolvedValue({
-      ok: true,
-      json: async () => mockResponse,
-    })
+    ;(globalThis.fetch as any).mockResolvedValue(jsonResponse(200, mockResponse))
 
     const result = await createClient({
       id: 'cl-456',
@@ -123,11 +120,7 @@ describe('createClient', () => {
   })
 
   it('throws on server error', async () => {
-    ;(globalThis.fetch as any).mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: async () => ({ error: 'Database error' }),
-    })
+    ;(globalThis.fetch as any).mockResolvedValue(jsonResponse(500, { error: 'Database error' }))
 
     await expect(
       createClient({

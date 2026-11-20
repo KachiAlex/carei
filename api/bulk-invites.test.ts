@@ -44,6 +44,8 @@ describe('bulk invites', () => {
   it('creates invites from CSV and returns summary', async () => {
     const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
     mockSql
+      .mockResolvedValueOnce([]) // getUserFromToken hashed-token scan
+      .mockResolvedValueOnce([{ id: 'u-1', name: 'Admin', role: 'admin' }]) // plaintext fallback
       .mockResolvedValueOnce([{ role: 'admin' }]) // verifyTenantAccess
       .mockResolvedValueOnce([{ name: 'Acme' }]) // tenant name
       .mockResolvedValueOnce([]) // invite 1 insert
@@ -67,12 +69,15 @@ describe('bulk invites', () => {
     expect(response.total).toBe(2)
     expect(response.created).toBe(2)
     expect(response.failed).toBe(0)
-    expect(mockSql).toHaveBeenCalledTimes(4)
+    expect(mockSql).toHaveBeenCalledTimes(6)
   })
 
   it('returns 403 for non-admin', async () => {
     const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
-    mockSql.mockResolvedValueOnce([{ role: 'carer' }]) // verifyTenantAccess
+    mockSql
+      .mockResolvedValueOnce([]) // getUserFromToken hashed-token scan
+      .mockResolvedValueOnce([{ id: 'u-1', name: 'Carer', role: 'carer' }]) // plaintext fallback
+      .mockResolvedValueOnce([{ role: 'carer' }]) // verifyTenantAccess
 
     const req = makeReq({
       headers: { authorization: `Bearer ${token}` },
@@ -88,6 +93,8 @@ describe('bulk invites', () => {
   it('reports invalid emails without failing entire batch', async () => {
     const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
     mockSql
+      .mockResolvedValueOnce([]) // getUserFromToken hashed-token scan
+      .mockResolvedValueOnce([{ id: 'u-1', name: 'Admin', role: 'admin' }]) // plaintext fallback
       .mockResolvedValueOnce([{ role: 'admin' }])
       .mockResolvedValueOnce([{ name: 'Acme' }])
       .mockResolvedValueOnce([])
@@ -113,7 +120,10 @@ describe('bulk invites', () => {
 
   it('returns 400 when CSV header is missing email column', async () => {
     const token = 'header.eyJ1c2VySWQiOiJ1LTEifQ==.sig'
-    mockSql.mockResolvedValueOnce([{ role: 'admin' }])
+    mockSql
+      .mockResolvedValueOnce([]) // getUserFromToken hashed-token scan
+      .mockResolvedValueOnce([{ id: 'u-1', name: 'Admin', role: 'admin' }]) // plaintext fallback
+      .mockResolvedValueOnce([{ role: 'admin' }])
 
     const req = makeReq({
       headers: { authorization: `Bearer ${token}` },

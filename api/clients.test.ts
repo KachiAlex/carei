@@ -40,6 +40,7 @@ describe('clients API tenant isolation', () => {
     const token = 'valid-token-123'
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([]) // hashed-token scan
       .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'admin' }])
       .mockResolvedValueOnce([{ role: 'admin' }])
       .mockResolvedValueOnce([
@@ -60,7 +61,7 @@ describe('clients API tenant isolation', () => {
       ])
     )
     // Ensure tenant filter is applied
-    const sqlCall = mockSql.mock.calls[3] // fourth call is the SELECT
+    const sqlCall = mockSql.mock.calls[4] // fifth call is the SELECT
     const template = sqlCall[0] as string[]
     expect(template.join('')).toContain('tenant_id')
   })
@@ -69,6 +70,7 @@ describe('clients API tenant isolation', () => {
     const token = 'valid-token-123'
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([]) // hashed-token scan
       .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'admin' }])
       .mockResolvedValueOnce([{ role: 'admin' }])
       .mockResolvedValueOnce([]) // no matching client in this tenant
@@ -91,6 +93,7 @@ describe('clients API tenant isolation', () => {
     const token = 'valid-token-123'
     mockSql
       .mockResolvedValueOnce([{ id: 't-1', slug: 'acme', name: 'Acme' }])
+      .mockResolvedValueOnce([]) // hashed-token scan
       .mockResolvedValueOnce([{ id: 'u-1', name: 'Test', role: 'admin' }])
       .mockResolvedValueOnce([{ role: 'admin' }])
       .mockResolvedValueOnce([])
@@ -105,7 +108,7 @@ describe('clients API tenant isolation', () => {
     await clientsHandler(req, res)
 
     expect(res.status).toHaveBeenCalledWith(201)
-    const sqlCall = mockSql.mock.calls[3]
+    const sqlCall = mockSql.mock.calls[4]
     const template = sqlCall[0] as string[]
     expect(template.join('')).toContain('tenant_id')
   })
