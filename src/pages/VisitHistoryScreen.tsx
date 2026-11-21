@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useRoute } from 'wouter'
-import { getVisits } from '../api/client'
+import { getVisitApprovals } from '../api/client'
 
 const COLORS = {
   darkNavy: '#0B1120',
@@ -22,16 +22,18 @@ interface VisitRecord {
 
 export default function VisitHistoryScreen() {
   const [, setLocation] = useLocation()
-  const [match, params] = useRoute('/client/:id/history')
-  const clientId = params?.id || ''
+  const [, clientParams] = useRoute('/client/:id/history')
+  const [, tenantParams] = useRoute('/tenant/:slug/client/:id/history')
+  const clientId = clientParams?.id || tenantParams?.id || ''
   const [visits, setVisits] = useState<VisitRecord[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!clientId) return
-    getVisits()
+    getVisitApprovals()
       .then((data: any[]) => {
-        const filtered = data.filter((v) => v.client_id === clientId || v.clientId === clientId)
+        const filtered = clientId
+          ? data.filter((v) => v.client_id === clientId || v.clientId === clientId)
+          : data
         setVisits(filtered.sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime()))
         setLoading(false)
       })
@@ -45,7 +47,7 @@ export default function VisitHistoryScreen() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <div className="px-4 pt-4 pb-3 text-white shrink-0" style={{ background: `linear-gradient(160deg, ${COLORS.darkNavy} 0%, ${COLORS.navy} 100%)` }}>
-        <button onClick={() => setLocation(`/client/${clientId}/overview`)} className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors mb-3">
+        <button onClick={() => (clientId ? setLocation(`/client/${clientId}/overview`) : window.history.back())} className="text-white/60 hover:text-white text-sm bg-transparent border-none cursor-pointer flex items-center gap-1 transition-colors mb-3">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           Back
         </button>
@@ -54,7 +56,9 @@ export default function VisitHistoryScreen() {
 
       <div className="flex-1 px-4 py-4 flex flex-col gap-3 overflow-auto">
         {visits.length === 0 && (
-          <div className="text-center text-sm text-slate-400 py-8">No completed visits for this client yet.</div>
+          <div className="text-center text-sm text-slate-400 py-8">
+            {clientId ? 'No completed visits for this client yet.' : 'No completed visits yet.'}
+          </div>
         )}
         {visits.map((v) => {
           const date = v.submitted_at ? new Date(v.submitted_at) : new Date()
