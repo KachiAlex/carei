@@ -78,15 +78,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           if (tagRows[0]?.tag_id) tagMatch = tagRows[0].tag_id === evvData.tagId
         }
 
+        const carerRows = await tenantSql`SELECT name FROM users WHERE id = ${userId} LIMIT 1` as any[]
+
         await tenantSql`
           INSERT INTO visits (
             id, tenant_id, client_id, client_name, client_age, client_address,
+            carer_id, carer_name,
             status, clock_in_at, tasks, medications, submitted_at,
             clock_in_lat, clock_in_lng, clock_in_accuracy, geo_verified,
             geo_distance_m, geo_override_reason,
             tag_scan_id, tag_scan_method, tag_scanned_at, tag_verified
           ) VALUES (
             ${visitId}, ${tenantId}, ${c.id}, ${c.name}, ${c.age || null}, ${c.address || null},
+            ${userId}, ${carerRows[0]?.name || null},
             'active', NOW(), ${JSON.stringify([])}, ${JSON.stringify(c.medications || [])}, NOW(),
             ${evvData.lat}, ${evvData.lng}, ${evvData.accuracy}, ${geoVerified},
             ${evvData.distanceM}, ${evvData.geoOverrideReason},
@@ -136,12 +140,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sql`
       INSERT INTO visits (
         id, client_id, client_name, client_age, client_address,
+        carer_id, carer_name,
         status, clock_in_at, tasks, medications, submitted_at,
         clock_in_lat, clock_in_lng, clock_in_accuracy, geo_verified,
         geo_distance_m, geo_override_reason,
         tag_scan_id, tag_scan_method, tag_scanned_at, tag_verified
       ) VALUES (
         ${visitId}, ${c.id}, ${c.name}, ${c.age || null}, ${c.address || null},
+        ${user.id}, ${user.name || null},
         'active', NOW(), ${JSON.stringify([])}, ${JSON.stringify(c.medications || [])}, NOW(),
         ${evvData.lat}, ${evvData.lng}, ${evvData.accuracy}, ${geoVerified},
         ${evvData.distanceM}, ${evvData.geoOverrideReason},

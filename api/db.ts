@@ -1228,6 +1228,10 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_security_events_type ON security_events(event_type)`
     await sql`CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)`
 
+    // Carer attribution on visits
+    await sql`ALTER TABLE IF EXISTS visits ADD COLUMN IF NOT EXISTS carer_id TEXT`
+    await sql`ALTER TABLE IF EXISTS visits ADD COLUMN IF NOT EXISTS carer_name TEXT`
+
     // Per-account brute-force lockout (survives restarts, unlike the IP rate limiter)
     await sql`
       CREATE TABLE IF NOT EXISTS login_attempts (
