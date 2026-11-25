@@ -4,6 +4,7 @@ import {
   setCors,
   ensureTables,
   getAuthToken,
+  getUserFromToken,
   getTenantFromSlug,
   verifyTenantAccess,
   getTenantSlug,
@@ -24,16 +25,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  let userId: string
-  try {
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString())
-    userId = payload.userId
-    if (!userId) throw new Error()
-  } catch {
-    res.status(401).json({ error: 'Invalid token' })
-    return
-  }
-
   const tenantSlug = getTenantSlug(req)
   if (!tenantSlug) {
     res.status(400).json({ error: 'Tenant slug required via X-Tenant-Slug header' })
@@ -43,6 +34,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureTables()
     const sql = getSql()
+
+    const user = await getUserFromToken(sql, token)
+    if (!user) {
+      res.status(401).json({ error: 'Invalid token' })
+      return
+    }
+    const userId = user.id
 
     const tenant = await getTenantFromSlug(tenantSlug)
     if (!tenant) {
