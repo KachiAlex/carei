@@ -1209,6 +1209,11 @@ async function runMigrations() {
       )
     `
     await sql`CREATE INDEX IF NOT EXISTS idx_client_settings_client ON client_settings(client_id)`
+    // Repair pre-migration installs: id used to be INTEGER + sequence and
+    // updated_by did not exist (family-consent INSERTs failed in prod)
+    await sql`ALTER TABLE IF EXISTS client_settings ADD COLUMN IF NOT EXISTS updated_by TEXT`
+    await sql`ALTER TABLE IF EXISTS client_settings ALTER COLUMN id DROP DEFAULT`
+    await sql`ALTER TABLE IF EXISTS client_settings ALTER COLUMN id TYPE TEXT USING id::text`
 
     // Append-only security event log (no PINs/tokens/care content in metadata)
     await sql`

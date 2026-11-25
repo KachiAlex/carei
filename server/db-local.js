@@ -268,6 +268,14 @@ async function runMigrations() {
     await sql`ALTER TABLE IF EXISTS visits ADD COLUMN IF NOT EXISTS carer_id TEXT`
     await sql`ALTER TABLE IF EXISTS visits ADD COLUMN IF NOT EXISTS carer_name TEXT`
   })
+
+  // client_settings predates the TEXT-id schema: prod has id INTEGER with a
+  // sequence default and no updated_by — family-consent INSERTs fail on both.
+  await run(52, 'fix_client_settings_schema', async () => {
+    await sql`ALTER TABLE IF EXISTS client_settings ADD COLUMN IF NOT EXISTS updated_by TEXT`
+    await sql`ALTER TABLE IF EXISTS client_settings ALTER COLUMN id DROP DEFAULT`
+    await sql`ALTER TABLE IF EXISTS client_settings ALTER COLUMN id TYPE TEXT USING id::text`
+  })
 }
 
 // ─── Helper functions ───

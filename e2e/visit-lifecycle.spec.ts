@@ -191,6 +191,7 @@ test.describe('visit lifecycle', () => {
     })
     expect(famInvite.status).toBe(200)
     const tempPin = famInvite.body.tempPin
+    const famMemberId = famInvite.body.id as string
 
     const famLogin = await api('POST', '/api/family/auth/login', {
       body: { email: `e2e-family-${RUN}@careiapp.com`, pin: tempPin },
@@ -203,7 +204,11 @@ test.describe('visit lifecycle', () => {
     const visits = famVisits.body?.visits || famVisits.body || []
     expect(visits.some((v: any) => v.id === visitId), 'approved visit visible to family').toBe(true)
 
-    // ── cleanup: remove the leftover scheduled_visits row ────────
+    // ── cleanup: remove every artefact this test created ─────────
     await api('DELETE', `/api/schedule?id=${schedId}`, { token: managerToken })
+    if (famMemberId) {
+      await api('DELETE', `/api/family/members/${famMemberId}`, { token: managerToken })
+    }
+    await api('DELETE', `/api/manager/caregiver?id=${carerId}`, { token: managerToken })
   })
 })
