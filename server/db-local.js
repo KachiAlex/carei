@@ -155,6 +155,18 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_security_events_type ON security_events(event_type)`
     await sql`CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)`
 
+    // Per-account brute-force lockout (survives restarts, unlike the IP rate limiter)
+    await sql`
+      CREATE TABLE IF NOT EXISTS login_attempts (
+        email TEXT NOT NULL,
+        purpose TEXT NOT NULL DEFAULT 'login',
+        failures INT NOT NULL DEFAULT 0,
+        locked_until TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (email, purpose)
+      )
+    `
+
     await sql`
       CREATE TABLE IF NOT EXISTS assistant_sessions (
         id TEXT PRIMARY KEY,
@@ -451,6 +463,62 @@ export function checkRateLimit(req, key, maxRequests, windowMs = 60000) {
 }
 
 const rateLimitStore = new Map()
+
+// Per-account lockout — complements the IP rate limiter, which an attacker
+// can bypass by rotating IPs. 5 consecutive failures locks the account 15 min.
+const LOCKOUT_MAX_FAILURES = 5
+const LOCKOUT_MINUTES = 15
+
+export async function checkAccountLock(email, purpose = 'login') {
+  const sql = getSql()
+  const rows = await sql`
+    SELECT locked_until FROM login_attempts
+    WHERE email = ${email.toLowerCase()} AND purpose = ${purpose}
+  `
+  const lockedUntil = rows[0]?.locked_until ? new Date(rows[0].locked_until).getTime() : 0
+  if (lockedUntil > Date.now()) {
+    return { locked: true, retryAfter: Math.ceil((lockedUntil - Date.now()) / 1000) }
+  }
+  return { locked: false }
+}
+
+export async function recordLoginFailure(email, purpose = 'login') {
+  const sql = getSql()
+  const normalized = email.toLowerCase()
+  const rows = await sql`
+    SELECT failures, locked_until FROM login_attempts
+    WHERE email = ${normalized} AND purpose = ${purpose}
+  `
+  const cur = rows[0]
+  const stillLocked = cur?.locked_until && new Date(cur.locked_until).getTime() > Date.now()
+  const failures = stillLocked ? cur.failures : (cur?.failures ?? 0) + 1
+
+  if (!stillLocked && failures >= LOCKOUT_MAX_FAILURES) {
+    const lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60_000).toISOString()
+    await sql`
+      INSERT INTO login_attempts (email, purpose, failures, locked_until, updated_at)
+      VALUES (${normalized}, ${purpose}, 0, ${lockedUntil}, NOW())
+      ON CONFLICT (email, purpose) DO UPDATE
+      SET failures = 0, locked_until = ${lockedUntil}, updated_at = NOW()
+    `
+    return { locked: true, retryAfter: LOCKOUT_MINUTES * 60 }
+  }
+
+  await sql`
+    INSERT INTO login_attempts (email, purpose, failures, locked_until, updated_at)
+    VALUES (${normalized}, ${purpose}, ${failures}, NULL, NOW())
+    ON CONFLICT (email, purpose) DO UPDATE
+    SET failures = ${failures}, updated_at = NOW()
+  `
+  return { locked: false }
+}
+
+export async function clearLoginFailures(email, purpose = 'login') {
+  const sql = getSql()
+  await sql`
+    DELETE FROM login_attempts WHERE email = ${email.toLowerCase()} AND purpose = ${purpose}
+  `
+}
 
 export async function withTenant(req, res, handler) {
   const sql = getSql()
