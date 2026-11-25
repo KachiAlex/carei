@@ -287,7 +287,8 @@ export default function ActiveVisitScreen() {
           if (draft.fluid != null) setFluid(draft.fluid)
           if (draft.notes) setNotes(draft.notes)
           if (draft.meds) setMeds(draft.meds)
-          if (draft.clockedIn != null) setClockedIn(draft.clockedIn)
+          // Never let a stale draft undo a clock-in that already happened this session
+          if (draft.clockedIn != null) setClockedIn((prev) => prev || draft.clockedIn)
           if (draft.bpSystolic != null) setBpSystolic(draft.bpSystolic)
           if (draft.bpDiastolic != null) setBpDiastolic(draft.bpDiastolic)
           if (draft.pulse != null) setPulse(draft.pulse)

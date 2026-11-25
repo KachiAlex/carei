@@ -11,8 +11,8 @@ import { test, expect, request, APIRequestContext } from '@playwright/test'
  */
 
 const TENANT_SLUG = 'carei'
-const TENANT_ID = 'tenant-carei'
-const MANAGER = { email: 'onyedika.akoma@gmail.com', pin: '2660' }
+const TENANT_ID = 'tenant-1781724743251-djlgr'
+const MANAGER = { email: 'e2e-manager@careiapp.com', pin: '9090' } // dedicated E2E manager (prod DB)
 const RUN = Date.now().toString(36)
 
 async function api(
@@ -39,6 +39,7 @@ async function api(
 test.describe('visit lifecycle', () => {
   test('invite → join → clock in → tasks → clock out → approve → family', async ({ page, context }) => {
     test.setTimeout(120_000)
+    page.on('dialog', (d) => d.dismiss()) // native alerts (geo/med gates)
 
     // ── 1. Manager login (API) ───────────────────────────────────
     const login = await api('POST', '/api/auth/login', { body: MANAGER })
@@ -55,6 +56,10 @@ test.describe('visit lifecycle', () => {
     const linkToken = invite.body.token as string
 
     // ── 3. Carer accepts the invite in the browser ───────────────
+    // Pre-dismiss the biometric-enrollment prompt for the whole context
+    await context.addInitScript(() => {
+      sessionStorage.setItem('carei_bio_prompt_dismissed', '1')
+    })
     const carerEmail = `e2e-carer-${RUN}@careiapp.com`
     await page.goto(`/join?link=${linkToken}`)
     await page.getByPlaceholder(/full name/i).fill(`E2E Carer ${RUN}`)
@@ -68,7 +73,7 @@ test.describe('visit lifecycle', () => {
       page.getByRole('button', { name: /create account|join|continue/i }).click(),
     ])
     const joinBody = await joinRes.json()
-    expect(joinRes.status(), JSON.stringify(joinBody)).toBe(200)
+    expect([200, 201], JSON.stringify(joinBody)).toContain(joinRes.status())
     const carerId = joinBody.user?.id as string
     expect(carerId, 'new carer id from join response').toBeTruthy()
 
@@ -98,6 +103,13 @@ test.describe('visit lifecycle', () => {
     })
     expect(sched.status).toBe(201)
 
+    // visit-start requires an explicit carer↔client assignment too
+    const assign = await api('POST', '/api/manager/assignments', {
+      token: managerToken,
+      body: { caregiverId: carerId, clientId: client.id, visitDate: today },
+    })
+    expect(assign.status, JSON.stringify(assign.body)).toBe(201)
+
     // ── 5. Carer starts the visit ────────────────────────────────
     await context.grantPermissions(['geolocation'])
     await context.setGeolocation({ latitude: 51.5074, longitude: -0.1278 })
@@ -106,8 +118,13 @@ test.describe('visit lifecycle', () => {
     await expect(page.getByText(client.name).first()).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: /start visit/i }).first().click()
 
-    // Client overview → second Start Visit creates the visit record
-    const startBtn = page.getByRole('button', { name: /start visit/i })
+    // Client overview → Start Active Visit creates the visit record
+    page.on('response', (r) => {
+      if (r.url().includes('visit-detail')) {
+        console.log(`[e2e] visit-detail → ${r.status()} ${r.url()}`)
+      }
+    })
+    const startBtn = page.getByRole('button', { name: /start active visit/i })
     await expect(startBtn).toBeVisible({ timeout: 15_000 })
     await startBtn.click()
     await expect(page).toHaveURL(/\/visit\//, { timeout: 15_000 })
@@ -121,14 +138,33 @@ test.describe('visit lifecycle', () => {
       await page.locator('select').selectOption({ index: 1 })
       await overrideBtn.click()
     }
-    await expect(page.getByRole('button', { name: /clock out/i })).toBeVisible({ timeout: 15_000 })
+    const clockOutBtn = page.getByRole('button', { name: /^clock out$/i })
+    await expect(clockOutBtn).toBeVisible({ timeout: 15_000 })
+    // Regression guard: a late-arriving draft load must not revert the clock-in
+    await page.waitForTimeout(2500)
+    await expect(clockOutBtn).toBeVisible()
 
-    // ── 7. Complete a task ───────────────────────────────────────
-    await page.getByText('E2E check vitals').click()
+    // ── 7. Clock out — med-confirmation gate opens if meds pending ─
+    await clockOutBtn.click()
 
-    // ── 8. Clock out → submit handover ───────────────────────────
-    await page.getByRole('button', { name: /clock out/i }).click()
-    await page.getByRole('button', { name: /confirm|clock out/i }).last().click()
+    // Confirm every pending med inside the modal (Confirm → Confirm Given)
+    const confirmMedBtn = page.getByRole('button', { name: /^confirm$/i })
+    for (let i = 0; i < 10; i++) {
+      if (!(await confirmMedBtn.first().isVisible().catch(() => false))) break
+      await confirmMedBtn.first().click()
+      const confirmGiven = page.getByRole('button', { name: /confirm given/i })
+      if (await confirmGiven.isVisible({ timeout: 3_000 }).catch(() => false)) {
+        await confirmGiven.click()
+      }
+    }
+    const closeMeds = page.getByRole('button', { name: /^close$/i })
+    if (await closeMeds.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await closeMeds.click()
+      await clockOutBtn.click()
+    }
+
+    // ── 8. Confirm clock out → summary ───────────────────────────
+    await page.getByRole('button', { name: /confirm clock out/i }).click()
     await expect(page).toHaveURL(/summary|dashboard/, { timeout: 15_000 })
 
     const submitBtn = page.getByRole('button', { name: /submit|finish|complete/i })

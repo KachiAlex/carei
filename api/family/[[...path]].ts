@@ -41,6 +41,9 @@ function parsePath(req: VercelRequest): string[] {
   const path = req.query?.path
   if (Array.isArray(path)) return path
   if (typeof path === 'string') return [path]
+  // Non-Vercel hosts (express server): derive segments from the URL
+  const m = (req.url || '').match(/\/api\/family\/?([^?]*)/)
+  if (m?.[1]) return m[1].split('/').filter(Boolean)
   return []
 }
 
