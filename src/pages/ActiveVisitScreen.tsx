@@ -754,14 +754,21 @@ export default function ActiveVisitScreen() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
+      // iOS Safari/WKWebView only encodes mp4 (AAC); Chrome/Android prefers webm/opus.
+      // Pick the first type the platform actually supports and label the blob with
+      // mediaRecorder.mimeType — hardcoding webm produces files iOS can't decode.
+      const preferred = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg']
+      const mimeType = preferred.find((t) => MediaRecorder.isTypeSupported(t))
+      const mediaRecorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       recordedChunksRef.current = []
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) recordedChunksRef.current.push(e.data)
       }
       mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'audio/webm' })
+        const blob = new Blob(recordedChunksRef.current, { type: mediaRecorder.mimeType || 'audio/mp4' })
         setRecordedBlob(blob)
         stream.getTracks().forEach((t) => t.stop())
       }
@@ -800,8 +807,9 @@ export default function ActiveVisitScreen() {
       reader.onloadend = async () => {
         const base64 = reader.result as string
         let audioUrl: string
+        const ext = recordedBlob.type.includes('mp4') ? 'm4a' : recordedBlob.type.includes('ogg') ? 'ogg' : 'webm'
         try {
-          audioUrl = await uploadFile(base64, `voice-memo-${Date.now()}.webm`, 'voice-memos')
+          audioUrl = await uploadFile(base64, `voice-memo-${Date.now()}.${ext}`, 'voice-memos')
         } catch {
           // If upload fails, fall back to base64 for offline queue
           audioUrl = base64
