@@ -14,6 +14,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  // Disabled by default — requires ADMIN_SEED_TOKEN env + matching header.
+  // This endpoint creates a full-access account with known credentials,
+  // so it must never be reachable unauthenticated.
+  const seedToken = process.env.ADMIN_SEED_TOKEN
+  if (!seedToken || req.headers['x-admin-seed'] !== seedToken) {
+    res.status(404).json({ error: 'Not found' })
+    return
+  }
+
   try {
     await ensureTables()
     const sql = getSql()

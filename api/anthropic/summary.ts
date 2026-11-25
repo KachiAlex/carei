@@ -1,12 +1,28 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { getSql, setCors, ensureTables, getAuthToken, getUserFromToken } from '../db.js'
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || ''
 const MODEL = 'claude-sonnet-4-6'
 const MAX_TOKENS = 512
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(req, res)
+  if (req.method === 'OPTIONS') { res.status(200).end(); return }
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' })
+    return
+  }
+
+  const token = getAuthToken(req)
+  if (!token) {
+    res.status(401).json({ error: 'Authentication required' })
+    return
+  }
+  await ensureTables()
+  const sql = getSql()
+  const user = await getUserFromToken(sql, token)
+  if (!user) {
+    res.status(401).json({ error: 'Invalid or expired token' })
     return
   }
 

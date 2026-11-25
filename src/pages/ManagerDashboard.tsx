@@ -29,7 +29,7 @@ import {
   exportAgencyDataUrl,
   deleteAgencyData,
 } from '../api/client'
-import { clearAuthCache } from '../utils/tokenCache'
+import { clearAuthCache, getToken } from '../utils/tokenCache'
 import { sendSOSAlert, sendSOSResolved, requestNotificationPermission } from '../utils/notifications'
 import { exportVisits, exportCarers, exportClients } from '../utils/exportCsv'
 import BiometricsPrompt from '../components/BiometricsPrompt'
@@ -149,7 +149,11 @@ export default function ManagerDashboard() {
   }, [tenantSlug])
 
   useEffect(() => {
-    const eventSource = new EventSource('/api/events')
+    const sseToken = getToken()
+    const qs = new URLSearchParams()
+    if (sseToken) qs.set('token', sseToken)
+    if (tenantSlug) qs.set('tenantSlug', tenantSlug)
+    const eventSource = new EventSource(`/api/events?${qs}`)
     eventSource.onopen = () => setSseConnected(true)
     eventSource.onmessage = (event) => {
       try {

@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           timestamp: timestamp || new Date().toISOString(),
           receivedAt: new Date().toISOString(),
         }
-        broadcast(alert)
+        broadcast(alert, tenantId)
 
         res.status(200).json({
           status: 'alert_sent', alertId, escalatedTo: 'supervisor',

@@ -31,7 +31,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  // GET: diagnostic report (public - read only)
+  // GET: diagnostic report — schema/migration inventory is sensitive,
+  // require superadmin like POST instead of leaving it public.
+  {
+    const token = getAuthToken(req)
+    if (!token) {
+      res.status(401).json({ error: 'Authentication required' })
+      return
+    }
+    const user = await getUserFromToken(sql, token)
+    if (!user || user.role !== 'superadmin') {
+      res.status(403).json({ error: 'Superadmin access required' })
+      return
+    }
+  }
   try {
     const migrations = await sql`SELECT id, name, applied_at FROM _migrations ORDER BY id` as any[]
     const tables = [

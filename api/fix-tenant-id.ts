@@ -9,6 +9,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
+  // One-shot migration tool — destructive ALTER/backfill across all
+  // tenant-scoped tables. Disabled unless ADMIN_SEED_TOKEN is set and
+  // presented via the x-admin-seed header.
+  const seedToken = process.env.ADMIN_SEED_TOKEN
+  if (!seedToken || req.headers['x-admin-seed'] !== seedToken) {
+    res.status(404).json({ error: 'Not found' })
+    return
+  }
+
   const client = getClient()
   await client.connect()
 
