@@ -249,12 +249,6 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens (user_id)`
   })
 
-  // Carer attribution on visits (visit-start never recorded who did the visit)
-  await run(49, 'add_visit_carer_columns', async () => {
-    await sql`ALTER TABLE IF EXISTS visits ADD COLUMN IF NOT EXISTS carer_id TEXT`
-    await sql`ALTER TABLE IF EXISTS visits ADD COLUMN IF NOT EXISTS carer_name TEXT`
-  })
-
   // Per-account brute-force lockout (survives restarts, unlike the IP rate limiter)
   await run(50, 'create_login_attempts', async () => {
     await sql`
@@ -267,6 +261,12 @@ async function runMigrations() {
         PRIMARY KEY (email, purpose)
       )
     `
+  })
+
+  // Carer attribution on visits (visit-start never recorded who did the visit)
+  await run(51, 'add_visit_carer_columns', async () => {
+    await sql`ALTER TABLE IF EXISTS visits ADD COLUMN IF NOT EXISTS carer_id TEXT`
+    await sql`ALTER TABLE IF EXISTS visits ADD COLUMN IF NOT EXISTS carer_name TEXT`
   })
 }
 
