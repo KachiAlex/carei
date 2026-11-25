@@ -1,0 +1,24 @@
+name: API Health
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'server/**'
+      - 'src/api/**'
+      - '.github/workflows/api-health.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke-check:
+    runs-on: ubuntu-latest
+    steps:
+      # GCE auto-deploy polls the repo and rebuilds the container (~2 min).
+      # The health check itself retries for up to 10 min, so no fixed wait
+      # is needed beyond letting the deploy kick off.
+      - name: Wait for auto-deploy to pick up the commit
+        run: sleep 120
+
+      - name: Smoke check /health
+        run: node scripts/health-check.cjs --timeout 600
