@@ -165,14 +165,19 @@ async function postWithRetry(path: string, body: unknown, retries = 3, extraHead
   
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
+      const sentToken = getToken()
       const res = await fetch(`${API_BASE}${path}`, {
         method: 'POST',
         headers: { ...jsonHeaders, ...authHeaders(), ...extraHeaders },
         body: JSON.stringify(body),
       })
-      
+
       if (!res.ok) {
         if (res.status === 401) {
+          // If a concurrent refresh already rotated the token, this request
+          // carried a stale one — retry with the newer token rather than
+          // firing another rotation (prevents refresh storms under bursts)
+          if (getToken() && getToken() !== sentToken && attempt < retries - 1) continue
           const refreshed = await handleAuthError(res.status)
           if (refreshed && attempt < retries - 1) continue // retry with new token
         }
@@ -249,12 +254,16 @@ async function getWithRetry(path: string, retries = 3, extraHeaders?: Record<str
 
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
+      const sentToken = getToken()
       const res = await fetch(`${API_BASE}${path}`, {
         headers: { ...authHeaders(), ...extraHeaders },
       })
 
       if (!res.ok) {
         if (res.status === 401) {
+          // Stale-token 401 after a concurrent rotation — retry with the
+          // newer cached token instead of triggering another refresh
+          if (getToken() && getToken() !== sentToken && attempt < retries - 1) continue
           const refreshed = await handleAuthError(res.status)
           if (refreshed && attempt < retries - 1) continue // retry with new token
         }

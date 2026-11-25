@@ -120,8 +120,8 @@ test.describe('visit lifecycle', () => {
 
     // Client overview → Start Active Visit creates the visit record
     page.on('response', (r) => {
-      if (r.url().includes('visit-detail')) {
-        console.log(`[e2e] visit-detail → ${r.status()} ${r.url()}`)
+      if (r.url().includes('visit-detail') && r.status() >= 400) {
+        console.log(`[e2e] visit-detail → ${r.status()}`)
       }
     })
     const startBtn = page.getByRole('button', { name: /start active visit/i })
@@ -145,26 +145,25 @@ test.describe('visit lifecycle', () => {
     await expect(clockOutBtn).toBeVisible()
 
     // ── 7. Clock out — med-confirmation gate opens if meds pending ─
-    await clockOutBtn.click()
-
-    // Confirm every pending med inside the modal (Confirm → Confirm Given)
-    const confirmMedBtn = page.getByRole('button', { name: /^confirm$/i })
+    // Each "Confirm" marks one med and closes the modal, so keep driving
+    // the Clock Out gate until the confirm dialog itself appears.
+    const medConfirmBtn = page.getByRole('button', { name: /^confirm$/i })
+    const confirmClockOutBtn = page.getByRole('button', { name: /confirm clock out/i })
     for (let i = 0; i < 10; i++) {
-      if (!(await confirmMedBtn.first().isVisible().catch(() => false))) break
-      await confirmMedBtn.first().click()
-      const confirmGiven = page.getByRole('button', { name: /confirm given/i })
-      if (await confirmGiven.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await confirmGiven.click()
-      }
+      if (await confirmClockOutBtn.isVisible().catch(() => false)) break
+      await clockOutBtn.click()
+      if (await confirmClockOutBtn.isVisible().catch(() => false)) break
+      if (!(await medConfirmBtn.first().isVisible({ timeout: 5_000 }).catch(() => false))) break
+      await medConfirmBtn.first().click()
     }
     const closeMeds = page.getByRole('button', { name: /^close$/i })
-    if (await closeMeds.isVisible({ timeout: 2_000 }).catch(() => false)) {
+    if (await closeMeds.isVisible({ timeout: 1_000 }).catch(() => false)) {
       await closeMeds.click()
       await clockOutBtn.click()
     }
 
     // ── 8. Confirm clock out → summary ───────────────────────────
-    await page.getByRole('button', { name: /confirm clock out/i }).click()
+    await confirmClockOutBtn.click()
     await expect(page).toHaveURL(/summary|dashboard/, { timeout: 15_000 })
 
     const submitBtn = page.getByRole('button', { name: /submit|finish|complete/i })
