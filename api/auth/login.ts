@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug, checkRateLimit } from '../db.js'
+import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug, checkRateLimit, checkAccountLock, recordLoginFailure, clearLoginFailures } from '../db.js'
 import { verifyCredential, generateSecureToken, hashToken, tokenLookup } from '../hash.js'
 import { logSecurityEvent } from '../db.js'
 
@@ -28,6 +28,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureTables()
     const sql = getSql()
+
+    const lock = await checkAccountLock(email)
+    if (lock.locked) {
+      res.status(429).json({ error: 'Account temporarily locked after too many failed attempts', retryAfter: lock.retryAfter })
+      return
+    }
+
     const rows = await sql`
       SELECT id, name, email, phone, region, pin, pin_hash, role, status
       FROM users
@@ -58,9 +65,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         actorEmail: email,
         subjectEmail: user ? email : null,
       })
+      const failure = await recordLoginFailure(email)
+      if (failure.locked) {
+        res.status(429).json({ error: 'Account temporarily locked after too many failed attempts', retryAfter: failure.retryAfter })
+        return
+      }
       res.status(401).json({ error: 'Invalid email or PIN' })
       return
     }
+
+    await clearLoginFailures(email)
 
     const accessToken = generateSecureToken()
     const accessTokenHash = await hashToken(accessToken)

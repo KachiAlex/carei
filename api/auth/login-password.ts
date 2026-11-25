@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug, checkRateLimit, logSecurityEvent } from '../db.js'
+import { getSql, setCors, ensureTables, addUserToTenant, getTenantFromSlug, checkRateLimit, logSecurityEvent, checkAccountLock, recordLoginFailure, clearLoginFailures } from '../db.js'
 import crypto from 'crypto'
 import { verifyCredential, hashCredential, generateSecureToken, hashToken, tokenLookup } from '../hash.js'
 
@@ -32,6 +32,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     await ensureTables()
     const sql = getSql()
+
+    const lock = await checkAccountLock(email)
+    if (lock.locked) {
+      res.status(429).json({ error: 'Account temporarily locked after too many failed attempts', retryAfter: lock.retryAfter })
+      return
+    }
+
     const rows = await sql`
       SELECT id, name, email, phone, region, pin, role, status, password_hash, password_hash_scrypt
       FROM users
@@ -51,6 +58,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (!user || (!user.password_hash && !user.password_hash_scrypt)) {
       await logSecurityEvent({ eventType: 'login_failed', actorEmail: email })
+      const failure = await recordLoginFailure(email)
+      if (failure.locked) {
+        res.status(429).json({ error: 'Account temporarily locked after too many failed attempts', retryAfter: failure.retryAfter })
+        return
+      }
       res.status(401).json({ error: 'Invalid email or password' })
       return
     }
@@ -70,9 +82,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (!valid) {
       await logSecurityEvent({ eventType: 'login_failed_bad_password', actorEmail: email })
+      const failure = await recordLoginFailure(email)
+      if (failure.locked) {
+        res.status(429).json({ error: 'Account temporarily locked after too many failed attempts', retryAfter: failure.retryAfter })
+        return
+      }
       res.status(401).json({ error: 'Invalid email or password' })
       return
     }
+
+    await clearLoginFailures(email)
 
     const accessToken = generateSecureToken()
     const accessTokenHash = await hashToken(accessToken)

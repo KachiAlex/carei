@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getSql, setCors, ensureTables, checkRateLimit } from '../db.js'
+import { getSql, setCors, ensureTables, checkRateLimit, checkAccountLock, recordLoginFailure, clearLoginFailures } from '../db.js'
 import { hashCredential, generateSecureToken, hashToken } from '../hash.js'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -11,6 +11,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sql = getSql()
 
     if (req.method === 'POST') {
+      const lock = await checkAccountLock(req.body?.email || '', 'otp')
+      if (lock.locked) {
+        res.status(429).json({ error: 'Too many failed attempts — PIN reset temporarily locked', retryAfter: lock.retryAfter })
+        return
+      }
+
       const limit = checkRateLimit(req, 'reset-pin', 5, 60000)
       if (!limit.allowed) {
         res.status(429).json({ error: 'Too many reset attempts', retryAfter: limit.retryAfter })
@@ -43,6 +49,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ` as any[]
 
       if (otpRows.length === 0) {
+        const failure = await recordLoginFailure(email, 'otp')
+        if (failure.locked) {
+          res.status(429).json({ error: 'Too many failed attempts — PIN reset temporarily locked', retryAfter: failure.retryAfter })
+          return
+        }
         res.status(400).json({ error: 'Invalid or expired OTP code' })
         return
       }
@@ -71,6 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const tokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
       await sql`UPDATE users SET token_hash = ${tokenHash}, token_expires_at = ${tokenExpiresAt}, token = NULL WHERE id = ${user.id}`
 
+      await clearLoginFailures(email, 'otp')
       console.log(`[PIN Reset] User ${email} PIN updated successfully`)
 
       res.status(200).json({
