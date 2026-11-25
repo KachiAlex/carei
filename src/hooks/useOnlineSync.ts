@@ -33,29 +33,29 @@ export function getSyncStatus() {
   }
 }
 
-export function useOnlineSync() {
-  const sync = useCallback(async () => {
-    if (!navigator.onLine || syncInProgress) return
+// Exported for tests and non-hook callers — contains the full replay loop.
+export async function processQueue() {
+  if (!navigator.onLine || syncInProgress) return
+  
+  syncInProgress = true
+  syncError = null
+  
+  try {
+    const items = await getQueue()
+    let successCount = 0
+    let failCount = 0
     
-    syncInProgress = true
-    syncError = null
-    
-    try {
-      const items = await getQueue()
-      let successCount = 0
-      let failCount = 0
+    for (const item of items) {
+      // Skip items that have been retried too many times
+      if (item.retries > 5) {
+        console.warn(`[Sync] Skipping item ${item.id} - too many retries`)
+        continue
+      }
       
-      for (const item of items) {
-        // Skip items that have been retried too many times
-        if (item.retries > 5) {
-          console.warn(`[Sync] Skipping item ${item.id} - too many retries`)
-          continue
-        }
+      try {
+        console.log(`[Sync] Processing ${item.type}`, item.id)
         
-        try {
-          console.log(`[Sync] Processing ${item.type}`, item.id)
-          
-          switch (item.type) {
+        switch (item.type) {
             case 'visit':
               await saveVisit((item.payload as { visitId: string }).visitId, item.payload)
               break
@@ -152,13 +152,16 @@ export function useOnlineSync() {
         console.log(`[Sync] Complete - Success: ${successCount}, Failed: ${failCount}`)
       }
       
-    } catch (err) {
-      syncError = err instanceof Error ? err.message : 'Unknown sync error'
-      console.error('[Sync] Fatal error:', err)
-    } finally {
-      syncInProgress = false
-    }
-  }, [])
+  } catch (err) {
+    syncError = err instanceof Error ? err.message : 'Unknown sync error'
+    console.error('[Sync] Fatal error:', err)
+  } finally {
+    syncInProgress = false
+  }
+}
+
+export function useOnlineSync() {
+  const sync = useCallback(processQueue, [])
 
   useEffect(() => {
     // Initial sync

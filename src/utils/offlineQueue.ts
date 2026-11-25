@@ -51,12 +51,26 @@ interface QueueItem {
   retries: number
 }
 
+// Fingerprint for dedup — same type + payload is treated as the same action.
+function fingerprint(item: { type: string; payload: unknown }): string {
+  return `${item.type}:${JSON.stringify(item.payload ?? null)}`
+}
+
 export async function enqueue(item: Omit<QueueItem, 'id' | 'retries' | 'createdAt'>) {
   const db = await openDB()
   const tx = db.transaction(STORE, 'readwrite')
   const store = tx.objectStore(STORE)
-  store.add({ ...item, createdAt: new Date().toISOString(), retries: 0 })
+  const getAll = store.getAll()
   return new Promise<void>((resolve, reject) => {
+    getAll.onsuccess = () => {
+      const fp = fingerprint(item)
+      const alreadyQueued = (getAll.result as QueueItem[]).some(
+        (existing) => fingerprint(existing) === fp
+      )
+      if (!alreadyQueued) {
+        store.add({ ...item, createdAt: new Date().toISOString(), retries: 0 })
+      }
+    }
     tx.oncomplete = () => { db.close(); resolve() }
     tx.onerror = () => { db.close(); reject(tx.error) }
   })
