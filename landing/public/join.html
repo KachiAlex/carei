@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CAREi — Opening invite…</title>
+    <meta http-equiv="refresh" content="0; url=https://app.careiapp.com/join" />
+    <style>
+      body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0B1120; color: #e2e8f0; font-family: system-ui, sans-serif; text-align: center; }
+      a { color: #4FD1C5; }
+    </style>
+  </head>
+  <body>
+    <p>Taking you to your CAREi invite…<br /><a id="lnk" href="https://app.careiapp.com/join">Continue</a></p>
+    <script>
+      var target = 'https://app.careiapp.com/join' + location.search + location.hash;
+      document.getElementById('lnk').href = target;
+      location.replace(target);
+    </script>
+  </body>
+</html>

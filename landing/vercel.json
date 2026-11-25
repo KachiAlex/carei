@@ -5,6 +5,16 @@
   "cleanUrls": true,
   "redirects": [
     {
+      "source": "/join",
+      "destination": "https://app.careiapp.com/join",
+      "permanent": false
+    },
+    {
+      "source": "/join/(.*)",
+      "destination": "https://app.careiapp.com/join/$1",
+      "permanent": false
+    },
+    {
       "source": "/",
       "has": [{ "type": "host", "value": "www.careiapp.com" }],
       "destination": "https://careiapp.com/",
