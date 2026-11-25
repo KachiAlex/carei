@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Route, Router, Switch, useLocation, Redirect } from 'wouter'
 import SplashScreen from './pages/SplashScreen'
 import { useOnlineSync } from './hooks/useOnlineSync'
@@ -49,40 +49,47 @@ function decodeJwtPayload(token: string): { exp?: number } | null {
 }
 
 function useSecureBoot() {
+  const [ready, setReady] = useState(false)
   useEffect(() => {
-    // Load encrypted auth data into memory cache on boot
-    secureGet('token').then((token) => {
-      if (token) {
-        // Check expiry before accepting token
-        const payload = decodeJwtPayload(token)
-        if (payload?.exp && payload.exp * 1000 < Date.now()) {
-          // Access token expired — try to refresh using refresh token
-          secureGet('refreshToken').then(async (refreshToken) => {
+    // Load encrypted auth data into memory cache on boot. Rendering is
+    // gated on this completing so no authenticated request can fire
+    // before the token is hydrated (prevents 401 bursts + refresh churn
+    // on every reload).
+    const boot = async () => {
+      try {
+        const token = await secureGet('token')
+        if (token) {
+          // Check expiry before accepting token
+          const payload = decodeJwtPayload(token)
+          if (payload?.exp && payload.exp * 1000 < Date.now()) {
+            // Access token expired — try to refresh using refresh token
+            const refreshToken = await secureGet('refreshToken')
             if (refreshToken) {
               setRefreshToken(refreshToken)
-              // Actually call the refresh endpoint to get a new access token
               const refreshed = await refreshSession()
               if (!refreshed) {
-                secureWipe()
+                await secureWipe()
                 clearAuthCache()
               }
             } else {
-              secureWipe()
+              await secureWipe()
               clearAuthCache()
             }
-          })
-          return
+          } else {
+            setToken(token)
+          }
         }
-        setToken(token)
+        const refreshToken = await secureGet('refreshToken')
+        if (refreshToken) setRefreshToken(refreshToken)
+        const user = await secureGet('user')
+        if (user) setUser(user)
+      } finally {
+        setReady(true)
       }
-    })
-    secureGet('refreshToken').then((refreshToken) => {
-      if (refreshToken) setRefreshToken(refreshToken)
-    })
-    secureGet('user').then((user) => {
-      if (user) setUser(user)
-    })
+    }
+    boot()
   }, [])
+  return ready
 }
 
 function useClipboardGuard() {
@@ -274,7 +281,7 @@ function AutoLockGuard({ children }: { children: React.ReactNode }) {
 
 function App() {
   useReducedMotion()
-  useSecureBoot()
+  const booted = useSecureBoot()
   useClipboardGuard()
   useOnlineSync()
   useDataMinimisation()
@@ -296,6 +303,10 @@ function App() {
         <div className="text-white/30 text-xs mt-4">Redirecting to login...</div>
       </div>
     )
+  }
+
+  if (!booted) {
+    return <LoadingFallback />
   }
 
   return (
