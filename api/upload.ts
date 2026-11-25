@@ -14,6 +14,32 @@ const r2 = new S3Client({
 const BUCKET = process.env.R2_BUCKET || 'careiapp'
 const PUBLIC_URL = process.env.R2_PUBLIC_URL || ''
 
+// Allowed upload types → file extension. Serving HTML/SVG/executables from
+// the public R2 URL would enable XSS and arbitrary content hosting, so the
+// extension is derived from the verified MIME type — never from fileName.
+const ALLOWED_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/m4a': 'm4a',
+  'audio/aac': 'aac',
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'video/webm': 'webm',
+  'video/mp4': 'mp4',
+  'application/pdf': 'pdf',
+}
+
+const FOLDER_RE = /^[a-z0-9][a-z0-9-_]{0,39}$/i
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(req, res)
   if (req.method === 'OPTIONS') { res.status(200).end(); return }
@@ -59,8 +85,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return
     }
 
-    const ext = fileName.split('.').pop() || 'bin'
-    const key = `${folder || 'uploads'}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const ext = ALLOWED_TYPES[mimeType.toLowerCase()]
+    if (!ext) {
+      res.status(415).json({ error: `Unsupported file type: ${mimeType}` })
+      return
+    }
+
+    const safeFolder = FOLDER_RE.test(folder || '') ? folder : 'uploads'
+    const key = `${safeFolder}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
     await r2.send(
       new PutObjectCommand({
