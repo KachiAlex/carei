@@ -70,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         VALUES (${id}, ${tenantId}, ${code}, ${email}, ${role}, ${userId}, ${expiresAt}, FALSE)
       `
 
-      const inviteUrl = `${process.env.FRONTEND_URL || 'https://carei.com'}/join?code=${code}`
+      const inviteUrl = `${process.env.FRONTEND_URL || 'https://app.careiapp.com'}/join?code=${code}`
 
       // Fire-and-forget email send (don't block response)
       const tenantName = t?.name || 'your organization'

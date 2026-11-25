@@ -74,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         VALUES (${id}, ${tenantId}, ${token}, ${role}, ${label || null}, ${userId}, ${expiresAt}, ${maxUsesValue}, 0, TRUE)
       `
 
-      const inviteUrl = `${process.env.FRONTEND_URL || 'https://careiapp.com'}/join?link=${token}`
+      const inviteUrl = `${process.env.FRONTEND_URL || 'https://app.careiapp.com'}/join?link=${token}`
 
       res.status(201).json({
         id,
