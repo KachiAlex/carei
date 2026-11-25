@@ -155,18 +155,6 @@ async function runMigrations() {
     await sql`CREATE INDEX IF NOT EXISTS idx_security_events_type ON security_events(event_type)`
     await sql`CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)`
 
-    // Per-account brute-force lockout (survives restarts, unlike the IP rate limiter)
-    await sql`
-      CREATE TABLE IF NOT EXISTS login_attempts (
-        email TEXT NOT NULL,
-        purpose TEXT NOT NULL DEFAULT 'login',
-        failures INT NOT NULL DEFAULT 0,
-        locked_until TIMESTAMPTZ,
-        updated_at TIMESTAMPTZ DEFAULT NOW(),
-        PRIMARY KEY (email, purpose)
-      )
-    `
-
     await sql`
       CREATE TABLE IF NOT EXISTS assistant_sessions (
         id TEXT PRIMARY KEY,
@@ -259,6 +247,20 @@ async function runMigrations() {
       )
     `
     await sql`CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens (user_id)`
+  })
+
+  // Per-account brute-force lockout (survives restarts, unlike the IP rate limiter)
+  await run(49, 'create_login_attempts', async () => {
+    await sql`
+      CREATE TABLE IF NOT EXISTS login_attempts (
+        email TEXT NOT NULL,
+        purpose TEXT NOT NULL DEFAULT 'login',
+        failures INT NOT NULL DEFAULT 0,
+        locked_until TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (email, purpose)
+      )
+    `
   })
 }
 
